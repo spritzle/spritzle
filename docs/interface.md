@@ -95,6 +95,16 @@ A torrent resource contains all the information you would need to know about a t
 
 User
 ----
+
+A user 
+
+```javascript
+{
+ "username",     // required
+ "password",     // required
+ "auth_level"    // optional
+}
+```
 - /user
  - GET: Return a list of the users
  - POST: Create a new user
