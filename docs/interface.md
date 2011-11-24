@@ -10,7 +10,8 @@ Authentication
 
 Torrents
 --------
-- GET  /torrent         - List all torrents
-- GET  /torrent/\<hash\>  - List a torrent
-- PUT  /torrent/\<hash\>  - Update a torrent
-- POST /torrent         - Create a new torrent
+- GET    /torrent         - List all torrents
+- GET    /torrent/\<hash\>  - List a torrent
+- PUT    /torrent/\<hash\>  - Update a torrent
+- DELETE /torrent/\<hash\>  - Remove a torrent
+- POST   /torrent         - Create a new torrent
