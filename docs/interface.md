@@ -6,12 +6,15 @@ any language or environment.
 
 Authentication
 --------------
-- POST /auth            - Login to the server
+- /auth
+ - POST: Login to the server
 
 Torrents
 --------
-- GET    /torrent         - List all torrents
-- GET    /torrent/\<hash\>  - List a torrent
-- PUT    /torrent/\<hash\>  - Update a torrent
-- DELETE /torrent/\<hash\>  - Remove a torrent
-- POST   /torrent         - Create a new torrent
+- /torrent
+ - GET: List all torrents
+ - POST: Create a new torrent
+- /torrent/\<hash\> 
+ - GET: Fetch a torrents details
+ - PUT: Update a torrent
+ - DELETE: Remove a torrent
