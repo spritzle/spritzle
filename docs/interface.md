@@ -9,6 +9,12 @@ Authentication
 - /auth
  - POST: Login to the server
 
+Configuration
+-------------
+- /config
+ - GET: Get the global configuration
+ - PUT: Update the global configuration
+
 Torrents
 --------
 - /torrent
