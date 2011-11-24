@@ -11,6 +11,6 @@ Authentication
 Torrents
 --------
 - GET  /torrent         - List all torrents
-- GET  /torrent/<hash>  - List a torrent
-- PUT  /torrent/<hash>  - Update a torrent
+- GET  /torrent/\<hash\>  - List a torrent
+- PUT  /torrent/\<hash\>  - Update a torrent
 - POST /torrent         - Create a new torrent
