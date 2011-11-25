@@ -22,14 +22,17 @@
 #
 
 import json
+import bottle
 
-from bottle import run
 from spritzle import hooks, user
 
 def hook_decode_data(fmt, data):
     if fmt != 'json':
         return None
-    return json.loads(data)
+    try:
+        return json.loads(data)
+    except TypeError:
+        return json.load(data)
 
 def hook_encode_data(fmt, data):
     if fmt != 'json':
@@ -40,4 +43,5 @@ def main():
     hooks.register_default('decode_data', hook_decode_data)
     hooks.register_default('encode_data', hook_encode_data)
 
-    run(reloader=True)
+    bottle.debug(True)
+    bottle.run(reloader=True)

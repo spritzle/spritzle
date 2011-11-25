@@ -41,7 +41,14 @@ def users(fmt=None):
     return hooks.dispatch('encode_data', fmt, data)
 
 @post('/user')
-def create_user():
+@post('/user.:fmt')
+def create_user(fmt=None):
+    if fmt is None:
+        fmt = 'json'
+
+    data = hooks.dispatch('decode_data', fmt, request.body)
+    print data
+
     return 'This is create user'
 
 @delete('/user/:user')
