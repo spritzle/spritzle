@@ -21,8 +21,23 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import json
+
 from bottle import run
-from spritzle import user
+from spritzle import hooks, user
 
+def hook_decode_data(fmt, data):
+    if fmt != 'json':
+        return None
+    return json.loads(data)
 
-run(reloader=True)
+def hook_encode_data(fmt, data):
+    if fmt != 'json':
+        return None
+    return json.dumps(data)
+
+def main():
+    hooks.register_default('decode_data', hook_decode_data)
+    hooks.register_default('encode_data', hook_encode_data)
+
+    run(reloader=True)

@@ -20,3 +20,24 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 #
+
+_defaults = {}
+_handlers = {}
+
+def dispatch(hook_name, *args):
+    if hook_name in _handlers:
+        for handler in _handlers[hook_name]:
+            result = handler(*args)
+            if result is None:
+                continue
+            return result
+
+    if hook_name in _defaults:
+        return _defaults[hook_name](*args)
+
+def register(hook_name, handler):
+    handlers = _hooks.setdefault(hook_name, [])
+    handlers.append(handler)
+
+def register_default(hook_name, handler):
+    _defaults[hook_name] = handler

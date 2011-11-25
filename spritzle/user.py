@@ -22,10 +22,23 @@
 #
 
 from bottle import delete, get, post, put, response, request
+from spritzle import hooks
 
 @get('/user')
-def users():
-    return 'This is get user'
+@get('/user.:fmt')
+def users(fmt=None):
+    if fmt is None:
+        fmt = 'json'
+
+    data = [{
+        'username': 'damoxc'
+    }, {
+        'username': 'andar'
+    }, {
+        'username': 'johnnyg'
+    }]
+
+    return hooks.dispatch('encode_data', fmt, data)
 
 @post('/user')
 def create_user():
