@@ -23,3 +23,16 @@ Something happened" | sendmail joe@example.org
 ```
 
 to a fullblown plugin utilising all the hooks via python in process.
+
+Defined Hooks
+-------------
+
+- *encode_data*
+  - format, string, the format of the encoding
+  - data, string, the data to encode
+  - Returns the encoded data
+
+- *decode_data*
+  - format, string, the format of the encoding
+  - data, string, the data to decode
+  - Returns the decoded data
