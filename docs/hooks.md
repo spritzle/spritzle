@@ -33,6 +33,6 @@ Defined Hooks
   - Returns the encoded data
 
 - *decode_data*
-  - format, stribng, the format of the encoding
+  - format, string, the format of the encoding
   - data, string, the data to decode
   - Returns the decoded data
