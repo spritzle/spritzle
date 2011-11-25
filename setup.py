@@ -28,7 +28,7 @@ setup (
     name         = 'spritzle',
     version      = '0.1',
     fullname     = 'Spritzle Bittorrent Client',
-    description  = 'Lightweight Bitorrent Client'
+    description  = 'Lightweight Bitorrent Client',
     author       = 'Andrew Resch, Damien Churchill',
     author_email = 'andrewresch@gmail.com, damoxc@gmail.com',
     keywords     = 'torrent bittorrent p2p fileshare filesharing',
