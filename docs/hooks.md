@@ -24,6 +24,8 @@ Something happened" | sendmail joe@example.org
 
 to a fullblown plugin utilising all the hooks via python in process.
 
+Defined Hooks
+-------------
 
 - *encode_data*
   - format, string, the format of the encoding
