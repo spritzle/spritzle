@@ -26,7 +26,9 @@ import bottle
 import argparse
 import libtorrent
 
-from spritzle import hooks, user
+from spritzle import user
+from spritzle.error import InvalidEncodingError
+from spritzle.hooks import register_default
 
 class Core(object):
 
@@ -36,15 +38,15 @@ class Core(object):
         self.reloader = reloader
 
     def start(self):
-        hooks.register_default('decode_data', hook_decode_data)
-        hooks.register_default('encode_data', hook_encode_data)
+        register_default('decode_data', hook_decode_data)
+        register_default('encode_data', hook_encode_data)
 
         bottle.debug(self.debug)
         bottle.run(reloader=self.reloader, port=self.port)
 
 def hook_decode_data(fmt, data):
     if fmt != 'json':
-        return None
+        raise InvalidEncodingError("Don't know how to decode '%s'" % fmt)
     try:
         return json.loads(data)
     except TypeError:
@@ -52,7 +54,7 @@ def hook_decode_data(fmt, data):
 
 def hook_encode_data(fmt, data):
     if fmt != 'json':
-        return None
+        raise InvalidEncodingError("Don't know how to encode '%s'" % fmt)
     return json.dumps(data)
 
 def bootstrap():
