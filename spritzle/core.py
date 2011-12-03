@@ -21,11 +21,25 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import argparse
 import json
 import bottle
+import argparse
+import libtorrent
 
 from spritzle import hooks, user
+
+class Core(object):
+
+    def __init__(self, port, debug=False):
+        self.port = port
+        self.debug = debug
+
+    def start(self):
+        hooks.register_default('decode_data', hook_decode_data)
+        hooks.register_default('encode_data', hook_encode_data)
+
+        bottle.debug(True)
+        bottle.run(reloader=True, port=args.port)
 
 def hook_decode_data(fmt, data):
     if fmt != 'json':
@@ -40,14 +54,16 @@ def hook_encode_data(fmt, data):
         return None
     return json.dumps(data)
 
-def main():
-    parser = argparse.ArgumentParser(description='Spritzled')
-    parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
-    
-    args = parser.parse_args()
-    
+def bootstrap():
     hooks.register_default('decode_data', hook_decode_data)
     hooks.register_default('encode_data', hook_encode_data)
 
-    bottle.debug(True)
-    bottle.run(reloader=True, port=args.port)
+def main():
+    parser = argparse.ArgumentParser(description='Spritzled')
+    parser.add_argument('--debug', dest='debug', default=False, type=bool)
+    parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
+
+    args = parser.parse_args()
+
+    core = Core(args.port, args.debug)
+    core.start()
