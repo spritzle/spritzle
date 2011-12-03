@@ -29,11 +29,19 @@ def route(path, method='GET', callback=None, **options):
     def deco(func):
         def wrapper(**urlargs):
             fmt = urlargs.pop('fmt') if 'fmt' in urlargs else 'json'
+
+            # Handle older bottle versions
+            try:
+                urlargs.update(bottle.request.query)
+            except AttributeError:
+                urlargs.update(bottle.request.GET)
+
             if method in ('POST', 'PUT'):
-                data = dispatch('decode_data', fmt, request.body)
+                data = dispatch('decode_data', fmt, bottle.request.body)
                 result = func(data, **urlargs)
             else:
                 result = func(**urlargs)
+
             return dispatch('encode_data', fmt, result)
         bottle.route(path, method, wrapper, **options)
         bottle.route(path + '.:fmt', method, wrapper, **options)

@@ -25,7 +25,8 @@ from spritzle import hooks
 from spritzle.rest import delete, get, post, put
 
 @get('/user')
-def users_view():
+def users_view(**opts):
+    print opts
     return [
         {'username': 'damoxc'},
         {'username': 'andar'},
@@ -33,17 +34,17 @@ def users_view():
     ]
 
 @post('/user')
-def create_user(data):
+def create_user(user, **opts):
     return data
 
 @delete('/user/:user')
-def delete_user(user):
+def delete_user(**opts):
     return 'This is delete user'
 
 @get('/user/:user')
-def fetch_user(user):
+def fetch_user(**opts):
     return {'username': 'damoxc'}
 
 @put('/user/:user')
-def update_user(user):
+def update_user(user, **opts):
     return 'This is update user'
