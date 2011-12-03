@@ -26,29 +26,55 @@ from spritzle.hooks import dispatch
 
 def get(path, callback=None, **options):
     if callable(path): path, callback = None, path
-    def wrapper(fmt=None):
-        fmt = 'json' if fmt is None else fmt
-        result = callback()
-        return hooks.dispatch('encode_data', fmt, result)
-    return bottle.get(path, wrapper, **options)
+
+    def deco(func):
+        def wrapper(fmt=None):
+            fmt = 'json' if fmt is None else fmt
+            result = func()
+            return dispatch('encode_data', fmt, result)
+        bottle.get(path, callback=wrapper, **options)
+        return func
+
+    return deco(callback) if callback else deco
 
 def delete(path, callback=None, **options):
-    pass
+    if callable(path): path, callback = None, path
+
+    def deco(func):
+        def wrapper(fmt=None):
+            fmt = 'json' if fmt is None else fmt
+            data = dispatch('decode_data', fmt, request.body)
+            result = callback(data)
+            return dispatch('encode_data', fmt, result)
+        bottle.post(path, callback=wrapper, **options)
+        return func
+
+    return deco(callback) if callback else deco
 
 def post(path, callback=None, **options):
     if callable(path): path, callback = None, path
-    def wrapper(fmt=None):
-        fmt = 'json' if fmt is None else fmt
-        data = hooks.dispatch('decode_data', fmt, request.body)
-        result = callback(data)
-        return hooks.dispatch('encode_data', fmt, result)
-    return bottle.get(path, wrapper, **options)
+
+    def deco(func):
+        def wrapper(fmt=None):
+            fmt = 'json' if fmt is None else fmt
+            data = dispatch('decode_data', fmt, request.body)
+            result = callback(data)
+            return dispatch('encode_data', fmt, result)
+        bottle.post(path, callback=wrapper, **options)
+        return func
+
+    return deco(callback) if callback else deco
 
 def put(path, callback=None, **options):
     if callable(path): path, callback = None, path
-    def wrapper(fmt=None):
-        fmt = 'json' if fmt is None else fmt
-        data = hooks.dispatch('decode_data', fmt, request.body)
-        result = callback(data)
-        return hooks.dispatch('encode_data', fmt, result)
-    return bottle.get(path, wrapper, **options)
+
+    def deco(func):
+        def wrapper(fmt=None):
+            fmt = 'json' if fmt is None else fmt
+            data = dispatch('decode_data', fmt, request.body)
+            result = callback(data)
+            return dispatch('encode_data', fmt, result)
+        bottle.post(path, callback=wrapper, **options)
+        return func
+
+    return deco(callback) if callback else deco
