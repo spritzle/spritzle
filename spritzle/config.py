@@ -19,3 +19,16 @@
 #   The Free Software Foundation, Inc.,
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
+#
+
+from bottle import get, put
+
+@get('/config')
+@get('/config.:fmt')
+def get_config(fmt=None):
+    raise NotImplementedError
+
+@put('/config')
+@put('/config.:fmt')
+def update_config(fmt=None):
+    raise NotImplementedError
