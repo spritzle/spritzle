@@ -24,57 +24,30 @@ import bottle
 
 from spritzle.hooks import dispatch
 
-def get(path, callback=None, **options):
+def route(path, method='GET', callback=None, **options):
     if callable(path): path, callback = None, path
-
     def deco(func):
-        def wrapper(fmt=None):
-            fmt = 'json' if fmt is None else fmt
-            result = func()
+        def wrapper(**urlargs):
+            fmt = urlargs.pop('fmt') if 'fmt' in urlargs else 'json'
+            if method in ('POST', 'PUT'):
+                data = dispatch('decode_data', fmt, request.body)
+                result = func(data, **urlargs)
+            else:
+                result = func(**urlargs)
             return dispatch('encode_data', fmt, result)
-        bottle.get(path, callback=wrapper, **options)
+        bottle.route(path, method, wrapper, **options)
+        bottle.route(path + '.:fmt', method, wrapper, **options)
         return func
-
     return deco(callback) if callback else deco
+
+def get(path, callback=None, **options):
+    return route(path, callback=callback, **options)
 
 def delete(path, callback=None, **options):
-    if callable(path): path, callback = None, path
-
-    def deco(func):
-        def wrapper(fmt=None):
-            fmt = 'json' if fmt is None else fmt
-            data = dispatch('decode_data', fmt, request.body)
-            result = callback(data)
-            return dispatch('encode_data', fmt, result)
-        bottle.post(path, callback=wrapper, **options)
-        return func
-
-    return deco(callback) if callback else deco
+    return route(path, method='DELETE', callback=callback, **options)
 
 def post(path, callback=None, **options):
-    if callable(path): path, callback = None, path
-
-    def deco(func):
-        def wrapper(fmt=None):
-            fmt = 'json' if fmt is None else fmt
-            data = dispatch('decode_data', fmt, request.body)
-            result = callback(data)
-            return dispatch('encode_data', fmt, result)
-        bottle.post(path, callback=wrapper, **options)
-        return func
-
-    return deco(callback) if callback else deco
+    return route(path, method='POST', callback=callback, **options)
 
 def put(path, callback=None, **options):
-    if callable(path): path, callback = None, path
-
-    def deco(func):
-        def wrapper(fmt=None):
-            fmt = 'json' if fmt is None else fmt
-            data = dispatch('decode_data', fmt, request.body)
-            result = callback(data)
-            return dispatch('encode_data', fmt, result)
-        bottle.post(path, callback=wrapper, **options)
-        return func
-
-    return deco(callback) if callback else deco
+    return route(path, method='PUT', callback=callback, **options)
