@@ -21,33 +21,20 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import delete, get, post, put, response, request
 from spritzle import hooks
+from spritzle.rest import delete, get, post, put
 
 @get('/user')
-@get('/user.:fmt')
-def users_view(fmt=None):
-    if fmt is None:
-        fmt = 'json'
-
-    data = [
+def users_view():
+    return [
         {'username': 'damoxc'},
         {'username': 'andar'},
         {'username': 'johnnyg'}
     ]
 
-    return hooks.dispatch('encode_data', fmt, data)
-
 @post('/user')
-@post('/user.:fmt')
-def create_user(fmt=None):
-    if fmt is None:
-        fmt = 'json'
-
-    data = hooks.dispatch('decode_data', fmt, request.body)
-    print data
-
-    return 'This is create user'
+def create_user(data):
+    return data
 
 @delete('/user/:user')
 def delete_user(user):
@@ -55,7 +42,7 @@ def delete_user(user):
 
 @get('/user/:user')
 def fetch_user(user):
-    return 'This is fetch user'
+    return {'username': 'damoxc'}
 
 @put('/user/:user')
 def update_user(user):
