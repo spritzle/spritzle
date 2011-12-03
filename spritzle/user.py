@@ -26,17 +26,15 @@ from spritzle import hooks
 
 @get('/user')
 @get('/user.:fmt')
-def users(fmt=None):
+def users_view(fmt=None):
     if fmt is None:
         fmt = 'json'
 
-    data = [{
-        'username': 'damoxc'
-    }, {
-        'username': 'andar'
-    }, {
-        'username': 'johnnyg'
-    }]
+    data = [
+        {'username': 'damoxc'},
+        {'username': 'andar'},
+        {'username': 'johnnyg'}
+    ]
 
     return hooks.dispatch('encode_data', fmt, data)
 
