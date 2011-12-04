@@ -26,7 +26,6 @@ from spritzle.rest import delete, get, post, put
 
 @get('/user')
 def users_view(**opts):
-    print opts
     return [
         {'username': 'damoxc'},
         {'username': 'andar'},
