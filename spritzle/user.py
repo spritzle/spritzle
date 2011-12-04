@@ -34,7 +34,7 @@ def users_view(**opts):
 
 @post('/user')
 def create_user(user, **opts):
-    return data
+    return user
 
 @delete('/user/:user')
 def delete_user(**opts):
