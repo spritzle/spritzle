@@ -1,5 +1,5 @@
 #
-# spritzle/user.py
+# spritzle/error.py
 #
 # Copyright (C) 2011 Andrew Resch <andrewresch@gmail.com>
 #               2011 Damien Churchill <damoxc@gmail.com>
@@ -21,29 +21,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle import hooks
-from spritzle.rest import delete, get, post, put
+class SpritzleError(Exception):
+    pass
 
-@get('/user')
-def users_view(**opts):
-    return [
-        {'username': 'damoxc'},
-        {'username': 'andar'},
-        {'username': 'johnnyg'}
-    ]
-
-@post('/user')
-def create_user(user, **opts):
-    return user
-
-@delete('/user/:user')
-def delete_user(**opts):
-    return 'This is delete user'
-
-@get('/user/:user')
-def fetch_user(**opts):
-    return {'username': 'damoxc'}
-
-@put('/user/:user')
-def update_user(user, **opts):
-    return 'This is update user'
+class InvalidEncodingError(SpritzleError):
+    pass
