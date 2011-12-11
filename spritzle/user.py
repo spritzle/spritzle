@@ -45,7 +45,7 @@ def create_user(fmt=None):
         fmt = 'json'
 
     data = hooks.dispatch('decode_data', fmt, request.body)
-    print data
+    print(data)
 
     return 'This is create user'
 
