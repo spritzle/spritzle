@@ -21,6 +21,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from gevent import monkey; monkey.patch_all()
+
 import json
 import bottle
 import argparse
@@ -42,7 +44,7 @@ class Core(object):
         register_default('encode_data', hook_encode_data)
 
         bottle.debug(self.debug)
-        bottle.run(reloader=self.reloader, port=self.port)
+        bottle.run(reloader=self.reloader, port=self.port, server='gevent')
 
 def hook_decode_data(fmt, data):
     if fmt != 'json':
