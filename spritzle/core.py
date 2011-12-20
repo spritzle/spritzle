@@ -29,6 +29,7 @@ import argparse
 import libtorrent
 
 from spritzle import user
+from spritzle import hooks
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
 
