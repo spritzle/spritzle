@@ -36,7 +36,7 @@ def dispatch(hook_name, *args):
         return _defaults[hook_name](*args)
 
 def register(hook_name, handler):
-    handlers = _hooks.setdefault(hook_name, [])
+    handlers = _handlers.setdefault(hook_name, [])
     handlers.append(handler)
 
 def register_default(hook_name, handler):
