@@ -26,3 +26,6 @@ class SpritzleError(Exception):
 
 class InvalidEncodingError(SpritzleError):
     pass
+    
+class InvalidHook(SpritzleError):
+    pass

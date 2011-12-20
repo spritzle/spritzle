@@ -21,6 +21,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from spritzle.error import InvalidHook
+
 _defaults = {}
 _handlers = {}
 
@@ -36,6 +38,9 @@ def dispatch(hook_name, *args):
         return _defaults[hook_name](*args)
 
 def register(hook_name, handler):
+    if hook_name not in _defaults:
+        raise InvalidHook("The hook %s does not have a default handler!" % hook_name)
+        
     handlers = _handlers.setdefault(hook_name, [])
     handlers.append(handler)
 

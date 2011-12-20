@@ -1,4 +1,6 @@
 from spritzle import hooks
+from spritzle import error
+from nose.tools import assert_raises
 
 def test_register_default():
     test_args = ["foo", 1, {"bar": 2, "baz": 5.4}]
@@ -17,4 +19,30 @@ def test_register_default():
     
     hooks.dispatch("foobar", test_args)
     assert called == True
+
+def test_register():
+    global called_default
+    called_default = False
+    def handler_default(*args, **kwargs):
+        global called_default
+        called_default = True
+        return
+
+    global called
+    called = False
+    def handler(*args, **kwargs):
+        global called
+        called = True
+        return
+
+    with assert_raises(error.InvalidHook):
+        hooks.register("test_hook", handler)
+        
+    hooks.register_default("test_hook", handler)
     
+    hooks.register("test_hook", handler)
+
+    hooks.dispatch("test_hook")
+    assert called_default == False
+    assert called == True
+
