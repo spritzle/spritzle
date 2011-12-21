@@ -1,26 +1,36 @@
 from spritzle import hooks
 from spritzle import error
-from nose.tools import assert_raises
+from nose.tools import assert_raises, with_setup
 
+def setup():
+    hooks._defaults = {}
+    hooks._handlers = {}
+
+@with_setup(setup)
 def test_register_default():
-    test_args = ["foo", 1, {"bar": 2, "baz": 5.4}]
-    
-    global called
-    called = False
+    assert "test_hook" not in hooks._defaults
+    hooks.register_default("test_hook", None)
+    assert "test_hook" in hooks._defaults
 
-    def handler(*args, **kwargs):
-        assert args[0] == test_args
-        global called
-        called = True
-
-        return
-        
-    hooks.register_default("foobar", handler)
-    
-    hooks.dispatch("foobar", test_args)
-    assert called == True
-
+@with_setup(setup)
 def test_register():
+    assert "test_hook" not in hooks._handlers
+    assert "test_hook" not in hooks._defaults
+
+    with assert_raises(error.InvalidHook):
+        hooks.register("test_hook", lambda x: x)
+
+    assert "test_hook" not in hooks._handlers
+    assert "test_hook" not in hooks._defaults
+    
+    hooks.register_default("test_hook", lambda x: x)
+    
+    hooks.register("test_hook", lambda x: x)
+    
+    assert "test_hook" in hooks._handlers
+
+@with_setup(setup)
+def test_dispatch():
     global called_default
     called_default = False
     def handler_default(*args, **kwargs):
@@ -35,11 +45,8 @@ def test_register():
         called = True
         return args[0]
 
-    with assert_raises(error.InvalidHook):
-        hooks.register("test_hook", handler)
-        
+       
     hooks.register_default("test_hook", handler_default)
-    
     hooks.register("test_hook", handler)
 
     hooks.dispatch("test_hook", 1)
@@ -50,4 +57,3 @@ def test_register():
     hooks.dispatch("test_hook", None)
     assert called_default == True
     assert called == True
-    
