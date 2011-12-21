@@ -33,16 +33,21 @@ def test_register():
     def handler(*args, **kwargs):
         global called
         called = True
-        return
+        return args[0]
 
     with assert_raises(error.InvalidHook):
         hooks.register("test_hook", handler)
         
-    hooks.register_default("test_hook", handler)
+    hooks.register_default("test_hook", handler_default)
     
     hooks.register("test_hook", handler)
 
-    hooks.dispatch("test_hook")
+    hooks.dispatch("test_hook", 1)
     assert called_default == False
     assert called == True
-
+    called_default = False
+    called = False
+    hooks.dispatch("test_hook", None)
+    assert called_default == True
+    assert called == True
+    
