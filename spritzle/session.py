@@ -21,15 +21,23 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import get, put
+from spritzle.rest import delete, get, post, put
+from spritzle.core import core
 
-
-@get('/config')
-@get('/config.:fmt')
+@get('/session')
 def get_session(fmt=None):
-    raise NotImplementedError
+    status = {}
+    session_status = core.session.status()
+    keys = [x for x in dir(session_status) if not x.startswith('_')]
+
+    for key in keys:
+        try:
+            status[key] = getattr(session_status, key)
+        except TypeError as e:
+            print("Unsupported libtorrent key: ", key)
+
+    return status
 
 @put('/session')
-@put('/session.:fmt')
 def update_session(fmt=None):
     raise NotImplementedError

@@ -37,7 +37,7 @@ setup (
     packages     = ['spritzle'],
     entry_points = {
         'console_scripts': [
-            'spritzled =  spritzle.core:main'
+            'spritzled =  spritzle.main:main'
         ]
     }
 )

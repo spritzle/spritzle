@@ -21,14 +21,12 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import get, put
+from spritzle.rest import delete, get, post, put
 
 @get('/config')
-@get('/config.:fmt')
 def get_config(fmt=None):
     raise NotImplementedError
 
 @put('/config')
-@put('/config.:fmt')
 def update_config(fmt=None):
     raise NotImplementedError

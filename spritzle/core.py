@@ -21,56 +21,18 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from gevent import monkey; monkey.patch_all()
-
-import json
-import bottle
-import argparse
-import libtorrent
-
-from spritzle import user
-from spritzle import hooks
-from spritzle.error import InvalidEncodingError
-from spritzle.hooks import register_default
+import libtorrent as lt
+import pkg_resources
 
 class Core(object):
+    def __init__(self):
+        # Create the client fingerprint
+        version = pkg_resources.require("spritzle")[0].version
+        version = [int(value.split("-")[0]) for value in version.split(".")]
 
-    def __init__(self, port, debug=False, reloader=False):
-        self.port = port
-        self.debug = debug
-        self.reloader = reloader
+        while len(version) < 4:
+            version.append(0)
 
-    def start(self):
-        register_default('decode_data', hook_decode_data)
-        register_default('encode_data', hook_encode_data)
+        self.session = lt.session(lt.fingerprint("SZ", *version), flags=1)
 
-        bottle.debug(self.debug)
-        bottle.run(reloader=self.reloader, port=self.port, server='gevent')
-
-def hook_decode_data(fmt, data):
-    if fmt != 'json':
-        raise InvalidEncodingError("Don't know how to decode '%s'" % fmt)
-    try:
-        return json.loads(data)
-    except TypeError:
-        return json.load(data)
-
-def hook_encode_data(fmt, data):
-    if fmt != 'json':
-        raise InvalidEncodingError("Don't know how to encode '%s'" % fmt)
-    return json.dumps(data)
-
-def bootstrap():
-    hooks.register_default('decode_data', hook_decode_data)
-    hooks.register_default('encode_data', hook_encode_data)
-
-def main():
-    parser = argparse.ArgumentParser(description='Spritzled')
-    parser.add_argument('--debug', dest='debug', default=False, action='store_true')
-    parser.add_argument('--reload', dest='reload', default=False, action='store_true')
-    parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
-
-    args = parser.parse_args()
-
-    core = Core(args.port, args.debug, args.reload)
-    core.start()
+core = Core()
