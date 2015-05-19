@@ -37,7 +37,8 @@ def route(path, method='GET', callback=None, **options):
                 urlargs.update(bottle.request.GET)
 
             if method in ('POST', 'PUT'):
-                data = dispatch('decode_data', fmt, bottle.request.body)
+                body = bottle.request.body.read().decode("utf8")
+                data = dispatch('decode_data', fmt, body)
                 result = func(data, **urlargs)
             else:
                 result = func(**urlargs)
