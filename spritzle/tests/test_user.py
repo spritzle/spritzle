@@ -1,4 +1,4 @@
-from spritzle.core import bootstrap
+from spritzle.main import bootstrap
 from spritzle.user import users_view
 
 bootstrap()

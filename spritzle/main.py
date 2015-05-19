@@ -31,6 +31,8 @@ from spritzle import hooks
 from spritzle import session
 from spritzle import auth
 from spritzle import config
+from spritzle import settings
+
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
 
@@ -42,11 +44,14 @@ class Main(object):
         self.reloader = reloader
 
     def start(self):
-        register_default('decode_data', hook_decode_data)
-        register_default('encode_data', hook_encode_data)
+        bootstrap()
 
         bottle.debug(self.debug)
         bottle.run(reloader=self.reloader, port=self.port)
+
+def bootstrap():
+    register_default('decode_data', hook_decode_data)
+    register_default('encode_data', hook_encode_data)
 
 def hook_decode_data(fmt, data):
     if fmt != 'json':
