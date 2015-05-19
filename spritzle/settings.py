@@ -25,9 +25,27 @@ from spritzle.rest import delete, get, post, put
 from spritzle.core import core
 import spritzle.common as common
 
+import libtorrent
+
 @get('/settings/session')
 def get_settings_session():
     return common.struct_to_dict(core.session.settings())
+
+@put('/settings/session')
+def put_settings_session(settings):
+    current = core.session.settings()
+    for key, value in settings.items():
+        if hasattr(current, key):
+            setattr(current, key, value)
+    core.session.set_settings(current)
+
+@get('/settings/session/high_performance_seed')
+def get_settings_session_hps():
+    return common.struct_to_dict(libtorrent.high_performance_seed())
+
+@get('/settings/session/min_memory_usage')
+def get_settings_session_mmu():
+    return common.struct_to_dict(libtorrent.min_memory_usage())
 
 @get('/settings/proxy')
 def get_settings_proxy():
