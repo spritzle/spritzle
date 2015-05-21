@@ -23,21 +23,8 @@
 
 from spritzle.rest import delete, get, post, put
 from spritzle.core import core
+import spritzle.common as common
 
 @get('/session')
-def get_session(fmt=None):
-    status = {}
-    session_status = core.session.status()
-    keys = [x for x in dir(session_status) if not x.startswith('_')]
-
-    for key in keys:
-        try:
-            status[key] = getattr(session_status, key)
-        except TypeError as e:
-            print("Unsupported libtorrent key: ", key)
-
-    return status
-
-@put('/session')
-def update_session(fmt=None):
-    raise NotImplementedError
+def get_session_status():
+    return common.struct_to_dict(core.session.status())
