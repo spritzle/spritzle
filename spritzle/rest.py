@@ -42,6 +42,7 @@ def route(path, method='GET', callback=None, **options):
                 result = func(data, **urlargs)
             else:
                 result = func(**urlargs)
+                bottle.response.content_type = 'application/' + fmt
 
             return dispatch('encode_data', fmt, result)
         bottle.route(path, method, wrapper, **options)
