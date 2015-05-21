@@ -37,3 +37,14 @@ def struct_to_dict(struct):
             pass
 
     return d
+
+def update_struct_with_dict(struct, dictionary):
+    """
+    Update a struct with items from a dictionary.  Will only
+    update existing attributes; will not set new ones.
+    """
+
+    for key, value in dictionary.items():
+        if hasattr(struct, key):
+            setattr(struct, key, value)
+    return struct

@@ -15,3 +15,17 @@ def test_struct_to_dict():
     assert d['b'] == 2
     assert '__mytest__' not in d
     assert len(d) == 2
+
+def test_update_struct_with_dict():
+    class struct(object):
+        a = 1
+        b = 2
+
+    s = struct()
+    d = {'a': 3, 'c': 1}
+
+    s = common.update_struct_with_dict(s, d)
+
+    assert s.a == 3
+    assert s.b == 2
+    assert hasattr(s, 'c') == False

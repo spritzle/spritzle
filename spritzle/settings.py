@@ -33,11 +33,8 @@ def get_settings_session():
 
 @put('/settings/session')
 def put_settings_session(settings):
-    current = core.session.settings()
-    for key, value in settings.items():
-        if hasattr(current, key):
-            setattr(current, key, value)
-    core.session.set_settings(current)
+    s = common.update_struct_with_dict(core.session.settings(), settings)
+    core.session.set_settings(s)
 
 @get('/settings/session/high_performance_seed')
 def get_settings_session_hps():
@@ -50,6 +47,11 @@ def get_settings_session_mmu():
 @get('/settings/proxy')
 def get_settings_proxy():
     return common.struct_to_dict(core.session.proxy())
+
+@put('/settings/proxy')
+def put_settings_proxy(settings):
+    s = common.update_struct_with_dict(core.session.proxy(), settings)
+    core.session.set_proxy(s)
 
 @get('/settings/pe')
 def get_settings_pe():
