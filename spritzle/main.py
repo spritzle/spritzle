@@ -36,6 +36,8 @@ from spritzle import settings
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
 
+app = bottle.app()
+
 class Main(object):
 
     def __init__(self, port, debug=False, reloader=False):

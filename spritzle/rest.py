@@ -30,11 +30,7 @@ def route(path, method='GET', callback=None, **options):
         def wrapper(**urlargs):
             fmt = urlargs.pop('fmt') if 'fmt' in urlargs else 'json'
 
-            # Handle older bottle versions
-            try:
-                urlargs.update(bottle.request.query)
-            except AttributeError:
-                urlargs.update(bottle.request.GET)
+            urlargs.update(bottle.request.query)
 
             if method in ('POST', 'PUT'):
                 body = bottle.request.body.read().decode("utf8")
@@ -42,9 +38,11 @@ def route(path, method='GET', callback=None, **options):
                 result = func(data, **urlargs)
             else:
                 result = func(**urlargs)
-                bottle.response.content_type = 'application/' + fmt
+
+            bottle.response.content_type = 'application/' + fmt
 
             return dispatch('encode_data', fmt, result)
+
         bottle.route(path, method, wrapper, **options)
         bottle.route(path + '.:fmt', method, wrapper, **options)
         return func
