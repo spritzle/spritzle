@@ -2,6 +2,20 @@ from spritzle import hooks
 from spritzle import error
 from nose.tools import assert_raises, with_setup
 
+old_defaults = {}
+old_handlers = {}
+
+def setup_module():
+    old_defaults = hooks._defaults
+    hooks._defaults = {}
+
+    old_handlers = hooks._handlers
+    hooks._handlers = {}
+
+def teardown_module():
+    hooks._defaults = old_defaults
+    hooks._handlers = old_handlers
+
 def setup():
     hooks._defaults = {}
     hooks._handlers = {}
