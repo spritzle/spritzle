@@ -25,25 +25,21 @@ from spritzle import hooks
 from spritzle.rest import delete, get, post, put
 
 @get('/user')
-def users_view(**opts):
-    return [
-        {'username': 'damoxc'},
-        {'username': 'andar'},
-        {'username': 'johnnyg'}
-    ]
+def get_users(**opts):
+    raise NotImplementedError
 
 @post('/user')
 def create_user(user, **opts):
-    return user
+    raise NotImplementedError
 
-@delete('/user/:user')
-def delete_user(**opts):
-    return 'This is delete user'
+@delete('/user/<user>')
+def delete_user(user, **opts):
+    raise NotImplementedError
 
-@get('/user/:user')
-def fetch_user(**opts):
-    return {'username': 'damoxc'}
+@get('/user/<user>')
+def get_user(user, **opts):
+    raise NotImplementedError
 
-@put('/user/:user')
+@put('/user/<user>')
 def update_user(user, **opts):
-    return 'This is update user'
+    raise NotImplementedError
