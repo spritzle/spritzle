@@ -25,7 +25,6 @@ def test_bootstrap():
     assert len(hooks._defaults) > 0
 
 def test_main_class():
-    import bottle
     main = spritzle.main.Main(12345)
     assert main.port == 12345
 
