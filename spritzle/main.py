@@ -53,10 +53,7 @@ def bootstrap():
 def hook_decode_data(fmt, data):
     if fmt != 'json':
         raise InvalidEncodingError("Don't know how to decode '%s'" % fmt)
-    try:
-        return json.loads(data)
-    except TypeError:
-        return json.load(data)
+    return json.loads(data)
 
 def hook_encode_data(fmt, data):
     if fmt != 'json':
