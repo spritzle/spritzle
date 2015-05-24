@@ -25,14 +25,9 @@ import json
 import bottle
 import argparse
 
+import spritzle.view
 from spritzle import core
-from spritzle import user
 from spritzle import hooks
-from spritzle import session
-from spritzle import auth
-from spritzle import config
-from spritzle import settings
-
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
 
