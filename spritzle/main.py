@@ -25,7 +25,13 @@ import json
 import bottle
 import argparse
 
-import spritzle.view
+import spritzle.view.auth
+import spritzle.view.config
+import spritzle.view.session
+import spritzle.view.settings
+import spritzle.view.torrent
+import spritzle.view.user
+
 from spritzle import core
 from spritzle import hooks
 from spritzle.error import InvalidEncodingError
