@@ -24,6 +24,8 @@
 import json
 import bottle
 import argparse
+import os
+import asyncio
 
 import spritzle.view.auth
 import spritzle.view.config
@@ -39,6 +41,35 @@ from spritzle.hooks import register_default
 
 app = bottle.app()
 
+class AiohttpServer(bottle.ServerAdapter):
+    """ Untested. 
+        aiohttp
+        https://pypi.python.org/pypi/aiohttp/
+    """
+
+    def run(self, handler):
+        import asyncio
+        from aiohttp.wsgi import WSGIServerHttpProtocol
+
+        loop = asyncio.get_event_loop()
+        protocol_factory = lambda: WSGIServerHttpProtocol(
+            handler,
+            readpayload=True,
+            debug=(not self.quiet))
+        loop.run_until_complete(loop.create_server(protocol_factory,
+                                                             self.host,
+                                                             self.port))
+
+
+        if 'BOTTLE_CHILD' in os.environ:
+            import signal
+            signal.signal(signal.SIGINT, lambda s, f: loop.stop())
+
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            loop.stop()
+
 class Main(object):
 
     def __init__(self, port, debug=False, reloader=False):
@@ -49,8 +80,7 @@ class Main(object):
     def start(self):
         bootstrap()
 
-        bottle.debug(self.debug)
-        bottle.run(reloader=self.reloader, port=self.port)
+        bottle.run(server=AiohttpServer, reloader=self.reloader, port=self.port, debug=self.debug)
 
 def bootstrap():
     register_default('decode_data', hook_decode_data)
