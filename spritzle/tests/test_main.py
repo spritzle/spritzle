@@ -30,7 +30,12 @@ def test_main_class():
 
     with patch('spritzle.main.bottle.run'):
         main.start()
-        spritzle.main.bottle.run.assert_called_once_with(port=12345, reloader=False, debug=False, server=spritzle.main.AiohttpServer)
+        spritzle.main.bottle.run.assert_called_once_with(
+            port=12345,
+            reloader=False,
+            debug=False,
+            server=spritzle.main.AiohttpServer
+        )
 
 def test_main_entry_point():
     with patch('spritzle.main.Main.start'):
