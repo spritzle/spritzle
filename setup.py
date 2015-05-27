@@ -34,7 +34,7 @@ setup (
     keywords     = 'torrent bittorrent p2p fileshare filesharing',
     url          = 'http://github.com/damoxc/spritzle',
     license      = 'GPLv3',
-    packages     = ['spritzle'],
+    packages     = ['spritzle', 'spritzle.view'],
     entry_points = {
         'console_scripts': [
             'spritzled =  spritzle.main:main'
