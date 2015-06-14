@@ -28,3 +28,7 @@ import spritzle.common as common
 @get('/session')
 def get_session_status():
     return common.struct_to_dict(core.session.status())
+
+@get('/session/cache')
+def get_session_cache_status():
+    return common.struct_to_dict(core.session.get_cache_status())
