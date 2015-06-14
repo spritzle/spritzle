@@ -24,9 +24,15 @@
 import libtorrent as lt
 import pkg_resources
 
+from spritzle.config import Config
+
 class Core(object):
     def __init__(self):
-        # Create the client fingerprint
+        pass
+
+    def init(self, config_dir):
+        self.config = Config('spritzle.conf', config_dir)
+
         version = pkg_resources.require("spritzle")[0].version
         version = [int(value.split("-")[0]) for value in version.split(".")]
 

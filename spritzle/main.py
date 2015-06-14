@@ -34,7 +34,7 @@ import spritzle.view.settings
 import spritzle.view.torrent
 import spritzle.view.user
 
-from spritzle import core
+from spritzle.core import core
 from spritzle import hooks
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
@@ -42,7 +42,7 @@ from spritzle.hooks import register_default
 app = bottle.app()
 
 class AiohttpServer(bottle.ServerAdapter):
-    """ Untested. 
+    """ Untested.
         aiohttp
         https://pypi.python.org/pypi/aiohttp/
     """
@@ -72,17 +72,19 @@ class AiohttpServer(bottle.ServerAdapter):
 
 class Main(object):
 
-    def __init__(self, port, debug=False, reloader=False):
+    def __init__(self, port, debug=False, reloader=False, config_dir=None):
         self.port = port
         self.debug = debug
         self.reloader = reloader
+        self.config_dir = config_dir
 
     def start(self):
-        bootstrap()
+        bootstrap(config_dir=self.config_dir)
 
         bottle.run(server=AiohttpServer, reloader=self.reloader, port=self.port, debug=self.debug)
 
-def bootstrap():
+def bootstrap(config_dir=None):
+    core.init(config_dir)
     register_default('decode_data', hook_decode_data)
     register_default('encode_data', hook_encode_data)
 
@@ -101,6 +103,7 @@ def main():
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('--reload', dest='reload', default=False, action='store_true')
     parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
+    parser.add_argument('-c', '--config_dir', dest='config_dir', type=str)
 
     args = parser.parse_args()
 
