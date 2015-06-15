@@ -34,41 +34,13 @@ import spritzle.view.settings
 import spritzle.view.torrent
 import spritzle.view.user
 
+from spritzle.aiohttp import AiohttpServer
 from spritzle.core import core
 from spritzle import hooks
 from spritzle.error import InvalidEncodingError
 from spritzle.hooks import register_default
 
 app = bottle.app()
-
-class AiohttpServer(bottle.ServerAdapter):
-    """ Untested.
-        aiohttp
-        https://pypi.python.org/pypi/aiohttp/
-    """
-
-    def run(self, handler):
-        import asyncio
-        from aiohttp.wsgi import WSGIServerHttpProtocol
-
-        loop = asyncio.get_event_loop()
-        protocol_factory = lambda: WSGIServerHttpProtocol(
-            handler,
-            readpayload=True,
-            debug=(not self.quiet))
-        loop.run_until_complete(loop.create_server(protocol_factory,
-                                                             self.host,
-                                                             self.port))
-
-
-        if 'BOTTLE_CHILD' in os.environ:
-            import signal
-            signal.signal(signal.SIGINT, lambda s, f: loop.stop())
-
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            loop.stop()
 
 class Main(object):
 
