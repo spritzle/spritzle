@@ -81,3 +81,6 @@ class Config(object):
     def __delitem__(self, key):
         del self.config[key]
         self.save()
+
+    def get(self, key, default=None):
+        return self.config.get(key, default)

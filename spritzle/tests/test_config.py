@@ -63,3 +63,11 @@ def test_delitem():
         c['foo'] = 1
         del c['foo']
         assert 'foo' not in c
+
+def test_get():
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir)
+        assert c.get('foo') is None
+        assert c.get('foo', 1) == 1
+        c['foo'] = 2
+        assert c.get('foo') == 2
