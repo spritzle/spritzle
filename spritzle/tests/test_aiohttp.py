@@ -12,7 +12,7 @@ def test_aiohttp_run():
     with patch('asyncio.get_event_loop'):
         a = AiohttpServer()
         a.run(handler)
-        asyncio.get_event_loop.assert_called_once()
+        asyncio.get_event_loop.assert_called_once_with()
 
 def test_aiohttp_run_bottle_child():
     def handler(*args, **kwargs):
@@ -23,4 +23,4 @@ def test_aiohttp_run_bottle_child():
         with patch('signal.signal'):
             a = AiohttpServer()
             a.run(handler)
-            signal.signal.assert_called_once()
+            signal.signal.assert_called_once_with()
