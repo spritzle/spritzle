@@ -20,6 +20,8 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 
+import binascii
+
 from spritzle.rest import delete, get, post, put
 from spritzle.core import core
 import spritzle.common as common
@@ -28,13 +30,37 @@ import libtorrent as lt
 import bottle
 
 
+@get('/torrent')
 @get('/torrent/<tid>')
 def get_torrent(tid=None):
     if tid is None:
         return [str(th.info_hash()) for th in core.session.get_torrents()]
     else:
-        # TODO: get torrent status
-        return {}
+        handle = core.session.find_torrent(lt.sha1_hash(binascii.unhexlify(tid)))
+        if not handle.is_valid():
+            bottle.abort(400, "Invalid info-hash")
+
+        status = common.struct_to_dict(handle.status())
+        # TODO:
+        # We need to do some magic to fix up the status dict
+        # There are some libtorrent structs that we need to
+        # convert, etc.. These are being done in common.struct_to_dict()
+
+        # checking_files: libtorrent.states.checking_files
+        # downloading: libtorrent.states.downloading
+        # checking_resume_data: libtorrent.states.checking_resume_data
+        # next_announce: datetime.timedelta(0)
+        # announce_interval: datetime.timedelta(0)
+        # seeding: libtorrent.states.seeding
+        # finished: libtorrent.states.finished
+        # downloading_metadata: libtorrent.states.downloading_metadata
+        # storage_mode: libtorrent.storage_mode_t.storage_mode_sparse
+        # queued_for_checking: libtorrent.states.queued_for_checking
+        # state: libtorrent.states.checking_resume_data
+        # states: <class 'libtorrent.states'>
+        # allocating: libtorrent.states.allocating
+
+        return status
 
 @post('/torrent')
 def add_torrent():
@@ -53,7 +79,6 @@ def add_torrent():
         'save_path': core.config.get('add_torrent_params.save_path', '')
     }
 
-    print(len(bottle.request.files))
     for key, value in bottle.request.files.items():
 
         data = value.file.read()
@@ -76,4 +101,4 @@ def add_torrent():
     except RuntimeError as e:
         bottle.abort(400, str(e))
 
-    return str(th.info_hash())
+    return {'info_hash': str(th.info_hash())}
