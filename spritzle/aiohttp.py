@@ -34,18 +34,21 @@ class AiohttpServer(bottle.ServerAdapter):
         import asyncio
         from aiohttp.wsgi import WSGIServerHttpProtocol
 
-        loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_event_loop()
         protocol_factory = lambda: WSGIServerHttpProtocol(
             handler,
             readpayload=True,
             debug=(not self.quiet))
-        loop.run_until_complete(loop.create_server(protocol_factory,
+        self.loop.run_until_complete(self.loop.create_server(protocol_factory,
                                                              self.host,
                                                              self.port))
 
 
         if 'BOTTLE_CHILD' in os.environ:
             import signal
-            signal.signal(signal.SIGINT, lambda s, f: loop.stop())
+            signal.signal(signal.SIGINT, self.stop)
 
-        loop.run_forever()
+        self.loop.run_forever()
+
+    def stop():
+        self.loop.stop()

@@ -23,4 +23,4 @@ def test_aiohttp_run_bottle_child():
         with patch('signal.signal'):
             a = AiohttpServer()
             a.run(handler)
-            signal.signal.assert_called_once_with()
+            signal.signal.assert_called_once_with(signal.SIGINT, a.stop)
