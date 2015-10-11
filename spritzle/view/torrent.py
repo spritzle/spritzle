@@ -43,7 +43,7 @@ def get_torrent(tid=None):
         ignored_status_keys = ['states'] + list(lt.torrent_status.states.names.keys())
 
         status = common.struct_to_dict(
-            handle.status(), 
+            handle.status(),
             ignore_keys=ignored_status_keys,
         )
 
@@ -67,9 +67,12 @@ def add_torrent():
     }
 
     for key, value in bottle.request.files.items():
-
         data = value.file.read()
-        atp['ti'] = lt.torrent_info(lt.bdecode(data))
+        try:
+            atp['ti'] = lt.torrent_info(lt.bdecode(data))
+        except RuntimeError as e:
+            bottle.abort(400, "Not a valid torrent file!")
+
         # TODO: add support for adding multiple files at once
         break
 
@@ -86,6 +89,6 @@ def add_torrent():
     try:
         th = core.session.add_torrent(atp)
     except RuntimeError as e:
-        bottle.abort(400, str(e))
+        bottle.abort(500, str(e))
 
     return {'info_hash': str(th.info_hash())}
