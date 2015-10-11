@@ -20,6 +20,7 @@
 
 import bottle
 import os
+import asyncio
 
 class AiohttpServer(bottle.ServerAdapter):
     """ Untested.
@@ -30,11 +31,13 @@ class AiohttpServer(bottle.ServerAdapter):
         released bottle.py version
     """
 
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        super(AiohttpServer, self).__init__()
+
     def run(self, handler):
-        import asyncio
         from aiohttp.wsgi import WSGIServerHttpProtocol
 
-        self.loop = asyncio.get_event_loop()
         protocol_factory = lambda: WSGIServerHttpProtocol(
             handler,
             readpayload=True,
@@ -50,5 +53,5 @@ class AiohttpServer(bottle.ServerAdapter):
 
         self.loop.run_forever()
 
-    def stop():
+    def stop(self):
         self.loop.stop()

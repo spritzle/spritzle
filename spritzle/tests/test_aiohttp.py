@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import asyncio
 import os
 import signal
@@ -13,6 +13,12 @@ def test_aiohttp_run():
         a = AiohttpServer()
         a.run(handler)
         asyncio.get_event_loop.assert_called_once_with()
+
+def test_aiohttp_stop():
+    a = AiohttpServer()
+    a.loop.stop = MagicMock(name='stop')
+    a.stop()
+    assert a.loop.stop.called
 
 def test_aiohttp_run_bottle_child():
     def handler(*args, **kwargs):
