@@ -29,7 +29,6 @@ import spritzle.common as common
 import libtorrent as lt
 import bottle
 
-
 @get('/torrent')
 @get('/torrent/<tid>')
 def get_torrent(tid=None):
@@ -40,25 +39,13 @@ def get_torrent(tid=None):
         if not handle.is_valid():
             bottle.abort(400, "Invalid info-hash")
 
-        status = common.struct_to_dict(handle.status())
-        # TODO:
-        # We need to do some magic to fix up the status dict
-        # There are some libtorrent structs that we need to
-        # convert, etc.. These are being done in common.struct_to_dict()
+        # We don't want to return all of the keys as they are just an enum
+        ignored_status_keys = ['states'] + list(lt.torrent_status.states.names.keys())
 
-        # checking_files: libtorrent.states.checking_files
-        # downloading: libtorrent.states.downloading
-        # checking_resume_data: libtorrent.states.checking_resume_data
-        # next_announce: datetime.timedelta(0)
-        # announce_interval: datetime.timedelta(0)
-        # seeding: libtorrent.states.seeding
-        # finished: libtorrent.states.finished
-        # downloading_metadata: libtorrent.states.downloading_metadata
-        # storage_mode: libtorrent.storage_mode_t.storage_mode_sparse
-        # queued_for_checking: libtorrent.states.queued_for_checking
-        # state: libtorrent.states.checking_resume_data
-        # states: <class 'libtorrent.states'>
-        # allocating: libtorrent.states.allocating
+        status = common.struct_to_dict(
+            handle.status(), 
+            ignore_keys=ignored_status_keys,
+        )
 
         return status
 

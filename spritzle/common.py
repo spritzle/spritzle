@@ -21,22 +21,30 @@
 #
 
 import libtorrent as lt
+import datetime
 
-def struct_to_dict(struct):
+def struct_to_dict(struct, ignore_keys=None):
     """
     Convert a libtorrent struct into a dictionary by finding all
     attributes that do not start with '_'.
 
     A conversion attempt will be made for special libtorrent types.
     """
-
     # Define converter functions to coerce libtorrent types into
     # basic objects.
     def lt_sha1_hash(value):
         return str(value)
 
+    def datetime_timedelta(value):
+        return str(value.total_seconds())
+
+    def enum(value):
+        return value.name
+
     type_converters = {
         lt.sha1_hash: lt_sha1_hash,
+        datetime.timedelta: datetime_timedelta,
+        lt.torrent_status.states: enum,
     }
 
     d = {}
@@ -45,10 +53,14 @@ def struct_to_dict(struct):
     for key in keys:
         try:
             value = getattr(struct, key)
+            vtype = type(value)
+
+            if ignore_keys and key in ignore_keys:
+                continue
 
             # Convert the value if necessary
-            if type(value) in type_converters:
-                value = type_converters[type(value)](value)
+            if vtype in type_converters:
+                value = type_converters[vtype](value)
 
             d[key] = value
         except TypeError as e:
