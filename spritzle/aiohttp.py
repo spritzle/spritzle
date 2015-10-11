@@ -38,7 +38,7 @@ class AiohttpServer(bottle.ServerAdapter):
         protocol_factory = lambda: WSGIServerHttpProtocol(
             handler,
             readpayload=True,
-            debug=(not self.quiet))
+            debug=bottle.DEBUG)
         self.loop.run_until_complete(self.loop.create_server(protocol_factory,
                                                              self.host,
                                                              self.port))
