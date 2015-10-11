@@ -33,9 +33,15 @@ def route(path, method='GET', callback=None, **options):
             urlargs.update(bottle.request.query)
 
             if method in ('POST', 'PUT'):
-                body = bottle.request.body.read().decode("utf8")
-                data = dispatch('decode_data', fmt, body)
-                result = func(data, **urlargs)
+                content_type = bottle.request.content_type.split(';')[0]
+                data = {}
+
+                if content_type == 'application/' + fmt:
+                    body = bottle.request.body.read().decode("utf8")
+                    data = dispatch('decode_data', fmt, body)
+                    result = func(data, **urlargs)
+                else:
+                    result = func(**urlargs)
             else:
                 result = func(**urlargs)
 

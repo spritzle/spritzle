@@ -13,11 +13,11 @@ def get():
     pass
 
 @post('/test_post')
-def post(arg):
+def post():
     pass
 
 @put('/test_put')
-def put(arg):
+def put():
     pass
 
 def test_delete():
