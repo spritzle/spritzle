@@ -13,11 +13,11 @@ def get():
     pass
 
 @post('/test_post')
-def post():
+def post(*args, **kwargs):
     pass
 
 @put('/test_put')
-def put():
+def put(*args, **kwargs):
     pass
 
 def test_delete():
@@ -30,12 +30,16 @@ def test_get():
     assert response.status == '200 OK'
     assert response.content_type == 'application/json'
 
-def test_post():    
+def test_post():
     response = app.post('/test_post')
     assert response.status == '200 OK'
     assert response.content_type == 'application/json'
 
+    response = app.post('/test_post', content_type='application/json')
+    assert response.status == '200 OK'
+    assert response.content_type == 'application/json'
+
 def test_put():
-    response = app.put('/test_put')
+    response = app.put('/test_put', content_type='application/json')
     assert response.status == '200 OK'
     assert response.content_type == 'application/json'
