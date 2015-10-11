@@ -20,19 +20,37 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import libtorrent as lt
 
 def struct_to_dict(struct):
     """
     Convert a libtorrent struct into a dictionary by finding all
     attributes that do not start with '_'.
 
+    A conversion attempt will be made for special libtorrent types.
     """
+
+    # Define converter functions to coerce libtorrent types into
+    # basic objects.
+    def lt_sha1_hash(value):
+        return str(value)
+
+    type_converters = {
+        lt.sha1_hash: lt_sha1_hash,
+    }
+
     d = {}
     keys = [x for x in dir(struct) if not x.startswith('_')]
 
     for key in keys:
         try:
-            d[key] = getattr(struct, key)
+            value = getattr(struct, key)
+
+            # Convert the value if necessary
+            if type(value) in type_converters:
+                value = type_converters[type(value)](value)
+
+            d[key] = value
         except TypeError as e:
             pass
 
