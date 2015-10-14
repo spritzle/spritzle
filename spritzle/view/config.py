@@ -21,7 +21,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle.rest import delete, get, post, put
+from bottle import delete, get, post, put
 
 @get('/config')
 def get_config(fmt=None):

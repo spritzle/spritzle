@@ -37,7 +37,7 @@ def test_add_torrent():
 
     request = MagicMock()
     request.files = files
-    request.forms = {
+    request.json = {
         'ti': None,
         'paused': True,
     }
@@ -58,7 +58,7 @@ def test_add_torrent_bad_file():
 
     request = MagicMock()
     request.files = files
-    request.forms = {
+    request.json = {
         'ti': None,
         'paused': True,
     }
@@ -69,7 +69,7 @@ def test_add_torrent_bad_file():
 
 def test_add_torrent_bad_args():
     request = MagicMock()
-    request.forms = {
+    request.json = {
         'ti': None,
         'url': 'http://testing/test.torrent',
         'info_hash': 'a0'*20,

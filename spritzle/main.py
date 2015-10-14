@@ -57,18 +57,6 @@ class Main(object):
 
 def bootstrap(config_dir=None):
     core.init(config_dir)
-    register_default('decode_data', hook_decode_data)
-    register_default('encode_data', hook_encode_data)
-
-def hook_decode_data(fmt, data):
-    if fmt != 'json':
-        raise InvalidEncodingError("Don't know how to decode '%s'" % fmt)
-    return json.loads(data)
-
-def hook_encode_data(fmt, data):
-    if fmt != 'json':
-        raise InvalidEncodingError("Don't know how to encode '%s'" % fmt)
-    return json.dumps(data)
 
 def main():
     parser = argparse.ArgumentParser(description='Spritzled')

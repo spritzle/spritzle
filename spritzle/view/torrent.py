@@ -22,7 +22,7 @@
 
 import binascii
 
-from spritzle.rest import delete, get, post, put
+from bottle import delete, get, post, put
 from spritzle.core import core
 import spritzle.common as common
 
@@ -76,11 +76,13 @@ def add_torrent():
         # TODO: add support for adding multiple files at once
         break
 
-    for key, value in bottle.request.forms.items():
-        if key == 'ti':
-            # Ignore ti because it can't be useful
-            continue
-        atp[key] = value
+    body = bottle.request.json
+    if body:
+        for key, value in body.items():
+            if key == 'ti':
+                # Ignore ti because it can't be useful
+                continue
+            atp[key] = value
 
     if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
         # We require that only one of ti, url or info_hash is set

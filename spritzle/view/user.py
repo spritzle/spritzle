@@ -22,7 +22,7 @@
 #
 
 from spritzle import hooks
-from spritzle.rest import delete, get, post, put
+from bottle import delete, get, post, put
 
 @get('/user')
 def get_users(**opts):
