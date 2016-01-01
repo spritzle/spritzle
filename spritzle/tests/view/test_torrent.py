@@ -64,8 +64,9 @@ def test_add_torrent_bad_file():
     }
 
     with patch('bottle.request', request):
-        with assert_raises(bottle.HTTPError):
+        with assert_raises(bottle.HTTPError) as e:
             torrent.add_torrent()
+        assert e.exception.status_code == 400
 
 def test_add_torrent_bad_args():
     request = MagicMock()
@@ -76,5 +77,6 @@ def test_add_torrent_bad_args():
     }
 
     with patch('bottle.request', request):
-        with assert_raises(bottle.HTTPError):
+        with assert_raises(bottle.HTTPError) as e:
             torrent.add_torrent()
+        assert e.exception.status_code == 400
