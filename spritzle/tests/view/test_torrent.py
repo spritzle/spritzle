@@ -47,6 +47,32 @@ def test_add_torrent():
         assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
         assert torrent.get_torrent() == ['44a040be6d74d8d290cd20128788864cbf770719']
 
+def test_add_torrent_lt_runtime_error():
+
+    files = {
+        'random_one_file': bottle.FileUpload(
+            open(os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb'),
+            'random_one_file.torrent',
+            'random_one_file.torrent'
+        )
+    }
+
+    request = MagicMock()
+    request.files = files
+    request.json = {
+        'ti': None,
+        'paused': True,
+    }
+
+    add_torrent = MagicMock()
+    add_torrent.side_effect = RuntimeError()
+
+    with patch('bottle.request', request):
+        with patch('spritzle.core.core.session.add_torrent', add_torrent):
+            with assert_raises(bottle.HTTPError) as e:
+                info_hash = torrent.add_torrent()['info_hash']
+            assert e.exception.status_code == 500
+
 def test_add_torrent_bad_file():
     files = {
         'empty': bottle.FileUpload(
