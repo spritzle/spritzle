@@ -11,6 +11,29 @@ from spritzle.view import torrent
 
 bootstrap()
 
+def create_files_dict(torrent):
+    return {
+        torrent: bottle.FileUpload(
+            open(os.path.join(torrent_dir, torrent + '.torrent'), 'rb'),
+            torrent + '.torrent',
+            torrent + '.torrent'
+        )
+    }
+
+def create_mock_request(files=None, args=None):
+    request = MagicMock()
+    if files:
+        request.files = files
+    request.json = {
+        'ti': None,
+        'paused': True,
+    }
+
+    if args:
+        request.json.update(args)
+
+    return request
+
 def test_get_torrent():
     test_add_torrent()
 
@@ -26,21 +49,8 @@ def test_get_torrent():
         ts = torrent.get_torrent('a0'*20)
 
 def test_add_torrent():
-
-    files = {
-        'random_one_file': bottle.FileUpload(
-            open(os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb'),
-            'random_one_file.torrent',
-            'random_one_file.torrent'
-        )
-    }
-
-    request = MagicMock()
-    request.files = files
-    request.json = {
-        'ti': None,
-        'paused': True,
-    }
+    files = create_files_dict('random_one_file')
+    request = create_mock_request(files=files)
 
     with patch('bottle.request', request):
         info_hash = torrent.add_torrent()['info_hash']
@@ -48,21 +58,8 @@ def test_add_torrent():
         assert torrent.get_torrent() == ['44a040be6d74d8d290cd20128788864cbf770719']
 
 def test_add_torrent_lt_runtime_error():
-
-    files = {
-        'random_one_file': bottle.FileUpload(
-            open(os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb'),
-            'random_one_file.torrent',
-            'random_one_file.torrent'
-        )
-    }
-
-    request = MagicMock()
-    request.files = files
-    request.json = {
-        'ti': None,
-        'paused': True,
-    }
+    files = create_files_dict('random_one_file')
+    request = create_mock_request(files=files)
 
     add_torrent = MagicMock()
     add_torrent.side_effect = RuntimeError()
@@ -74,20 +71,8 @@ def test_add_torrent_lt_runtime_error():
             assert e.exception.status_code == 500
 
 def test_add_torrent_bad_file():
-    files = {
-        'empty': bottle.FileUpload(
-            open(os.path.join(torrent_dir, 'empty.torrent'), 'rb'),
-            'empty.torrent',
-            'empty.torrent'
-        )
-    }
-
-    request = MagicMock()
-    request.files = files
-    request.json = {
-        'ti': None,
-        'paused': True,
-    }
+    files = create_files_dict('empty')
+    request = create_mock_request(files=files)
 
     with patch('bottle.request', request):
         with assert_raises(bottle.HTTPError) as e:
@@ -95,12 +80,10 @@ def test_add_torrent_bad_file():
         assert e.exception.status_code == 400
 
 def test_add_torrent_bad_args():
-    request = MagicMock()
-    request.json = {
-        'ti': None,
-        'url': 'http://testing/test.torrent',
-        'info_hash': 'a0'*20,
-    }
+    request = create_mock_request(args={
+            'url': 'http://testing/test.torrent',
+            'info_hash': 'a0'*20,
+        })
 
     with patch('bottle.request', request):
         with assert_raises(bottle.HTTPError) as e:
