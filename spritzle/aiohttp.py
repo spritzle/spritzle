@@ -31,9 +31,9 @@ class AiohttpServer(bottle.ServerAdapter):
         released bottle.py version
     """
 
-    def __init__(self):
+    def __init__(self, host='127.0.0.1', port=8080, **options):
         self.loop = asyncio.get_event_loop()
-        super(AiohttpServer, self).__init__()
+        super(AiohttpServer, self).__init__(host, port, **options)
 
     def run(self, handler):
         from aiohttp.wsgi import WSGIServerHttpProtocol
