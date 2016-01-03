@@ -1,6 +1,6 @@
 from nose.tools import assert_raises
 
-from spritzle.view import config
+from spritzle.resource import config
 
 def test_get_config():
     with assert_raises(NotImplementedError):

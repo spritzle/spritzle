@@ -1,6 +1,6 @@
 from nose.tools import assert_raises
 
-from spritzle.view import user
+from spritzle.resource import user
 
 def test_get_users():
     with assert_raises(NotImplementedError):

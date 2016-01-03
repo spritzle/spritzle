@@ -1,5 +1,5 @@
 from spritzle.main import bootstrap
-from spritzle.view import session
+from spritzle.resource import session
 
 bootstrap()
 

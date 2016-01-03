@@ -1,5 +1,5 @@
 from spritzle.main import bootstrap
-from spritzle.view import settings
+from spritzle.resource import settings
 
 bootstrap()
 

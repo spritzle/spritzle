@@ -27,12 +27,12 @@ import argparse
 import os
 import asyncio
 
-import spritzle.view.auth
-import spritzle.view.config
-import spritzle.view.session
-import spritzle.view.settings
-import spritzle.view.torrent
-import spritzle.view.user
+import spritzle.resource.auth
+import spritzle.resource.config
+import spritzle.resource.session
+import spritzle.resource.settings
+import spritzle.resource.torrent
+import spritzle.resource.user
 
 from spritzle.aiohttp import AiohttpServer
 from spritzle.core import core

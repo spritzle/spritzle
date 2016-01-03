@@ -7,7 +7,7 @@ import libtorrent as lt
 import bottle
 
 from spritzle.main import bootstrap
-from spritzle.view import torrent
+from spritzle.resource import torrent
 
 bootstrap()
 
