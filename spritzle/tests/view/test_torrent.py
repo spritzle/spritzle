@@ -89,3 +89,24 @@ def test_add_torrent_bad_args():
         with assert_raises(bottle.HTTPError) as e:
             torrent.add_torrent()
         assert e.exception.status_code == 400
+
+def test_remove_torrent():
+    test_add_torrent()
+    tid = '44a040be6d74d8d290cd20128788864cbf770719'
+
+    request = MagicMock()
+    request.json = {'delete_files': True}
+
+    with patch('bottle.request', request):
+        torrent.remove_torrent(tid)
+        assert tid not in torrent.get_torrent()
+
+def test_remove_torrent_all():
+    test_add_torrent()
+
+    request = MagicMock()
+    request.json = {'delete_files': True}
+
+    with patch('bottle.request', request):
+        torrent.remove_torrent()
+        assert len(torrent.get_torrent()) == 0
