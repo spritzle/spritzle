@@ -5,11 +5,12 @@ language: python
 python:
     - "3.5"
 
-virtualenv:
-  system_site_packages: true
-
 before_install:
+    - sudo add-apt-repository ppa:deluge-team/ppa -y
     - sudo apt-get update -qq
-    - sudo apt-get install -y python3-libtorrent python3-coverage
+    - sudo apt-get install -y python3-libtorrent
+
+before_script:
+    - ln -s /usr/lib/python3/dist-packages/*libtorrent* $VIRTUALENV/lib/python3*/site-packages
 
 script: nosetests
