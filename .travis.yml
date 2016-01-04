@@ -7,6 +7,6 @@ python:
 
 before_install:
     - sudo apt-get update -qq
-    - sudo apt-get install -y python3-libtorrent python3-bottle python3-pyinotify
+    - sudo apt-get install -y python3-libtorrent python3-coverage
 
 script: nosetests
