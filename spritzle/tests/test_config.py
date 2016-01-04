@@ -43,19 +43,20 @@ def test_config_load():
         c.load()
         assert c.config == old
 
-def test_on_modified_load():
-    with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
-        c['foo'] = 1
-        json.dump({'foo': 2}, open(c.file, 'w'))
-        c.notifier.handle_read()
-        assert c['foo'] == 2
+# def test_on_modified_load():
+#     with tempfile.TemporaryDirectory() as tempdir:
+#         c = Config(config_dir=tempdir)
+#         c['foo'] = 1
+#         json.dump({'foo': 2}, open(c.file, 'w'))
+#         c.notifier.handle_read()
+#         assert c['foo'] == 2
 
 def test_contains():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c['foo'] = 1
         assert 'foo' in c
+        assert c['foo'] == 1
 
 def test_delitem():
     with tempfile.TemporaryDirectory() as tempdir:

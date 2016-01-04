@@ -20,11 +20,9 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-
 import os
 import json
 import asyncio
-import pyinotify
 
 class Config(object):
     def __init__(self, filename='spritzle.conf', config_dir=None):
@@ -49,17 +47,6 @@ class Config(object):
             self.load()
         else:
             self.save()
-
-        self.wm = pyinotify.WatchManager()
-        self.notifier = pyinotify.AsyncioNotifier(
-            self.wm, 
-            asyncio.get_event_loop(),
-            callback=self.on_file_modified
-        )
-        self.wm.add_watch(self.file, pyinotify.IN_MODIFY)
-
-    def on_file_modified(self, notifier):
-        self.load()
 
     def load(self):
         if os.path.isfile(self.file):
