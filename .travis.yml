@@ -12,5 +12,8 @@ before_install:
 
 before_script:
     - ln -sf /usr/lib/python3/dist-packages/*libtorrent* /home/travis/virtualenv/python3*/lib/python3*/site-packages
+    - ls -l /usr/lib/python3/dist-packages/*libtorrent*
+    - ls -l /home/travis/virtualenv/python3*/lib/python3*/site-packages
+    - python -c "import libtorrent; print(libtorrent.version)"
 
 script: nosetests
