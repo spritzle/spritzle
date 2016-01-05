@@ -14,6 +14,7 @@ before_install:
     - sudo apt-get install -y python3-libtorrent
 
 install:
+    - pip install -r requirements.txt
     - python setup.py install
 
 script: nosetests
