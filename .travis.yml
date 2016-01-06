@@ -5,13 +5,15 @@ language: python
 python:
     - "3.4"
 
-virtualenv:
-  system_site_packages: true
-
 before_install:
     - sudo add-apt-repository ppa:deluge-team/ppa -y
     - sudo apt-get update -qq
     - sudo apt-get install -y python3-libtorrent
+
+before_script:
+    - ln -sf /usr/lib/python3/dist-packages/*libtorrent* /home/travis/virtualenv/python3*/lib/python3*/site-packages
+    - ls -l /usr/lib/python3/dist-packages/*libtorrent*
+    - ls -l /home/travis/virtualenv/python3.4*/lib/python3*/site-packages
 
 install:
     - pip install -r requirements.txt
