@@ -56,3 +56,12 @@ def put_settings_proxy(settings):
 @get('/settings/pe')
 def get_settings_pe():
     return common.struct_to_dict(core.session.get_pe_settings())
+
+@get('/settings/dht')
+def get_settings_dht():
+    return common.struct_to_dict(core.session.get_dht_settings())
+
+@put('/settings/dht')
+def put_settings_dht(settings):
+    s = common.update_struct_with_dict(core.session.get_dht_settings(), settings)
+    core.session.set_dht_settings(s)

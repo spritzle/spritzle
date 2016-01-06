@@ -47,3 +47,18 @@ def test_get_settings_pe():
     s = settings.get_settings_pe()
     assert isinstance(s, dict)
     assert len(s) > 0
+
+def test_get_settings_dht():
+    s = settings.get_settings_dht()
+    assert isinstance(s, dict)
+    assert len(s) > 0
+
+def test_put_settings_dht():
+    test_key = 'max_peers_reply'
+
+    old = settings.get_settings_dht()
+    settings.put_settings_dht({test_key: old[test_key] + 1})
+    new = settings.get_settings_dht()
+
+    assert old[test_key] != new[test_key]
+    assert old[test_key] == new[test_key] - 1
