@@ -32,3 +32,15 @@ def get_session_status():
 @get('/session/cache')
 def get_session_cache_status():
     return common.struct_to_dict(core.session.get_cache_status())
+
+@get('/session/dht')
+def get_dht():
+    return core.session.is_dht_running()
+
+@put('/session/dht')
+def put_dht():
+    core.session.start_dht()
+
+@delete('/session/dht')
+def delete_dht():
+    core.session.stop_dht()
