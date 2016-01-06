@@ -1,8 +1,7 @@
 #
 # spritzle/session.py
 #
-# Copyright (C) 2011 Andrew Resch <andrewresch@gmail.com>
-#               2011 Damien Churchill <damoxc@gmail.com>
+# Copyright (C) 2016 Andrew Resch <andrewresch@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
