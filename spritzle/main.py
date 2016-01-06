@@ -67,5 +67,5 @@ def main():
 
     args = parser.parse_args()
 
-    main = Main(args.port, args.debug, args.reload)
+    main = Main(args.port, args.debug, args.reload, args.config_dir)
     main.start()
