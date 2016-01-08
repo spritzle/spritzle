@@ -22,7 +22,6 @@
 
 import os
 import json
-import asyncio
 
 class Config(object):
     def __init__(self, filename='spritzle.conf', config_dir=None):
