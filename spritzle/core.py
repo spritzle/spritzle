@@ -24,6 +24,7 @@ import libtorrent as lt
 import pkg_resources
 
 from spritzle.config import Config
+from spritzle.alert import Alert
 
 class Core(object):
     def __init__(self):
@@ -39,5 +40,7 @@ class Core(object):
             version.append(0)
 
         self.session = lt.session(lt.fingerprint("SZ", *version), flags=1)
+
+        self.alert = Alert(self.session)
 
 core = Core()
