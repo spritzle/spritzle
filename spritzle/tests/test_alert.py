@@ -21,7 +21,9 @@
 #
 
 from unittest.mock import patch, MagicMock
+
 import spritzle.alert
+from spritzle.tests.common import run_until_complete
 
 class AlertTestOne(object):
     pass
@@ -29,14 +31,14 @@ class AlertTestOne(object):
 class AlertTestTwo(object):
     pass
 
-def test_pop_alerts():
-    loop = MagicMock()
-    asyncio = MagicMock()
-    asyncio.configure_mock(**{
-        'get_event_loop.return_value': loop,
-    })
+def test_alert_stop():
+    a = spritzle.alert.Alert()
+    assert a.run == True
+    a.stop()
+    assert a.run == False
 
-    spritzle.alert.asyncio = asyncio
+@run_until_complete
+async def test_pop_alerts():
     session = MagicMock()
     
     alert_test_one = AlertTestOne()
@@ -47,9 +49,8 @@ def test_pop_alerts():
         'pop_alerts.return_value': [alert_test_one, alert_test_two],
     })
     
-    a = spritzle.alert.Alert(session)
-    loop.call_soon.assert_called_with(a.pop_alerts)
-    loop.reset_mock()
+    a = spritzle.alert.Alert()
+    a.session = session
 
     handler_one = MagicMock()
     a.register_handler('AlertTestOne', handler_one)
@@ -58,11 +59,8 @@ def test_pop_alerts():
     handler_two = MagicMock()
     a.register_handler('AlertTestTwo', handler_two)
     assert 'AlertTestTwo' in a.handlers
-    
-    a.pop_alerts()
+
+    await a.pop_alerts(run_once=True)
 
     handler_one.assert_called_with(alert_test_one)
     handler_two.assert_called_with(alert_test_two)
-
-    loop.call_later.assert_called_with(a.pop_alerts)
-

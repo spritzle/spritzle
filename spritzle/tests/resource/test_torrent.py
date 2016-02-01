@@ -25,110 +25,145 @@ torrent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'torrents
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
+import aiohttp.web_reqrep
+import aiohttp.errors
 import libtorrent as lt
-import bottle
+import asyncio
+import io
 
-from spritzle.main import bootstrap
 from spritzle.resource import torrent
+from spritzle.tests.common import run_until_complete, json_response
+import spritzle.tests.common as common
+from spritzle.main import bootstrap
 
 bootstrap()
 
-def create_files_dict(torrent):
-    return {
-        torrent: bottle.FileUpload(
-            open(os.path.join(torrent_dir, torrent + '.torrent'), 'rb'),
-            torrent + '.torrent',
-            torrent + '.torrent'
-        )
-    }
+loop = asyncio.get_event_loop()
 
-def create_mock_request(files=None, args=None):
+def create_mock_request(filename=None, args=None):
     request = MagicMock()
-    if files:
-        request.files = files
-    request.json = {
-        'ti': None,
-        'paused': True,
-    }
 
-    if args:
-        request.json.update(args)
+    async def json():
+        d = {
+            'ti': None,
+            'paused': True,
+        }
+        if args:
+            d.update(args)
+        return d
+
+    async def post():
+        if filename:
+            filepath = os.path.join(torrent_dir, filename)
+            f = aiohttp.web_reqrep.FileField("file", filename, open(filepath, 'rb'), 'text/plain')
+            return {'file': f}
+        else:
+            return {}
+
+    request = MagicMock()
+    request.json = json
+    request.post = post
 
     return request
 
-def test_get_torrent():
-    test_add_torrent()
+@run_until_complete
+async def test_get_torrent():
+    await test_post_torrent()
 
-    torrents = torrent.get_torrent()
+    request = MagicMock()
+    request.match_info = {}
+
+    torrents = await json_response(torrent.get_torrent(request))
     assert isinstance(torrents, list)
     assert len(torrents) > 0
 
-    ts = torrent.get_torrent('44a040be6d74d8d290cd20128788864cbf770719')
+    request.match_info['tid'] = '44a040be6d74d8d290cd20128788864cbf770719'
+
+    ts = await json_response(torrent.get_torrent(request))
     assert isinstance(ts, dict)
     assert ts['info_hash'] == '44a040be6d74d8d290cd20128788864cbf770719'
 
-    with assert_raises(bottle.HTTPError) as e:
-        ts = torrent.get_torrent('a0'*20)
+    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+        request.match_info['tid'] = 'a0'*20
+        ts = await json_response(torrent.get_torrent(request))
 
-def test_add_torrent():
-    files = create_files_dict('random_one_file')
-    request = create_mock_request(files=files)
+@run_until_complete
+async def test_post_torrent():
+    request = create_mock_request(filename='random_one_file.torrent')
 
-    with patch('bottle.request', request):
-        info_hash = torrent.add_torrent()['info_hash']
-        assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
-        assert torrent.get_torrent() == ['44a040be6d74d8d290cd20128788864cbf770719']
+    response = await json_response(torrent.post_torrent(request))
+    assert 'info_hash' in response
 
-def test_add_torrent_lt_runtime_error():
-    files = create_files_dict('random_one_file')
-    request = create_mock_request(files=files)
+    info_hash = response['info_hash']
+
+    assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
+
+    request = MagicMock()
+    request.match_info = {}
+    tlist = await json_response(torrent.get_torrent(request))
+    assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
+
+@run_until_complete
+async def test_add_torrent_lt_runtime_error():
+    request = create_mock_request(filename='random_one_file.torrent')
 
     add_torrent = MagicMock()
     add_torrent.side_effect = RuntimeError()
 
-    with patch('bottle.request', request):
-        with patch('spritzle.core.core.session.add_torrent', add_torrent):
-            with assert_raises(bottle.HTTPError) as e:
-                info_hash = torrent.add_torrent()['info_hash']
-            assert e.exception.status_code == 500
+    with patch('spritzle.core.core.session.add_torrent', add_torrent):
+        with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+            response = await json_response(torrent.post_torrent(request))
+            assert e.exception.code == 500
 
-def test_add_torrent_bad_file():
-    files = create_files_dict('empty')
-    request = create_mock_request(files=files)
+@run_until_complete
+async def test_add_torrent_bad_file():
+    request = create_mock_request('empty.torrent')
 
-    with patch('bottle.request', request):
-        with assert_raises(bottle.HTTPError) as e:
-            torrent.add_torrent()
-        assert e.exception.status_code == 400
+    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+        await json_response(torrent.post_torrent(request))
+    assert e.exception.code == 400
 
-def test_add_torrent_bad_args():
+@run_until_complete
+async def test_add_torrent_bad_args():
     request = create_mock_request(args={
             'url': 'http://testing/test.torrent',
             'info_hash': 'a0'*20,
         })
 
-    with patch('bottle.request', request):
-        with assert_raises(bottle.HTTPError) as e:
-            torrent.add_torrent()
-        assert e.exception.status_code == 400
+    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+        await json_response(torrent.post_torrent(request))
+    assert e.exception.code == 400
 
-def test_remove_torrent():
-    test_add_torrent()
+@run_until_complete
+async def test_remove_torrent():
+    await test_post_torrent()
     tid = '44a040be6d74d8d290cd20128788864cbf770719'
 
-    request = MagicMock()
-    request.json = {'delete_files': True}
-
-    with patch('bottle.request', request):
-        torrent.remove_torrent(tid)
-        assert tid not in torrent.get_torrent()
-
-def test_remove_torrent_all():
-    test_add_torrent()
+    async def json():
+        return {'delete_files': True}
 
     request = MagicMock()
-    request.json = {'delete_files': True}
+    request.match_info = {
+        'tid': tid
+    }
+    request.json = json
 
-    with patch('bottle.request', request):
-        torrent.remove_torrent()
-        assert len(torrent.get_torrent()) == 0
+    await json_response(torrent.delete_torrent(request))
+    request = MagicMock()
+    request.match_info = {}
+
+    assert tid not in await json_response(torrent.get_torrent(request))
+
+@run_until_complete
+async def test_remove_torrent_all():
+    await test_post_torrent()
+
+    async def json():
+        return {'delete_files': True}
+
+    request = MagicMock()
+    request.json = json
+    request.match_info = {}
+
+    await json_response(torrent.delete_torrent(request))
+    assert len(torrent.get_torrent_list()) == 0

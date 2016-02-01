@@ -20,47 +20,13 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import delete, get, post, put
+from aiohttp import web
 from spritzle.core import core
-import spritzle.common as common
 
-import libtorrent
+async def get_settings(request):
+    return web.json_response(core.session.get_settings())
 
-@get('/settings/session')
-def get_settings_session():
-    return common.struct_to_dict(core.session.settings())
-
-@put('/settings/session')
-def put_settings_session(settings):
-    s = common.update_struct_with_dict(core.session.settings(), settings)
-    core.session.set_settings(s)
-
-@get('/settings/session/high_performance_seed')
-def get_settings_session_hps():
-    return common.struct_to_dict(libtorrent.high_performance_seed())
-
-@get('/settings/session/min_memory_usage')
-def get_settings_session_mmu():
-    return common.struct_to_dict(libtorrent.min_memory_usage())
-
-@get('/settings/proxy')
-def get_settings_proxy():
-    return common.struct_to_dict(core.session.proxy())
-
-@put('/settings/proxy')
-def put_settings_proxy(settings):
-    s = common.update_struct_with_dict(core.session.proxy(), settings)
-    core.session.set_proxy(s)
-
-@get('/settings/pe')
-def get_settings_pe():
-    return common.struct_to_dict(core.session.get_pe_settings())
-
-@get('/settings/dht')
-def get_settings_dht():
-    return common.struct_to_dict(core.session.get_dht_settings())
-
-@put('/settings/dht')
-def put_settings_dht(settings):
-    s = common.update_struct_with_dict(core.session.get_dht_settings(), settings)
-    core.session.set_dht_settings(s)
+async def put_settings(request):
+    settings = await request.json()
+    core.session.set_settings(settings)
+    return web.json_response()

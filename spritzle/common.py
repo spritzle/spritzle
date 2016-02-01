@@ -41,30 +41,38 @@ def struct_to_dict(struct, ignore_keys=None):
     def enum(value):
         return value.name
 
+    def error_code(value):
+        return {
+            'value': value.value(),
+            'message': value.message(),
+            'category': {
+                'name': value.category().name(),
+                'message': value.category().message(value.value()),
+            },
+        }
+
     type_converters = {
         lt.sha1_hash: lt_sha1_hash,
         datetime.timedelta: datetime_timedelta,
         lt.torrent_status.states: enum,
+        lt.error_code: error_code,
     }
 
     d = {}
     keys = [x for x in dir(struct) if not x.startswith('_')]
 
     for key in keys:
-        try:
-            value = getattr(struct, key)
-            vtype = type(value)
+        value = getattr(struct, key)
+        vtype = type(value)
 
-            if ignore_keys and key in ignore_keys:
-                continue
+        if ignore_keys and key in ignore_keys:
+            continue
 
-            # Convert the value if necessary
-            if vtype in type_converters:
-                value = type_converters[vtype](value)
+        # Convert the value if necessary
+        if vtype in type_converters:
+            value = type_converters[vtype](value)
 
-            d[key] = value
-        except TypeError as e:
-            pass
+        d[key] = value
 
     return d
 

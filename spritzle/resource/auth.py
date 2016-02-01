@@ -20,8 +20,5 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import delete, get, post, put
-
-@post('/login')
-def login():
+async def post_auth(request):
     raise NotImplementedError

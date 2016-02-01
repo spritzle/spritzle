@@ -20,10 +20,13 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from unittest.mock import MagicMock
 from nose.tools import assert_raises
 
+from spritzle.tests.common import run_until_complete
 from spritzle.resource import auth
 
-def test_login():
+@run_until_complete
+async def test_post_auth():
     with assert_raises(NotImplementedError):
-        auth.login()
+        await auth.post_auth(MagicMock())

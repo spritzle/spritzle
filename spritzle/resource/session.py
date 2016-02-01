@@ -20,26 +20,12 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import delete, get, post, put
+from aiohttp import web
 from spritzle.core import core
-import spritzle.common as common
 
-@get('/session')
-def get_session_status():
-    return common.struct_to_dict(core.session.status())
+async def get_session(self):
+    # TODO: Fix for libtorrent 1.1 api.
+    return web.json_response({'foo': 'status'})
 
-@get('/session/cache')
-def get_session_cache_status():
-    return common.struct_to_dict(core.session.get_cache_status())
-
-@get('/session/dht')
-def get_dht():
-    return core.session.is_dht_running()
-
-@put('/session/dht')
-def put_dht():
-    core.session.start_dht()
-
-@delete('/session/dht')
-def delete_dht():
-    core.session.stop_dht()
+async def get_session_dht(self):
+    return web.json_response(core.session.is_dht_running())

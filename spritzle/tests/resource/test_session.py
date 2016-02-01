@@ -20,31 +20,23 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
+from unittest.mock import MagicMock
+from nose.tools import assert_raises
+
 from spritzle.main import bootstrap
 from spritzle.resource import session
+from spritzle.tests.common import run_until_complete, json_response
 
 bootstrap()
 
-def test_get_session_status():
-    s = session.get_session_status()
+@run_until_complete
+async def test_get_session():
+    s = await json_response(session.get_session(MagicMock()))
     assert isinstance(s, dict)
     assert len(s) > 0
 
-def test_get_session_cache_status():
-    s = session.get_session_cache_status()
-    assert isinstance(s, dict)
-    assert len(s) > 0
-
-def test_get_dht():
-    b = session.get_dht()
-    assert b == False
-
-def test_put_dht():
-    session.put_dht()
-    b = session.get_dht()
+@run_until_complete
+async def test_get_session_dht():
+    b = await json_response(session.get_session_dht(MagicMock()))
     assert b == True
-
-def test_delete_dht():
-    session.delete_dht()
-    b = session.get_dht()
-    assert b == False

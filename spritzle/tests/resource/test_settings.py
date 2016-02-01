@@ -20,67 +20,42 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
+from unittest.mock import MagicMock
+
 from spritzle.main import bootstrap
 from spritzle.resource import settings
+import spritzle.tests.common as common
+from spritzle.tests.common import run_until_complete, json_response
+
+loop = asyncio.get_event_loop()
 
 bootstrap()
 
-def test_get_settings_session():
-    s = settings.get_settings_session()
+@run_until_complete
+async def test_get_settings():
+    s = await json_response(settings.get_settings(MagicMock()))
+
     assert isinstance(s, dict)
     assert len(s) > 0
 
-def test_put_settings_session():
+@run_until_complete
+async def test_put_settings():
+    old = await json_response(settings.get_settings(MagicMock()))
     test_key = 'peer_connect_timeout'
 
-    old = settings.get_settings_session()
-    settings.put_settings_session({test_key: old[test_key] + 1})
-    new = settings.get_settings_session()
+    async def json():
+        return {test_key: old[test_key] + 1}
 
-    assert old[test_key] != new[test_key]
-    assert old[test_key] == new[test_key] - 1
+    request = MagicMock()
+    request.configure_mock(**{
+        'json.return_value': json(),
+    })
 
-def test_get_settings_session_hps():
-    s = settings.get_settings_session_hps()
-    assert isinstance(s, dict)
-    assert len(s) > 0
+    response = await settings.put_settings(request)
+    assert response.status == 200
 
-def test_get_settings_session_mmu():
-    s = settings.get_settings_session_mmu()
-    assert isinstance(s, dict)
-    assert len(s) > 0
-
-def test_get_settings_proxy():
-    s = settings.get_settings_proxy()
-    assert isinstance(s, dict)
-    assert len(s) > 0
-
-def test_put_settings_proxy():
-    test_key = 'hostname'
-
-    old = settings.get_settings_proxy()
-    settings.put_settings_proxy({test_key: 'test_host'})
-    new = settings.get_settings_proxy()
-
-    assert old[test_key] != new[test_key]
-    assert new[test_key] == 'test_host'
-
-def test_get_settings_pe():
-    s = settings.get_settings_pe()
-    assert isinstance(s, dict)
-    assert len(s) > 0
-
-def test_get_settings_dht():
-    s = settings.get_settings_dht()
-    assert isinstance(s, dict)
-    assert len(s) > 0
-
-def test_put_settings_dht():
-    test_key = 'max_peers_reply'
-
-    old = settings.get_settings_dht()
-    settings.put_settings_dht({test_key: old[test_key] + 1})
-    new = settings.get_settings_dht()
+    new = await json_response(settings.get_settings(MagicMock()))
 
     assert old[test_key] != new[test_key]
     assert old[test_key] == new[test_key] - 1

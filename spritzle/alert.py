@@ -21,20 +21,23 @@
 #
 
 import asyncio
+import functools
 
 import libtorrent as lt
 
 class Alert(object):
-    def __init__(self, session):
+    def __init__(self):
         self.loop = asyncio.get_event_loop()
-
-        self.session = session
-        self.session.set_alert_mask(
-            lt.alert.category_t.all_categories)
-
         self.handlers = {}
+        self.run = True
 
-        self.loop.call_soon(self.pop_alerts)
+    def start(self, session):
+        self.session = session
+        self.run = True
+        asyncio.ensure_future(self.pop_alerts())
+
+    def stop(self):
+        self.run = False
 
     def register_handler(self, alert_type, handler):
         if alert_type not in self.handlers:
@@ -42,13 +45,16 @@ class Alert(object):
 
         self.handlers[alert_type].append(handler)
 
-    def pop_alerts(self):
-        if self.session.wait_for_alert(5000):
-            for alert in self.session.pop_alerts():
-                alert_type = type(alert).__name__
+    async def pop_alerts(self, run_once=False):
+        while self.run or run_once:
+            if await self.loop.run_in_executor(
+                None, functools.partial(self.session.wait_for_alert), 200):
+                for alert in self.session.pop_alerts():
+                    alert_type = type(alert).__name__
+                    print('alert: {}'.format(alert_type))
 
-                if alert_type in self.handlers:
-                    for handler in self.handlers[alert_type]:
-                        handler(alert)
-
-        self.loop.call_later(self.pop_alerts)
+                    if alert_type in self.handlers:
+                        for handler in self.handlers[alert_type]:
+                            handler(alert)
+            if run_once:
+                break

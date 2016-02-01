@@ -20,23 +20,34 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import signal
+import functools
+
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
 import spritzle.main
 
-def test_main_class():
+def test_main_start():
     main = spritzle.main.Main(12345)
     assert main.port == 12345
+    main.loop = MagicMock()
+    with patch('spritzle.main.core') as core:
+        with patch('spritzle.main.run_app') as run_app:
+            main.start()
+            run_app.assert_called_once_with(spritzle.main.app)
+        assert core.init.called
+    assert main.loop.add_signal_handler.called
 
-    with patch('spritzle.main.bottle.run'):
-        main.start()
-        spritzle.main.bottle.run.assert_called_once_with(
-            port=12345,
-            reloader=False,
-            debug=False,
-            server=spritzle.main.AiohttpServer
-        )
+def test_main_stop():
+    main = spritzle.main.Main(12345)
+    main.executor = MagicMock()
+    main.loop = MagicMock()
+    with patch('spritzle.main.core') as core:
+        main.stop()
+        assert core.stop.called
+    assert main.loop.stop.called
+    assert main.executor.shutdown.called
 
 def test_main_entry_point():
     with patch('spritzle.main.Main.start'):

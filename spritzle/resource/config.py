@@ -20,12 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from bottle import delete, get, post, put
-
-@get('/config')
-def get_config(fmt=None):
+async def get_config(request):
     raise NotImplementedError
 
-@put('/config')
-def update_config(fmt=None):
+async def put_config(request):
     raise NotImplementedError

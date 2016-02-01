@@ -28,19 +28,21 @@ from spritzle.alert import Alert
 
 class Core(object):
     def __init__(self):
-        pass
+        self.alert = Alert()
 
     def init(self, config_dir):
         self.config = Config('spritzle.conf', config_dir)
 
-        version = pkg_resources.require("spritzle")[0].version
-        version = [int(value.split("-")[0]) for value in version.split(".")]
+        self.session = lt.session({
+            'alert_mask': lt.alert.category_t.all_categories,
+            'user_agent': 'Spritzle/%s libtorrent/%s' % (
+                pkg_resources.require("spritzle")[0].version,
+                lt.__version__),
+            })
 
-        while len(version) < 4:
-            version.append(0)
+        self.alert.start(self.session)
 
-        self.session = lt.session(lt.fingerprint("SZ", *version), flags=1)
-
-        self.alert = Alert(self.session)
+    def stop(self):
+        self.alert.stop()
 
 core = Core()
