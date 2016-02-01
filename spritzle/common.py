@@ -23,6 +23,7 @@
 import libtorrent as lt
 import datetime
 
+
 def struct_to_dict(struct, ignore_keys=None):
     """
     Convert a libtorrent struct into a dictionary by finding all
@@ -75,6 +76,7 @@ def struct_to_dict(struct, ignore_keys=None):
         d[key] = value
 
     return d
+
 
 def update_struct_with_dict(struct, dictionary):
     """

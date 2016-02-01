@@ -20,17 +20,14 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import asyncio
 from unittest.mock import MagicMock
 
 from spritzle.main import bootstrap
 from spritzle.resource import settings
-import spritzle.tests.common as common
 from spritzle.tests.common import run_until_complete, json_response
 
-loop = asyncio.get_event_loop()
-
 bootstrap()
+
 
 @run_until_complete
 async def test_get_settings():
@@ -38,6 +35,7 @@ async def test_get_settings():
 
     assert isinstance(s, dict)
     assert len(s) > 0
+
 
 @run_until_complete
 async def test_put_settings():

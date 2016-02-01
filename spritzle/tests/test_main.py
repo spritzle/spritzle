@@ -20,13 +20,10 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import signal
-import functools
-
 from unittest.mock import patch, MagicMock
-from nose.tools import assert_raises
 
 import spritzle.main
+
 
 def test_main_start():
     main = spritzle.main.Main(12345)
@@ -39,6 +36,7 @@ def test_main_start():
         assert core.init.called
     assert main.loop.add_signal_handler.called
 
+
 def test_main_stop():
     main = spritzle.main.Main(12345)
     main.executor = MagicMock()
@@ -49,9 +47,10 @@ def test_main_stop():
     assert main.loop.stop.called
     assert main.executor.shutdown.called
 
+
 def test_main_entry_point():
     with patch('spritzle.main.Main.start'):
         with patch('sys.argv'):
-        
+
             spritzle.main.main()
             spritzle.main.Main.start.assert_called_once_with()

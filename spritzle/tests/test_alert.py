@@ -20,27 +20,31 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import spritzle.alert
 from spritzle.tests.common import run_until_complete
 
+
 class AlertTestOne(object):
     pass
+
 
 class AlertTestTwo(object):
     pass
 
+
 def test_alert_stop():
     a = spritzle.alert.Alert()
-    assert a.run == True
+    assert a.run
     a.stop()
-    assert a.run == False
+    assert not a.run
+
 
 @run_until_complete
 async def test_pop_alerts():
     session = MagicMock()
-    
+
     alert_test_one = AlertTestOne()
     alert_test_two = AlertTestTwo()
 
@@ -48,7 +52,7 @@ async def test_pop_alerts():
         'wait_for_alert.return_value': True,
         'pop_alerts.return_value': [alert_test_one, alert_test_two],
     })
-    
+
     a = spritzle.alert.Alert()
     a.session = session
 

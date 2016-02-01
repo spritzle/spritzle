@@ -2,6 +2,7 @@ import json
 import asyncio
 import functools
 
+
 def run_until_complete(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -12,8 +13,9 @@ def run_until_complete(f):
             return loop.run_until_complete(future)
         else:
             return asyncio.ensure_future(future)
-            
+
     return wrapper
+
 
 async def json_response(cr):
     response = await cr

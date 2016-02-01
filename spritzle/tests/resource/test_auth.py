@@ -26,6 +26,7 @@ from nose.tools import assert_raises
 from spritzle.tests.common import run_until_complete
 from spritzle.resource import auth
 
+
 @run_until_complete
 async def test_post_auth():
     with assert_raises(NotImplementedError):

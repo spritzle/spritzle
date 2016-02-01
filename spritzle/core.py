@@ -26,6 +26,7 @@ import pkg_resources
 from spritzle.config import Config
 from spritzle.alert import Alert
 
+
 class Core(object):
     def __init__(self):
         self.alert = Alert()

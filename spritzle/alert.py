@@ -23,7 +23,6 @@
 import asyncio
 import functools
 
-import libtorrent as lt
 
 class Alert(object):
     def __init__(self):
@@ -48,7 +47,7 @@ class Alert(object):
     async def pop_alerts(self, run_once=False):
         while self.run or run_once:
             if await self.loop.run_in_executor(
-                None, functools.partial(self.session.wait_for_alert), 200):
+                    None, functools.partial(self.session.wait_for_alert), 200):
                 for alert in self.session.pop_alerts():
                     alert_type = type(alert).__name__
                     print('alert: {}'.format(alert_type))

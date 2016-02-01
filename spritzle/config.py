@@ -23,15 +23,15 @@
 import os
 import json
 
+
 class Config(object):
     def __init__(self, filename='spritzle.conf', config_dir=None):
-        
         self.config = {}
 
         if config_dir is None:
             self.dir = os.path.join(
-                os.path.expanduser('~'), 
-                '.config', 
+                os.path.expanduser('~'),
+                '.config',
                 'spritzle'
             )
         else:

@@ -20,11 +20,14 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+
 class SpritzleError(Exception):
     pass
 
+
 class InvalidEncodingError(SpritzleError):
     pass
-    
+
+
 class InvalidHook(SpritzleError):
     pass

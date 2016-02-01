@@ -21,24 +21,22 @@
 #
 
 import os
-torrent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'torrents')
+
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
-import aiohttp.web_reqrep
+from aiohttp.web_reqrep import FileField
 import aiohttp.errors
-import libtorrent as lt
-import asyncio
-import io
 
 from spritzle.resource import torrent
 from spritzle.tests.common import run_until_complete, json_response
-import spritzle.tests.common as common
 from spritzle.main import bootstrap
 
 bootstrap()
 
-loop = asyncio.get_event_loop()
+torrent_dir = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'torrents')
+
 
 def create_mock_request(filename=None, args=None):
     request = MagicMock()
@@ -55,7 +53,7 @@ def create_mock_request(filename=None, args=None):
     async def post():
         if filename:
             filepath = os.path.join(torrent_dir, filename)
-            f = aiohttp.web_reqrep.FileField("file", filename, open(filepath, 'rb'), 'text/plain')
+            f = FileField("file", filename, open(filepath, 'rb'), 'text/plain')
             return {'file': f}
         else:
             return {}
@@ -65,6 +63,7 @@ def create_mock_request(filename=None, args=None):
     request.post = post
 
     return request
+
 
 @run_until_complete
 async def test_get_torrent():
@@ -86,6 +85,8 @@ async def test_get_torrent():
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         request.match_info['tid'] = 'a0'*20
         ts = await json_response(torrent.get_torrent(request))
+        assert e.code == 400
+
 
 @run_until_complete
 async def test_post_torrent():
@@ -103,6 +104,7 @@ async def test_post_torrent():
     tlist = await json_response(torrent.get_torrent(request))
     assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
 
+
 @run_until_complete
 async def test_add_torrent_lt_runtime_error():
     request = create_mock_request(filename='random_one_file.torrent')
@@ -112,8 +114,9 @@ async def test_add_torrent_lt_runtime_error():
 
     with patch('spritzle.core.core.session.add_torrent', add_torrent):
         with assert_raises(aiohttp.errors.HttpProcessingError) as e:
-            response = await json_response(torrent.post_torrent(request))
+            await json_response(torrent.post_torrent(request))
             assert e.exception.code == 500
+
 
 @run_until_complete
 async def test_add_torrent_bad_file():
@@ -122,6 +125,7 @@ async def test_add_torrent_bad_file():
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         await json_response(torrent.post_torrent(request))
     assert e.exception.code == 400
+
 
 @run_until_complete
 async def test_add_torrent_bad_args():
@@ -133,6 +137,7 @@ async def test_add_torrent_bad_args():
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         await json_response(torrent.post_torrent(request))
     assert e.exception.code == 400
+
 
 @run_until_complete
 async def test_remove_torrent():
@@ -153,6 +158,7 @@ async def test_remove_torrent():
     request.match_info = {}
 
     assert tid not in await json_response(torrent.get_torrent(request))
+
 
 @run_until_complete
 async def test_remove_torrent_all():

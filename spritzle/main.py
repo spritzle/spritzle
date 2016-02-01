@@ -20,9 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import json
 import argparse
-import os
 import asyncio
 import signal
 import functools
@@ -37,15 +35,13 @@ import spritzle.resource.settings
 import spritzle.resource.torrent
 
 from spritzle.core import core
-from spritzle import hooks
-from spritzle.error import InvalidEncodingError
-from spritzle.hooks import register_default
 
 app = aiohttp.web.Application()
 
+
 def run_app(app, *, host='0.0.0.0', port=None,
             shutdown_timeout=60.0, ssl_context=None,
-            print=print): # pragma: no cover
+            print=print):  # pragma: no cover
     """Run an app locally
 
     TODO: Remove this when aiohttp release has it.
@@ -79,6 +75,7 @@ def run_app(app, *, host='0.0.0.0', port=None,
         loop.run_until_complete(app.finish())
     loop.close()
 
+
 class Main(object):
 
     def __init__(self, port, debug=False, config_dir=None):
@@ -96,15 +93,24 @@ class Main(object):
 
     def setup_routes(self):
         # TODO: Turn these into decorators.
-        app.router.add_route('POST', '/auth', spritzle.resource.auth.post_auth)
-        app.router.add_route('GET', '/config', spritzle.resource.config.get_config)
-        app.router.add_route('PUT', '/config', spritzle.resource.config.put_config)
-        app.router.add_route('GET', '/session', spritzle.resource.session.get_session)
-        app.router.add_route('GET', '/session/dht', spritzle.resource.session.get_session_dht)
-        app.router.add_route('GET', '/torrent', spritzle.resource.torrent.get_torrent)
-        app.router.add_route('GET', '/torrent/{tid}', spritzle.resource.torrent.get_torrent)
-        app.router.add_route('POST', '/torrent', spritzle.resource.torrent.post_torrent)
-        app.router.add_route('DELETE', '/torrent', spritzle.resource.torrent.delete_torrent)
+        app.router.add_route('POST', '/auth',
+                             spritzle.resource.auth.post_auth)
+        app.router.add_route('GET', '/config',
+                             spritzle.resource.config.get_config)
+        app.router.add_route('PUT', '/config',
+                             spritzle.resource.config.put_config)
+        app.router.add_route('GET', '/session',
+                             spritzle.resource.session.get_session)
+        app.router.add_route('GET', '/session/dht',
+                             spritzle.resource.session.get_session_dht)
+        app.router.add_route('GET', '/torrent',
+                             spritzle.resource.torrent.get_torrent)
+        app.router.add_route('GET', '/torrent/{tid}',
+                             spritzle.resource.torrent.get_torrent)
+        app.router.add_route('POST', '/torrent',
+                             spritzle.resource.torrent.post_torrent)
+        app.router.add_route('DELETE', '/torrent',
+                             spritzle.resource.torrent.delete_torrent)
 
     def stop(self):
         core.stop()
@@ -121,12 +127,15 @@ class Main(object):
 
         run_app(app)
 
+
 def bootstrap(config_dir=None):
     core.init(config_dir)
 
+
 def main():
     parser = argparse.ArgumentParser(description='Spritzled')
-    parser.add_argument('--debug', dest='debug', default=False, action='store_true')
+    parser.add_argument(
+        '--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
     parser.add_argument('-c', '--config_dir', dest='config_dir', type=str)
 

@@ -22,7 +22,6 @@
 import binascii
 
 from aiohttp import web
-from aiohttp.multipart import MultipartReader
 from aiohttp.errors import HttpProcessingError
 
 from spritzle.core import core
@@ -30,15 +29,18 @@ import spritzle.common as common
 
 import libtorrent as lt
 
+
 def get_valid_handle(tid):
     """
     Either returns a valid torrent_handle or aborts with a client-error (400)
     """
     handle = core.session.find_torrent(lt.sha1_hash(binascii.unhexlify(tid)))
     if not handle.is_valid():
-        raise HttpProcessingError(code=400, message='Invalid info-hash: ' + tid)
+        raise HttpProcessingError(
+            code=400, message='Invalid info-hash: ' + tid)
 
     return handle
+
 
 def get_torrent_list():
     return [str(th.info_hash()) for th in core.session.get_torrents()]
@@ -52,11 +54,11 @@ async def get_torrent(request):
         handle = get_valid_handle(tid)
 
         # We don't want to return all of the keys as they are just an enum
-        ignored_status_keys = ['states'] + list(lt.torrent_status.states.names.keys())
+        ignored = ['states'] + list(lt.torrent_status.states.names.keys())
 
         status = common.struct_to_dict(
             handle.status(),
-            ignore_keys=ignored_status_keys,
+            ignore_keys=ignored,
         )
 
         return web.json_response(status)
@@ -84,7 +86,8 @@ async def post_torrent(request):
         try:
             atp['ti'] = lt.torrent_info(lt.bdecode(data))
         except RuntimeError as e:
-            raise HttpProcessingError(code=400, message='Not a valid torrent file!')
+            raise HttpProcessingError(
+                code=400, message='Not a valid torrent file!')
 
     body = await request.json()
     if body:
@@ -97,7 +100,9 @@ async def post_torrent(request):
     if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
         # We require that only one of ti, url or info_hash is set
         raise HttpProcessingError(
-            code=400, message="Only one of 'ti', 'url' or 'info_hash' allowed.")
+            code=400,
+            message="Only one of 'ti', 'url' or 'info_hash' allowed."
+        )
 
     try:
         th = core.session.add_torrent(atp)

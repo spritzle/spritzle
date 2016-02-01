@@ -24,6 +24,7 @@ import binascii
 import libtorrent as lt
 import spritzle.common as common
 
+
 def test_struct_to_dict():
     class struct(object):
         a = 1
@@ -42,6 +43,7 @@ def test_struct_to_dict():
     assert len(d) == 3
     assert d['sha1_hash'] == 'a0'*20
 
+
 def test_update_struct_with_dict():
     class struct(object):
         a = 1
@@ -54,4 +56,4 @@ def test_update_struct_with_dict():
 
     assert s.a == 3
     assert s.b == 2
-    assert hasattr(s, 'c') == False
+    assert not hasattr(s, 'c')

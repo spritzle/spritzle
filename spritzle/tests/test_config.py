@@ -25,7 +25,7 @@ from spritzle.config import Config
 import tempfile
 import os
 import shutil
-import json
+
 
 def test_config_init_no_dir():
     tmpdir = os.path.join(tempfile.gettempdir(), 'spritzletmpdir')
@@ -41,13 +41,15 @@ def test_config_init_no_dir():
 
     assert os.path.isfile(
         os.path.join(
-            tmpdir, '.config', 'spritzle', 'spritzle.conf')) == True
+            tmpdir, '.config', 'spritzle', 'spritzle.conf'))
 
     shutil.rmtree(tmpdir)
 
+
 def test_config_init_with_dir():
     with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
+        Config(config_dir=tempdir)
+
 
 def test_config_save():
     with tempfile.TemporaryDirectory() as tempdir:
@@ -57,6 +59,7 @@ def test_config_save():
         c.load()
         assert old == c.config
 
+
 def test_config_load():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
@@ -65,13 +68,6 @@ def test_config_load():
         c.load()
         assert c.config == old
 
-# def test_on_modified_load():
-#     with tempfile.TemporaryDirectory() as tempdir:
-#         c = Config(config_dir=tempdir)
-#         c['foo'] = 1
-#         json.dump({'foo': 2}, open(c.file, 'w'))
-#         c.notifier.handle_read()
-#         assert c['foo'] == 2
 
 def test_contains():
     with tempfile.TemporaryDirectory() as tempdir:
@@ -80,12 +76,14 @@ def test_contains():
         assert 'foo' in c
         assert c['foo'] == 1
 
+
 def test_delitem():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c['foo'] = 1
         del c['foo']
         assert 'foo' not in c
+
 
 def test_get():
     with tempfile.TemporaryDirectory() as tempdir:

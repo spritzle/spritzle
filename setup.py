@@ -24,18 +24,18 @@
 
 from setuptools import setup
 
-setup (
-    name         = 'spritzle',
-    version      = '0.1',
-    fullname     = 'Spritzle Bittorrent Client',
-    description  = 'Lightweight Bitorrent Client',
-    author       = 'Andrew Resch',
-    author_email = 'andrewresch@gmail.com',
-    keywords     = 'torrent bittorrent p2p fileshare filesharing',
-    url          = 'http://github.com/damoxc/spritzle',
-    license      = 'GPLv3',
-    packages     = ['spritzle', 'spritzle.resource'],
-    entry_points = {
+setup(
+    name='spritzle',
+    version='0.1',
+    fullname='Spritzle Bittorrent Client',
+    description='Lightweight Bitorrent Client',
+    author='Andrew Resch',
+    author_email='andrewresch@gmail.com',
+    keywords='torrent bittorrent p2p fileshare filesharing',
+    url='http://github.com/damoxc/spritzle',
+    license='GPLv3',
+    packages=['spritzle', 'spritzle.resource'],
+    entry_points={
         'console_scripts': [
             'spritzled =  spritzle.main:main'
         ]

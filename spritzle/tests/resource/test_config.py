@@ -20,17 +20,18 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import asyncio
 from unittest.mock import MagicMock
 from nose.tools import assert_raises
 
 from spritzle.tests.common import run_until_complete
 from spritzle.resource import config
 
+
 @run_until_complete
 async def test_get_config():
     with assert_raises(NotImplementedError):
         await config.get_config(MagicMock())
+
 
 @run_until_complete
 async def test_put_config():
