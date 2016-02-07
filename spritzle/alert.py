@@ -24,11 +24,17 @@ import asyncio
 import functools
 
 
+def debug_handler(alert):
+    print('alert: {}'.format(type(alert).__name__))
+
 class Alert(object):
     def __init__(self):
         self.loop = asyncio.get_event_loop()
-        self.handlers = {}
+        self.handlers = {
+            '*': [],
+        }
         self.run = True
+        self.register_handler('*', debug_handler)
 
     def start(self, session):
         self.session = session
@@ -50,10 +56,13 @@ class Alert(object):
                     None, functools.partial(self.session.wait_for_alert), 200):
                 for alert in self.session.pop_alerts():
                     alert_type = type(alert).__name__
-                    print('alert: {}'.format(alert_type))
 
-                    if alert_type in self.handlers:
-                        for handler in self.handlers[alert_type]:
-                            handler(alert)
+                    handlers = set(
+                        self.handlers.get(alert_type, []) +
+                        self.handlers['*'])
+
+                    for handler in handlers:
+                        handler(alert)
+
             if run_once:
                 break
