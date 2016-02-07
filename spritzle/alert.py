@@ -27,6 +27,7 @@ import functools
 def debug_handler(alert):
     print('alert: {}'.format(type(alert).__name__))
 
+
 class Alert(object):
     def __init__(self):
         self.loop = asyncio.get_event_loop()
