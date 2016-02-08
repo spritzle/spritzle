@@ -30,7 +30,7 @@ def test_main_start():
     assert main.port == 12345
     main.loop = MagicMock()
     with patch('spritzle.main.core') as core:
-        with patch('spritzle.main.run_app') as run_app:
+        with patch('aiohttp.web.run_app') as run_app:
             main.start()
             run_app.assert_called_once_with(spritzle.main.app)
         assert core.init.called
