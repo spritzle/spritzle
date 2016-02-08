@@ -1,5 +1,5 @@
 #
-# spritzle/session.py
+# test_core.py
 #
 # Copyright (C) 2016 Andrew Resch <andrewresch@gmail.com>
 #
@@ -20,13 +20,22 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from aiohttp import web
-from spritzle.core import core
+from unittest.mock import patch, MagicMock
+import tempfile
+import os
+
+import spritzle.core
 
 
-async def get_session(self):
-    status = await core.get_session_status()
-    return web.json_response(status)
+def test_save_state():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path_mock = MagicMock(return_value=os.path.join(tmpdir, "state"))
+        patch('os.path.expanduser', new=path_mock).start()
 
-async def get_session_dht(self):
-    return web.json_response(core.session.is_dht_running())
+        core = spritzle.core.Core()
+        assert not os.path.exists(core.get_lt_state_file_path())
+
+        core.init(os.path.join(tmpdir, "config"))
+        core.save_state()
+
+        assert os.path.exists(core.get_lt_state_file_path())

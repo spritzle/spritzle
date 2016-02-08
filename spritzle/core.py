@@ -20,8 +20,10 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import libtorrent as lt
+import asyncio
 import pkg_resources
+
+import libtorrent as lt
 
 from spritzle.config import Config
 from spritzle.alert import Alert
@@ -30,6 +32,12 @@ from spritzle.alert import Alert
 class Core(object):
     def __init__(self):
         self.alert = Alert()
+        self.alert.register_handler(
+            'session_stats_alert',
+            self.on_session_stats_alert
+        )
+
+        self.session_stats_future = None
 
     def init(self, config_dir):
         self.config = Config('spritzle.conf', config_dir)
@@ -45,5 +53,17 @@ class Core(object):
 
     def stop(self):
         self.alert.stop()
+
+    def on_session_stats_alert(self, alert):
+        self.session_stats_future.set_result(alert.values)
+
+    async def get_session_status(self):
+        if self.session_stats_future is None or \
+                self.session_stats_future.done():
+            self.session_stats_future = asyncio.Future()
+            self.session.post_session_stats()
+
+        await self.session_stats_future
+        return self.session_stats_future.result()
 
 core = Core()
