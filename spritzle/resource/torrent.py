@@ -89,13 +89,17 @@ async def post_torrent(request):
             raise HttpProcessingError(
                 code=400, message='Not a valid torrent file!')
 
-    body = await request.json()
-    if body:
-        for key, value in body.items():
-            if key == 'ti':
-                # Ignore ti because it can't be useful
-                continue
-            atp[key] = value
+    if request.has_body:
+        try:
+            body = await request.json()
+        except UnicodeDecodeError:
+            body = None
+        if body:
+            for key, value in body.items():
+                if key == 'ti':
+                    # Ignore ti because it can't be useful
+                    continue
+                atp[key] = value
 
     if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
         # We require that only one of ti, url or info_hash is set

@@ -61,6 +61,7 @@ def create_mock_request(filename=None, args=None):
     request = MagicMock()
     request.json = json
     request.post = post
+    request.has_body = True
 
     return request
 
@@ -103,6 +104,21 @@ async def test_post_torrent():
     request.match_info = {}
     tlist = await json_response(torrent.get_torrent(request))
     assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
+
+
+@run_until_complete
+async def test_post_torrent_bad_body():
+    request = create_mock_request(filename='random_one_file.torrent')
+    async def json():
+        return b'\xc3\x28'.decode("utf8")
+
+    request.json = json
+    response = await json_response(torrent.post_torrent(request))
+    assert 'info_hash' in response
+
+    info_hash = response['info_hash']
+
+    assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
 
 
 @run_until_complete
