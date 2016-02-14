@@ -31,12 +31,12 @@ bootstrap()
 
 @run_until_complete
 async def test_get_session():
-    s = await json_response(session.get_session(MagicMock()))
+    s, response = await json_response(session.get_session(MagicMock()))
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
 @run_until_complete
 async def test_get_session_dht():
-    b = await json_response(session.get_session_dht(MagicMock()))
+    b, response = await json_response(session.get_session_dht(MagicMock()))
     assert b

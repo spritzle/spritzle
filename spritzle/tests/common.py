@@ -20,4 +20,4 @@ def run_until_complete(f):
 async def json_response(cr):
     response = await cr
     assert response.content_type == 'application/json'
-    return json.loads(response.text)
+    return json.loads(response.text), response

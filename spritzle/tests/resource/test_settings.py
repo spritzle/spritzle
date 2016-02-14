@@ -31,7 +31,7 @@ bootstrap()
 
 @run_until_complete
 async def test_get_settings():
-    s = await json_response(settings.get_settings(MagicMock()))
+    s, response = await json_response(settings.get_settings(MagicMock()))
 
     assert isinstance(s, dict)
     assert len(s) > 0
@@ -39,7 +39,7 @@ async def test_get_settings():
 
 @run_until_complete
 async def test_put_settings():
-    old = await json_response(settings.get_settings(MagicMock()))
+    old, response = await json_response(settings.get_settings(MagicMock()))
     test_key = 'peer_connect_timeout'
 
     async def json():
@@ -53,7 +53,7 @@ async def test_put_settings():
     response = await settings.put_settings(request)
     assert response.status == 200
 
-    new = await json_response(settings.get_settings(MagicMock()))
+    new, response = await json_response(settings.get_settings(MagicMock()))
 
     assert old[test_key] != new[test_key]
     assert old[test_key] == new[test_key] - 1

@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 
 import binascii
+import json
 
 from aiohttp import web
 from aiohttp.errors import HttpProcessingError
@@ -80,6 +81,7 @@ async def post_torrent(request):
     }
 
     post = await request.post()
+
     if 'file' in post:
         data = post['file'].file.read()
 
@@ -89,17 +91,13 @@ async def post_torrent(request):
             raise HttpProcessingError(
                 code=400, message='Not a valid torrent file!')
 
-    if request.has_body:
-        try:
-            body = await request.json()
-        except UnicodeDecodeError:
-            body = None
-        if body:
-            for key, value in body.items():
-                if key == 'ti':
-                    # Ignore ti because it can't be useful
-                    continue
-                atp[key] = value
+    if 'args' in post:
+        args = json.loads(post['args'])
+        for key, value in args.items():
+            if key == 'ti':
+                # Ignore ti because it can't be useful
+                continue
+            atp[key] = value
 
     if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
         # We require that only one of ti, url or info_hash is set
@@ -114,7 +112,14 @@ async def post_torrent(request):
         raise HttpProcessingError(
             code=500, message="Error in session.add_torrent(): " + str(e))
 
-    return web.json_response({'info_hash': str(th.info_hash())})
+    info_hash = str(th.info_hash())
+
+    return web.json_response(
+        {'info_hash': info_hash},
+        status=201,
+        headers={'Location': '{}://{}/torrent/{}'.format(
+            request.scheme, request.host, info_hash)}
+        )
 
 async def delete_torrent(request):
     tid = request.match_info.get('tid', None)

@@ -21,6 +21,7 @@
 #
 
 import os
+import json
 
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
@@ -41,27 +42,28 @@ torrent_dir = os.path.join(
 def create_mock_request(filename=None, args=None):
     request = MagicMock()
 
-    async def json():
-        d = {
+    async def post():
+        post = {}
+        a = {
             'ti': None,
             'paused': True,
         }
         if args:
-            d.update(args)
-        return d
+            a.update(args)
 
-    async def post():
+        post['args'] = json.dumps(a)
+
         if filename:
             filepath = os.path.join(torrent_dir, filename)
             f = FileField("file", filename, open(filepath, 'rb'), 'text/plain')
-            return {'file': f}
-        else:
-            return {}
+            post['file'] = f
+
+        return post
 
     request = MagicMock()
-    request.json = json
     request.post = post
-    request.has_body = True
+    request.scheme = 'http'
+    request.host = 'localhost:8080'
 
     return request
 
@@ -73,19 +75,19 @@ async def test_get_torrent():
     request = MagicMock()
     request.match_info = {}
 
-    torrents = await json_response(torrent.get_torrent(request))
+    torrents, response = await json_response(torrent.get_torrent(request))
     assert isinstance(torrents, list)
     assert len(torrents) > 0
 
     request.match_info['tid'] = '44a040be6d74d8d290cd20128788864cbf770719'
 
-    ts = await json_response(torrent.get_torrent(request))
+    ts, response = await json_response(torrent.get_torrent(request))
     assert isinstance(ts, dict)
     assert ts['info_hash'] == '44a040be6d74d8d290cd20128788864cbf770719'
 
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         request.match_info['tid'] = 'a0'*20
-        ts = await json_response(torrent.get_torrent(request))
+        ts, response = await json_response(torrent.get_torrent(request))
         assert e.code == 400
 
 
@@ -93,16 +95,19 @@ async def test_get_torrent():
 async def test_post_torrent():
     request = create_mock_request(filename='random_one_file.torrent')
 
-    response = await json_response(torrent.post_torrent(request))
-    assert 'info_hash' in response
+    body, response = await json_response(torrent.post_torrent(request))
+    assert 'info_hash' in body
+    info_hash = body['info_hash']
 
-    info_hash = response['info_hash']
+    assert response.headers['LOCATION'] == \
+        'http://localhost:8080/torrent/{}'.format(info_hash)
+    assert response.status == 201
 
     assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
 
     request = MagicMock()
     request.match_info = {}
-    tlist = await json_response(torrent.get_torrent(request))
+    tlist, response = await json_response(torrent.get_torrent(request))
     assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
 
 
@@ -113,10 +118,10 @@ async def test_post_torrent_bad_body():
         return b'\xc3\x28'.decode("utf8")
 
     request.json = json
-    response = await json_response(torrent.post_torrent(request))
-    assert 'info_hash' in response
+    body, response = await json_response(torrent.post_torrent(request))
+    assert 'info_hash' in body
 
-    info_hash = response['info_hash']
+    info_hash = body['info_hash']
 
     assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
 
