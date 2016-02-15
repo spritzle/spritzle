@@ -38,7 +38,7 @@ def get_valid_handle(tid):
     handle = core.session.find_torrent(lt.sha1_hash(binascii.unhexlify(tid)))
     if not handle.is_valid():
         raise HttpProcessingError(
-            code=400, message='Invalid info-hash: ' + tid)
+            code=404, message='Torrent not found: ' + tid)
 
     return handle
 
@@ -127,10 +127,8 @@ async def delete_torrent(request):
     # see libtorrent.options_t for valid options
     options = 0
 
-    body = await request.json()
-    if body:
-        for key in body.keys():
-            options = options | lt.options_t.names[key]
+    for key in request.GET.keys():
+        options = options | lt.options_t.names[key]
 
     if tid is None:
         # If tid is None, we remove all the torrents
@@ -142,4 +140,4 @@ async def delete_torrent(request):
         handle = get_valid_handle(tid)
         core.session.remove_torrent(handle, options)
 
-    return web.json_response('')
+    return web.Response()

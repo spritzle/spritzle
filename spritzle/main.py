@@ -74,6 +74,8 @@ class Main(object):
                              spritzle.resource.torrent.post_torrent)
         app.router.add_route('DELETE', '/torrent',
                              spritzle.resource.torrent.delete_torrent)
+        app.router.add_route('DELETE', '/torrent/{tid}',
+                             spritzle.resource.torrent.delete_torrent)
 
     def stop(self):
         core.stop()

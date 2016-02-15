@@ -87,8 +87,9 @@ async def test_get_torrent():
 
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         request.match_info['tid'] = 'a0'*20
-        ts, response = await json_response(torrent.get_torrent(request))
-        assert e.code == 400
+        response = await torrent.get_torrent(request)
+
+    assert e.exception.code == 404
 
 
 @run_until_complete
@@ -136,7 +137,7 @@ async def test_add_torrent_lt_runtime_error():
     with patch('spritzle.core.core.session.add_torrent', add_torrent):
         with assert_raises(aiohttp.errors.HttpProcessingError) as e:
             await json_response(torrent.post_torrent(request))
-            assert e.exception.code == 500
+        assert e.exception.code == 500
 
 
 @run_until_complete
@@ -165,32 +166,33 @@ async def test_remove_torrent():
     await test_post_torrent()
     tid = '44a040be6d74d8d290cd20128788864cbf770719'
 
-    async def json():
-        return {'delete_files': True}
-
     request = MagicMock()
     request.match_info = {
         'tid': tid
     }
-    request.json = json
+    request.GET = {
+        'delete_files': True,
+    }
 
-    await json_response(torrent.delete_torrent(request))
+    response = await torrent.delete_torrent(request)
+    assert response.status == 200
+
     request = MagicMock()
     request.match_info = {}
-
-    assert tid not in await json_response(torrent.get_torrent(request))
+    response = await torrent.get_torrent(request)
+    assert response.status == 200
 
 
 @run_until_complete
 async def test_remove_torrent_all():
     await test_post_torrent()
 
-    async def json():
-        return {'delete_files': True}
-
     request = MagicMock()
-    request.json = json
     request.match_info = {}
+    request.GET = {
+        'delete_files': True,
+    }
 
-    await json_response(torrent.delete_torrent(request))
+    response = await torrent.delete_torrent(request)
+    assert response.status == 200
     assert len(torrent.get_torrent_list()) == 0
