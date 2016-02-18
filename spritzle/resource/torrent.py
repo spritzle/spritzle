@@ -19,6 +19,8 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 
+import asyncio
+import functools
 import binascii
 import json
 
@@ -107,7 +109,8 @@ async def post_torrent(request):
         )
 
     try:
-        th = core.session.add_torrent(atp)
+        th = await asyncio.get_event_loop().run_in_executor(
+                None, functools.partial(core.session.add_torrent), atp)
     except RuntimeError as e:
         raise HttpProcessingError(
             code=500, message="Error in session.add_torrent(): " + str(e))
