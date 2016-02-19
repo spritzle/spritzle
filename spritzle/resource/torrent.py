@@ -24,6 +24,7 @@ import functools
 import binascii
 import json
 
+import aiohttp
 from aiohttp import web
 from aiohttp.errors import HttpProcessingError
 
@@ -84,15 +85,6 @@ async def post_torrent(request):
 
     post = await request.post()
 
-    if 'file' in post:
-        data = post['file'].file.read()
-
-        try:
-            atp['ti'] = lt.torrent_info(lt.bdecode(data))
-        except RuntimeError as e:
-            raise HttpProcessingError(
-                code=400, message='Not a valid torrent file!')
-
     if 'args' in post:
         args = json.loads(post['args'])
         for key, value in args.items():
@@ -100,6 +92,27 @@ async def post_torrent(request):
                 # Ignore ti because it can't be useful
                 continue
             atp[key] = value
+
+    data = None
+    if 'file' in post:
+        data = post['file'].file.read()
+
+    # We do not use libtorrent's ability to download torrents as it will
+    # probably be removed in future versions and cannot provide the
+    # info-hash when we need it.
+    # See: https://github.com/arvidn/libtorrent/issues/481
+    if 'url' in atp:
+        url = atp.pop('url')
+        with aiohttp.ClientSession() as client:
+            async with client.get(url) as resp:
+                data = await resp.read()
+
+    if data:
+        try:
+            atp['ti'] = lt.torrent_info(lt.bdecode(data))
+        except RuntimeError as e:
+            raise HttpProcessingError(
+                code=400, message='Not a valid torrent file!')
 
     if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
         # We require that only one of ti, url or info_hash is set
