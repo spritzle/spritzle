@@ -42,19 +42,18 @@ class Core(object):
     def init(self, config_dir):
         self.config = Config('spritzle.conf', config_dir)
         self.session = lt.session({
-            'alert_mask': int(lt.alert.category_t.error_notification) | \
-                          int(lt.alert.category_t.peer_notification) | \
-                          int(lt.alert.category_t.port_mapping_notification) | \
-                          int(lt.alert.category_t.storage_notification) | \
-                          int(lt.alert.category_t.tracker_notification) | \
-                          int(lt.alert.category_t.status_notification) | \
-                          int(lt.alert.category_t.ip_block_notification) | \
-                          int(lt.alert.category_t.performance_warning) | \
-                          int(lt.alert.category_t.stats_notification) | \
-                          int(lt.alert.category_t.session_log_notification) | \
-                          int(lt.alert.category_t.torrent_log_notification) | \
-                          int(lt.alert.category_t.peer_log_notification),
-
+            'alert_mask': (int(lt.alert.category_t.error_notification) |
+                           int(lt.alert.category_t.peer_notification) |
+                           int(lt.alert.category_t.port_mapping_notification) |
+                           int(lt.alert.category_t.storage_notification) |
+                           int(lt.alert.category_t.tracker_notification) |
+                           int(lt.alert.category_t.status_notification) |
+                           int(lt.alert.category_t.ip_block_notification) |
+                           int(lt.alert.category_t.performance_warning) |
+                           int(lt.alert.category_t.stats_notification) |
+                           int(lt.alert.category_t.session_log_notification) |
+                           int(lt.alert.category_t.torrent_log_notification) |
+                           int(lt.alert.category_t.peer_log_notification)),
             'user_agent': 'Spritzle/%s libtorrent/%s' % (
                 pkg_resources.require("spritzle")[0].version,
                 lt.__version__),
