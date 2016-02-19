@@ -101,26 +101,24 @@ async def post_torrent(request):
             message="Only one of 'file', 'url' or 'info_hash' allowed."
         )
 
-    data = None
-    if 'file' in post:
-        data = post['file'].file.read()
-
-    # We do not use libtorrent's ability to download torrents as it will
-    # probably be removed in future versions and cannot provide the
-    # info-hash when we need it.
-    # See: https://github.com/arvidn/libtorrent/issues/481
-    if 'url' in atp:
-        url = atp.pop('url')
-        with aiohttp.ClientSession() as client:
-            async with client.get(url) as resp:
-                data = await resp.read()
-
-    if data:
+    def generate_torrent_info(data):
         try:
             atp['ti'] = lt.torrent_info(lt.bdecode(data))
         except RuntimeError as e:
             raise HttpProcessingError(
-                code=400, message='Not a valid torrent file!')
+                code=400, message='Not a valid torrent file: {}'.format(e))
+
+    if 'file' in post:
+        generate_torrent_info(post['file'].file.read())
+    # We do not use libtorrent's ability to download torrents as it will
+    # probably be removed in future versions and cannot provide the
+    # info-hash when we need it.
+    # See: https://github.com/arvidn/libtorrent/issues/481
+    elif 'url' in atp:
+        url = atp.pop('url')
+        with aiohttp.ClientSession() as client:
+            async with client.get(url) as resp:
+                generate_torrent_info(await resp.read())
 
     try:
         th = await asyncio.get_event_loop().run_in_executor(
