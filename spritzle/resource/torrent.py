@@ -93,6 +93,14 @@ async def post_torrent(request):
                 continue
             atp[key] = value
 
+    # We require that only one of file, url or info_hash is set
+    if len(set([*post.keys(), *atp.keys()]).intersection(
+            ('file', 'url', 'info_hash'))) != 1:
+        raise HttpProcessingError(
+            code=400,
+            message="Only one of 'file', 'url' or 'info_hash' allowed."
+        )
+
     data = None
     if 'file' in post:
         data = post['file'].file.read()
@@ -113,13 +121,6 @@ async def post_torrent(request):
         except RuntimeError as e:
             raise HttpProcessingError(
                 code=400, message='Not a valid torrent file!')
-
-    if len(set(atp.keys()).intersection(('ti', 'url', 'info_hash'))) != 1:
-        # We require that only one of ti, url or info_hash is set
-        raise HttpProcessingError(
-            code=400,
-            message="Only one of 'ti', 'url' or 'info_hash' allowed."
-        )
 
     try:
         th = await asyncio.get_event_loop().run_in_executor(
