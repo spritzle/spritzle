@@ -88,17 +88,16 @@ async def post_torrent(request):
     if 'args' in post:
         args = json.loads(post['args'])
         for key, value in args.items():
-            if key == 'ti':
-                # Ignore ti because it can't be useful
+            if key in ('ti', 'info_hash'):
                 continue
             atp[key] = value
 
     # We require that only one of file, url or info_hash is set
-    if len(set([*post.keys(), *atp.keys()]).intersection(
+    if len(set([*post.keys()]).intersection(
             ('file', 'url', 'info_hash'))) != 1:
         raise HttpProcessingError(
             code=400,
-            message="Only one of 'file', 'url' or 'info_hash' allowed."
+            message="One of and only one 'file', 'url' or 'info_hash' allowed."
         )
 
     def generate_torrent_info(data):
@@ -114,11 +113,13 @@ async def post_torrent(request):
     # probably be removed in future versions and cannot provide the
     # info-hash when we need it.
     # See: https://github.com/arvidn/libtorrent/issues/481
-    elif 'url' in atp:
-        url = atp.pop('url')
+    elif 'url' in post:
         with aiohttp.ClientSession() as client:
-            async with client.get(url) as resp:
+            async with client.get(post['url']) as resp:
                 generate_torrent_info(await resp.read())
+
+    elif 'info_hash' in post:
+        atp['info_hash'] = binascii.unhexlify(post['info_hash'])
 
     try:
         th = await asyncio.get_event_loop().run_in_executor(

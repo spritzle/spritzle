@@ -39,7 +39,7 @@ torrent_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'torrents')
 
 
-def create_mock_request(filename=None, args=None):
+def create_mock_request(filename=None, url=None, info_hash=None, args=None):
     request = MagicMock()
 
     async def post():
@@ -57,6 +57,12 @@ def create_mock_request(filename=None, args=None):
             filepath = os.path.join(torrent_dir, filename)
             f = FileField("file", filename, open(filepath, 'rb'), 'text/plain')
             post['file'] = f
+
+        if url:
+            post['url'] = url
+
+        if info_hash:
+            post['info_hash'] = info_hash
 
         return post
 
@@ -87,7 +93,7 @@ async def test_get_torrent():
 
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         request.match_info['tid'] = 'a0'*20
-        response = await torrent.get_torrent(request)
+        await torrent.get_torrent(request)
 
     assert e.exception.code == 404
 
@@ -128,6 +134,17 @@ async def test_post_torrent_bad_body():
 
 
 @run_until_complete
+async def test_post_torrent_info_hash():
+    request = create_mock_request(
+        info_hash='44a040be6d74d8d290cd20128788864cbf770719')
+
+    body, response = await json_response(torrent.post_torrent(request))
+    assert 'info_hash' in body
+    info_hash = body['info_hash']
+    assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
+
+
+@run_until_complete
 async def test_add_torrent_lt_runtime_error():
     request = create_mock_request(filename='random_one_file.torrent')
 
@@ -150,15 +167,46 @@ async def test_add_torrent_bad_file():
 
 
 @run_until_complete
-async def test_add_torrent_bad_args():
-    request = create_mock_request(args={
-            'url': 'http://testing/test.torrent',
-            'info_hash': 'a0'*20,
-        })
+async def test_add_torrent_bad_number_args():
+    request = create_mock_request(
+        url='http://testing/test.torrent',
+        info_hash='a0'*20)
 
     with assert_raises(aiohttp.errors.HttpProcessingError) as e:
         await json_response(torrent.post_torrent(request))
     assert e.exception.code == 400
+
+
+@run_until_complete
+async def test_add_torrent_url():
+    request = create_mock_request(url='http://localhost/test.torrent')
+    data = open(
+        os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb').read()
+
+    class AsyncContextManager:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return
+
+        async def read(self):
+            print('read')
+            return data
+
+    class ClientSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return
+
+        def get(self, url):
+            return AsyncContextManager()
+
+    with patch('aiohttp.ClientSession', new=ClientSession):
+        body, response = await json_response(torrent.post_torrent(request))
+        assert response.status == 201
 
 
 @run_until_complete
