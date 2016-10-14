@@ -28,5 +28,5 @@ async def get_settings(request):
 
 async def put_settings(request):
     settings = await request.json()
-    core.session.set_settings(settings)
+    core.session.apply_settings(settings)
     return web.json_response()
