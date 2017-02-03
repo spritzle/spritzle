@@ -31,6 +31,9 @@ from spritzle.alert import Alert
 
 class Core(object):
     def __init__(self):
+        self.config = None
+        self.session = None
+
         self.alert = Alert()
         self.alert.register_handler(
             'session_stats_alert',
@@ -75,5 +78,6 @@ class Core(object):
 
         await self.session_stats_future
         return self.session_stats_future.result()
+
 
 core = Core()

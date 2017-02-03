@@ -20,8 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import libtorrent as lt
 import datetime
+import libtorrent as lt
 
 
 def struct_to_dict(struct, ignore_keys=None):

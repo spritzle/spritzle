@@ -38,6 +38,7 @@ def test_main_start():
 
 
 def test_main_stop():
+    # pylint: disable=E1101
     main = spritzle.main.Main(12345)
     main.executor = MagicMock()
     main.loop = MagicMock()
@@ -49,8 +50,8 @@ def test_main_stop():
 
 
 def test_main_entry_point():
+    # pylint: disable=E1101
     with patch('spritzle.main.Main.start'):
-        with patch('sys.argv'):
-
+        with patch('sys.argv', ['']):
             spritzle.main.main()
             spritzle.main.Main.start.assert_called_once_with()

@@ -49,6 +49,7 @@ def get_valid_handle(tid):
 def get_torrent_list():
     return [str(th.info_hash()) for th in core.session.get_torrents()]
 
+
 async def get_torrent(request):
     tid = request.match_info.get('tid', None)
 
@@ -58,14 +59,15 @@ async def get_torrent(request):
         handle = get_valid_handle(tid)
 
         # We don't want to return all of the keys as they are just an enum
-        ignored = ['states'] + list(lt.torrent_status.states.names.keys())
+        ignored = (['states', 'handle', 'torrent_file'] +
+                   list(lt.torrent_status.states.names.keys()))
 
         status = common.struct_to_dict(
             handle.status(),
             ignore_keys=ignored,
         )
-
         return web.json_response(status)
+
 
 async def post_torrent(request):
     """
@@ -136,6 +138,7 @@ async def post_torrent(request):
         headers={'Location': '{}://{}/torrent/{}'.format(
             request.scheme, request.host, info_hash)}
         )
+
 
 async def delete_torrent(request):
     tid = request.match_info.get('tid', None)

@@ -20,11 +20,11 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle.config import Config
-
 import tempfile
 import os
 import shutil
+
+from spritzle.config import Config
 
 
 def test_config_init_no_dir():
