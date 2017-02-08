@@ -20,14 +20,39 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from nose.tools import assert_raises
 
-from spritzle.tests.common import run_until_complete
+import aiohttp.errors
+
+from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
+
+
+def create_mock_request(password=None):
+    async def post():
+        return {
+            'password': password,
+        }
+
+    request = MagicMock()
+    request.post = post
+    return request
 
 
 @run_until_complete
 async def test_post_auth():
-    with assert_raises(NotImplementedError):
-        await auth.post_auth(MagicMock())
+    config = {
+        'password': 'password',
+        'auth_timeout': 120,
+        'auth_secret': 'secret',
+    }
+
+    with patch('spritzle.core.core.config', config):
+        _, response = await json_response(
+            auth.post_auth(create_mock_request('password')))
+        assert response.status == 200
+        with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+            await json_response(
+                auth.post_auth(create_mock_request('badpassword')))
+        assert e.exception.code == 401

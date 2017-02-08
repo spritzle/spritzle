@@ -20,5 +20,28 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from datetime import datetime, timedelta
+
+import jwt
+from aiohttp import web
+from aiohttp.errors import HttpProcessingError
+
+from spritzle.core import core
+
+
 async def post_auth(request):
-    raise NotImplementedError
+    post = await request.post()
+
+    if post.get('password', None) != core.config['password']:
+        raise HttpProcessingError(
+            code=401,
+            message='Incorrect password')
+
+    payload = {
+       'exp': (datetime.utcnow() +
+               timedelta(seconds=core.config['auth_timeout']))
+    }
+
+    jwt_token = jwt.encode(payload, core.config['auth_secret'], 'HS256')
+
+    return web.json_response({'token': jwt_token.decode('utf8')})
