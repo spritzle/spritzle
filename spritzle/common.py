@@ -73,6 +73,12 @@ def struct_to_dict(struct, ignore_keys=None):
         if vtype in type_converters:
             value = type_converters[vtype](value)
 
+        # Skip values that cannot be json encoded
+        if (type(value) not in (dict, list, str, int, float, bool) and
+                value is not None):
+            print(f'skipping key: {key} value: {value}')
+            continue
+
         d[key] = value
 
     return d
