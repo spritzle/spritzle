@@ -26,7 +26,6 @@ import json
 
 import aiohttp
 from aiohttp import web
-from aiohttp.errors import HttpProcessingError
 
 from spritzle.core import core
 import spritzle.common as common
@@ -40,8 +39,7 @@ def get_valid_handle(tid):
     """
     handle = core.session.find_torrent(lt.sha1_hash(binascii.unhexlify(tid)))
     if not handle.is_valid():
-        raise HttpProcessingError(
-            code=404, message='Torrent not found: ' + tid)
+        raise web.HTTPNotFound(reason='Torrent not found: ' + tid)
 
     return handle
 
@@ -97,17 +95,16 @@ async def post_torrent(request):
     # We require that only one of file, url or info_hash is set
     if len(set([*post.keys()]).intersection(
             ('file', 'url', 'info_hash'))) != 1:
-        raise HttpProcessingError(
-            code=400,
-            message="One of and only one 'file', 'url' or 'info_hash' allowed."
+        raise web.HTTPBadRequest(
+            reason="One of and only one 'file', 'url' or 'info_hash' allowed."
         )
 
     def generate_torrent_info(data):
         try:
             atp['ti'] = lt.torrent_info(lt.bdecode(data))
         except RuntimeError as e:
-            raise HttpProcessingError(
-                code=400, message='Not a valid torrent file: {}'.format(e))
+            raise web.HTTPBadRequest(
+                reason='Not a valid torrent file: {}'.format(e))
 
     if 'file' in post:
         generate_torrent_info(post['file'].file.read())
@@ -127,8 +124,8 @@ async def post_torrent(request):
         th = await asyncio.get_event_loop().run_in_executor(
                 None, functools.partial(core.session.add_torrent), atp)
     except RuntimeError as e:
-        raise HttpProcessingError(
-            code=500, message="Error in session.add_torrent(): " + str(e))
+        raise web.HTTPInternalServerError(
+            reason="Error in session.add_torrent(): {}".format(str(e)))
 
     info_hash = str(th.info_hash())
 

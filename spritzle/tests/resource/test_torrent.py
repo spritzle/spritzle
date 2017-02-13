@@ -26,8 +26,8 @@ import json
 from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
+import aiohttp.web
 from aiohttp.web_reqrep import FileField
-import aiohttp.errors
 
 from spritzle.resource import torrent
 from spritzle.tests.common import run_until_complete, json_response
@@ -91,11 +91,10 @@ async def test_get_torrent():
     assert isinstance(ts, dict)
     assert ts['info_hash'] == '44a040be6d74d8d290cd20128788864cbf770719'
 
-    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
+    with assert_raises(aiohttp.web.HTTPNotFound):
         request.match_info['tid'] = 'a0'*20
-        await torrent.get_torrent(request)
-
-    assert e.exception.code == 404
+        _, response = await torrent.get_torrent(request)
+        assert response.status == 404
 
 
 @run_until_complete
@@ -121,6 +120,7 @@ async def test_post_torrent():
 @run_until_complete
 async def test_post_torrent_bad_body():
     request = create_mock_request(filename='random_one_file.torrent')
+
     async def json():
         return b'\xc3\x28'.decode("utf8")
 
@@ -152,18 +152,18 @@ async def test_add_torrent_lt_runtime_error():
     add_torrent.side_effect = RuntimeError()
 
     with patch('spritzle.core.core.session.add_torrent', add_torrent):
-        with assert_raises(aiohttp.errors.HttpProcessingError) as e:
-            await json_response(torrent.post_torrent(request))
-        assert e.exception.code == 500
+        with assert_raises(aiohttp.web.HTTPInternalServerError):
+            _, response = await json_response(torrent.post_torrent(request))
+            assert response.status == 500
 
 
 @run_until_complete
 async def test_add_torrent_bad_file():
     request = create_mock_request('empty.torrent')
 
-    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
-        await json_response(torrent.post_torrent(request))
-    assert e.exception.code == 400
+    with assert_raises(aiohttp.web.HTTPBadRequest):
+        _, response = await json_response(torrent.post_torrent(request))
+        assert response.status == 400
 
 
 @run_until_complete
@@ -172,9 +172,9 @@ async def test_add_torrent_bad_number_args():
         url='http://testing/test.torrent',
         info_hash='a0'*20)
 
-    with assert_raises(aiohttp.errors.HttpProcessingError) as e:
-        await json_response(torrent.post_torrent(request))
-    assert e.exception.code == 400
+    with assert_raises(aiohttp.web.HTTPBadRequest):
+        _, response = await json_response(torrent.post_torrent(request))
+        assert response.status == 400
 
 
 @run_until_complete
@@ -191,7 +191,6 @@ async def test_add_torrent_url():
             return
 
         async def read(self):
-            print('read')
             return data
 
     class ClientSession:
