@@ -28,5 +28,6 @@ async def get_session(self):
     status = await core.get_session_status()
     return web.json_response(status)
 
+
 async def get_session_dht(self):
     return web.json_response(core.session.is_dht_running())

@@ -23,8 +23,10 @@
 from aiohttp import web
 from spritzle.core import core
 
+
 async def get_settings(request):
     return web.json_response(core.session.get_settings())
+
 
 async def put_settings(request):
     settings = await request.json()

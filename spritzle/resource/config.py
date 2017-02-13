@@ -20,8 +20,10 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+
 async def get_config(request):
     raise NotImplementedError
+
 
 async def put_config(request):
     raise NotImplementedError
