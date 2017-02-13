@@ -55,26 +55,35 @@ def test_config_save():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c.save()
-        old = c.config
+        old = c.data
         c.load()
-        assert old == c.config
+        assert old == c.data
 
 
 def test_config_load():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c['foo'] = 1
-        old = c.config
+        old = c.data
         c.load()
-        assert c.config == old
+        assert c.data == old
 
 
-def test_contains():
+def test_len():
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir)
+        assert len(c) == 0
+        c['foo'] = 1
+        assert len(c) == 1
+        c['bar'] = 1
+        assert len(c) == 2
+
+
+def test_iter():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c['foo'] = 1
-        assert 'foo' in c
-        assert c['foo'] == 1
+        assert next(iter(c)) == 'foo'
 
 
 def test_delitem():

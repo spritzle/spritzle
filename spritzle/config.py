@@ -21,12 +21,13 @@
 #
 
 import os
-import json
+import yaml
+import collections.abc
 
 
-class Config(object):
+class Config(collections.abc.MutableMapping):
     def __init__(self, filename='spritzle.conf', config_dir=None):
-        self.config = {}
+        self.data = {}
 
         if config_dir is None:
             self.dir = os.path.join(
@@ -49,24 +50,24 @@ class Config(object):
 
     def load(self):
         if os.path.isfile(self.file):
-            self.config = json.load(open(self.file, 'r'))
+            self.data = yaml.load(open(self.file, 'r'))
 
     def save(self):
-        json.dump(self.config, open(self.file, 'w'))
+        yaml.dump(self.data, open(self.file, 'w'))
 
-    def __contains__(self, item):
-        return item in self.config
+    def __len__(self):
+        return len(self.data)
+
+    def __iter__(self):
+        return iter(self.data)
 
     def __setitem__(self, key, value):
-        self.config[key] = value
+        self.data[key] = value
         self.save()
 
     def __getitem__(self, key):
-        return self.config[key]
+        return self.data[key]
 
     def __delitem__(self, key):
-        del self.config[key]
+        del self.data[key]
         self.save()
-
-    def get(self, key, default=None):
-        return self.config.get(key, default)
