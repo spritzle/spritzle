@@ -66,7 +66,6 @@ class Core(object):
 
     def stop(self):
         self.alert.stop()
-        self.config.save()
 
     def on_session_stats_alert(self, alert):
         self.session_stats_future.set_result(alert.values)
