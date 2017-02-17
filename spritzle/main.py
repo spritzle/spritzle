@@ -36,7 +36,8 @@ import spritzle.resource.torrent
 
 from spritzle.core import core
 
-app = aiohttp.web.Application()
+app = aiohttp.web.Application(
+    middlewares=[spritzle.resource.auth.auth_middleware])
 
 
 def setup_routes():

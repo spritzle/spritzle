@@ -24,7 +24,6 @@ from datetime import datetime, timedelta
 
 import jwt
 from aiohttp import web
-from aiohttp.errors import HttpProcessingError
 
 from spritzle.core import core
 
@@ -32,10 +31,8 @@ from spritzle.core import core
 async def post_auth(request):
     post = await request.post()
 
-    if post.get('password', None) != core.config['password']:
-        raise HttpProcessingError(
-            code=401,
-            message='Incorrect password')
+    if post.get('password', None) != core.config['auth_password']:
+        raise web.HTTPUnauthorized(reason='Incorrect password')
 
     payload = {
        'exp': (datetime.utcnow() +
@@ -45,3 +42,24 @@ async def post_auth(request):
     jwt_token = jwt.encode(payload, core.config['auth_secret'], 'HS256')
 
     return web.json_response({'token': jwt_token.decode('utf8')})
+
+
+async def auth_middleware(_, handler):
+    async def middleware(request):
+        if request.rel_url.path == '/auth':
+            return await handler(request)
+
+        jwt_token = request.headers.get('authorization', None)
+        if jwt_token is None:
+            raise web.HTTPUnauthorized(reason='Authorization token required')
+
+        try:
+            jwt.decode(
+                jwt_token,
+                core.config['auth_secret'],
+                algorithms=['HS256'])
+        except (jwt.DecodeError, jwt.ExpiredSignatureError):
+            raise web.HTTPUnauthorized(reason='Token is invalid')
+
+        return await handler(request)
+    return middleware

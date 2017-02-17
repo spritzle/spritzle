@@ -22,8 +22,10 @@
 
 from unittest.mock import MagicMock, patch
 from nose.tools import assert_raises
+from datetime import datetime, timedelta
 
 import aiohttp.errors
+import jwt
 
 from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
@@ -43,7 +45,7 @@ def create_mock_request(password=None):
 @run_until_complete
 async def test_post_auth():
     config = {
-        'password': 'password',
+        'auth_password': 'password',
         'auth_timeout': 120,
         'auth_secret': 'secret',
     }
@@ -52,7 +54,47 @@ async def test_post_auth():
         _, response = await json_response(
             auth.post_auth(create_mock_request('password')))
         assert response.status == 200
-        with assert_raises(aiohttp.errors.HttpProcessingError) as e:
-            await json_response(
+        with assert_raises(aiohttp.web.HTTPUnauthorized):
+            _, response = await json_response(
                 auth.post_auth(create_mock_request('badpassword')))
-        assert e.exception.code == 401
+            assert response.status == 401
+
+
+@run_until_complete
+async def test_auth_middleware():
+    async def handler(request):
+        request.handled = True
+
+    request = MagicMock()
+    request.headers = {}
+    request.handled = False
+    request.rel_url.path = '/auth'
+
+    mw = await auth.auth_middleware(MagicMock(), handler)
+    await mw(request)
+    assert request.handled
+
+    request.handled = False
+    request.rel_url.path = '/'
+
+    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+        await mw(request)
+    assert e.exception.reason == 'Authorization token required'
+
+    request.headers['authorization'] = 'badtoken'
+
+    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+        await mw(request)
+    assert e.exception.reason == 'Token is invalid'
+
+    config = {
+        'auth_secret': 'secret',
+    }
+    payload = {
+        'exp': (datetime.utcnow() + timedelta(seconds=120))
+    }
+    token = jwt.encode(payload, config['auth_secret'], 'HS256').decode('utf8')
+    request.headers['authorization'] = token
+    with patch('spritzle.core.core.config', config):
+        await mw(request)
+        assert request.handled
