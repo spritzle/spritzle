@@ -59,7 +59,7 @@ class Config(collections.abc.MutableMapping):
 
     def load(self):
         if os.path.isfile(self.file):
-            self.data = yaml.safe_load(open(self.file, 'r'))
+            self.data = yaml.safe_load(open(self.file, 'r')) or {}
 
     def save(self):
         f = open(self.file, 'w')

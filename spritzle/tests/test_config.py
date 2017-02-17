@@ -64,6 +64,8 @@ def test_config_save():
 def test_config_load():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
+        c.load()
+        assert c.data == {}
         c['foo'] = 1
         old = c.data
         c.load()
