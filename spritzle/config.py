@@ -24,9 +24,18 @@ import os
 import yaml
 import collections.abc
 
+DEFAULTS = {
+    'auth_password': 'password',
+    'auth_secret': 'secret',
+    'auth_timeout': 120,
+}
+
 
 class Config(collections.abc.MutableMapping):
-    def __init__(self, filename='spritzle.conf', config_dir=None):
+    def __init__(self, filename='spritzle.conf', config_dir=None,
+                 defaults=None):
+
+        self.defaults = defaults or DEFAULTS
         self.data = {}
 
         if config_dir is None:
@@ -50,10 +59,24 @@ class Config(collections.abc.MutableMapping):
 
     def load(self):
         if os.path.isfile(self.file):
-            self.data = yaml.load(open(self.file, 'r'))
+            self.data = yaml.safe_load(open(self.file, 'r'))
 
     def save(self):
-        yaml.dump(self.data, open(self.file, 'w'))
+        f = open(self.file, 'w')
+        f.write(
+            '''#
+# Configuration file for Spritzle. The format is YAML.
+#
+# Default values:
+#
+''')
+        for key, value in sorted(self.defaults.items()):
+            f.write(f'# {key}: {value}\n')
+
+        f.write('#\n# Overrides should be made below this line\n\n')
+        if self.data:
+            for k, v in sorted(self.data.items()):
+                yaml.safe_dump({k: v}, f, default_flow_style=False)
 
     def __len__(self):
         return len(self.data)
@@ -66,6 +89,8 @@ class Config(collections.abc.MutableMapping):
         self.save()
 
     def __getitem__(self, key):
+        if key in self.defaults:
+            return self.data.get(key, self.defaults[key])
         return self.data[key]
 
     def __delitem__(self, key):
