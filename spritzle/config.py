@@ -33,35 +33,43 @@ DEFAULTS = {
 
 class Config(collections.abc.MutableMapping):
     def __init__(self, filename='spritzle.conf', config_dir=None,
-                 defaults=None):
+                 defaults=None, in_memory=False):
 
+        self.in_memory = in_memory
         self.defaults = defaults or DEFAULTS
         self.data = {}
 
-        if config_dir is None:
-            self.dir = os.path.join(
-                os.path.expanduser('~'),
-                '.config',
-                'spritzle'
-            )
-        else:
-            self.dir = config_dir
+        if not self.in_memory:
+            if config_dir is None:
+                self.dir = os.path.join(
+                    os.path.expanduser('~'),
+                    '.config',
+                    'spritzle'
+                )
+            else:
+                self.dir = config_dir
 
-        self.file = os.path.join(self.dir, filename)
+            self.file = os.path.join(self.dir, filename)
 
-        if not os.path.isdir(self.dir):
-            os.makedirs(self.dir)
+            if not os.path.isdir(self.dir):
+                os.makedirs(self.dir)
 
-        if os.path.isfile(self.file):
-            self.load()
-        else:
-            self.save()
+            if os.path.isfile(self.file):
+                self.load()
+            else:
+                self.save()
 
     def load(self):
+        if self.in_memory:
+            return
+
         if os.path.isfile(self.file):
             self.data = yaml.safe_load(open(self.file, 'r')) or {}
 
     def save(self):
+        if self.in_memory:
+            return
+
         f = open(self.file, 'w')
         f.write(
             '''#

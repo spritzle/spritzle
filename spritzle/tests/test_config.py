@@ -60,6 +60,12 @@ def test_config_save():
         c.load()
         assert old == c.data
 
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir, in_memory=True)
+        c['foo'] = 1
+        c.save()
+        assert not os.path.exists(os.path.join(tempdir, 'spritzle.conf'))
+
 
 def test_config_load():
     with tempfile.TemporaryDirectory() as tempdir:
@@ -70,6 +76,10 @@ def test_config_load():
         old = c.data
         c.load()
         assert c.data == old
+
+        c = Config(config_dir=tempdir, in_memory=True)
+        c.load()
+        assert c.data == {}
 
 
 def test_len():
