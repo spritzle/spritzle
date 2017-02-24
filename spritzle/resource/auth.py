@@ -25,27 +25,27 @@ from datetime import datetime, timedelta
 import jwt
 from aiohttp import web
 
-from spritzle.core import core
-
 
 async def post_auth(request):
+    config = request.app['spritzle.config']
     post = await request.post()
 
-    if post.get('password', None) != core.config['auth_password']:
+    if post.get('password', None) != config['auth_password']:
         raise web.HTTPUnauthorized(reason='Incorrect password')
 
     payload = {
        'exp': (datetime.utcnow() +
-               timedelta(seconds=core.config['auth_timeout']))
+               timedelta(seconds=config['auth_timeout']))
     }
 
-    jwt_token = jwt.encode(payload, core.config['auth_secret'], 'HS256')
+    jwt_token = jwt.encode(payload, config['auth_secret'], 'HS256')
 
     return web.json_response({'token': jwt_token.decode('utf8')})
 
 
-async def auth_middleware(_, handler):
+async def auth_middleware(app, handler):
     async def middleware(request):
+        config = app['spritzle.config']
         if request.rel_url.path == '/auth':
             return await handler(request)
 
@@ -56,7 +56,7 @@ async def auth_middleware(_, handler):
         try:
             jwt.decode(
                 jwt_token,
-                core.config['auth_secret'],
+                config['auth_secret'],
                 algorithms=['HS256'])
         except (jwt.DecodeError, jwt.ExpiredSignatureError):
             raise web.HTTPUnauthorized(reason='Token is invalid')

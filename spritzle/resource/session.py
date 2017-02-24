@@ -21,13 +21,14 @@
 #
 
 from aiohttp import web
-from spritzle.core import core
 
 
-async def get_session(self):
+async def get_session(request):
+    core = request.app['spritzle.core']
     status = await core.get_session_status()
     return web.json_response(status)
 
 
-async def get_session_dht(self):
+async def get_session_dht(request):
+    core = request.app['spritzle.core']
     return web.json_response(core.session.is_dht_running())

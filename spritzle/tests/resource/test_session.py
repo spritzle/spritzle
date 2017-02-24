@@ -20,23 +20,21 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import MagicMock
-
-from spritzle.main import bootstrap
 from spritzle.resource import session
-from spritzle.tests.common import run_until_complete, json_response
-
-bootstrap()
+from spritzle.tests.common import (
+    run_until_complete, json_response, create_mock_request)
 
 
 @run_until_complete
 async def test_get_session():
-    s, response = await json_response(session.get_session(MagicMock()))
+    request = create_mock_request()
+    s, response = await json_response(session.get_session(request))
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
 @run_until_complete
 async def test_get_session_dht():
-    b, response = await json_response(session.get_session_dht(MagicMock()))
+    request = create_mock_request()
+    b, response = await json_response(session.get_session_dht(request))
     assert b

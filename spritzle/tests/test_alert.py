@@ -37,6 +37,7 @@ class AlertTestTwo(object):
 def test_alert_stop():
     a = spritzle.alert.Alert()
     assert a.run
+    a.start(MagicMock())
     a.stop()
     assert not a.run
 

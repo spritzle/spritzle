@@ -34,7 +34,8 @@ import spritzle.resource.session
 import spritzle.resource.settings
 import spritzle.resource.torrent
 
-from spritzle.core import core
+from spritzle.core import Core
+from spritzle.config import Config
 
 app = aiohttp.web.Application(
     middlewares=[spritzle.resource.auth.auth_middleware])
@@ -68,9 +69,11 @@ class Main(object):
     def __init__(self, port, debug=False, config_dir=None):
         self.port = port
         self.debug = debug
-        self.config_dir = config_dir
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(self.debug)
+
+        app['spritzle.config'] = Config('spritzle.conf', config_dir)
+        app['spritzle.core'] = Core()
 
         # Create an executor so that we can call shutdown(wait=True) on it
         # when we shutdown the server.  This is done to allow Tasks to
@@ -79,23 +82,18 @@ class Main(object):
         self.loop.set_default_executor(self.executor)
 
     def stop(self):
-        core.stop()
+        app['spritzle.core'].stop()
         self.executor.shutdown(wait=True)
         self.loop.stop()
 
     def start(self):
-        bootstrap(config_dir=self.config_dir)
-
         setup_routes()
 
         for s in (signal.SIGINT, signal.SIGTERM):
             self.loop.add_signal_handler(s, functools.partial(self.stop))
 
+        app['spritzle.core'].start()
         aiohttp.web.run_app(app)
-
-
-def bootstrap(config_dir=None):
-    core.init(config_dir)
 
 
 def main():

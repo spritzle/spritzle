@@ -25,13 +25,11 @@ import pkg_resources
 
 import libtorrent as lt
 
-from spritzle.config import Config
 from spritzle.alert import Alert
 
 
 class Core(object):
     def __init__(self):
-        self.config = None
         self.session = None
 
         self.alert = Alert()
@@ -42,8 +40,7 @@ class Core(object):
 
         self.session_stats_future = None
 
-    def init(self, config_dir):
-        self.config = Config('spritzle.conf', config_dir)
+    def start(self):
         self.session = lt.session({
             'alert_mask': (int(lt.alert.category_t.error_notification) |
                            int(lt.alert.category_t.peer_notification) |
@@ -78,6 +75,3 @@ class Core(object):
 
         await self.session_stats_future
         return self.session_stats_future.result()
-
-
-core = Core()

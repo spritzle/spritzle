@@ -31,17 +31,13 @@ from aiohttp.web_reqrep import FileField
 
 from spritzle.resource import torrent
 from spritzle.tests.common import run_until_complete, json_response
-from spritzle.main import bootstrap
-
-bootstrap()
+import spritzle.tests.common
 
 torrent_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'torrents')
 
 
 def create_mock_request(filename=None, url=None, info_hash=None, args=None):
-    request = MagicMock()
-
     async def post():
         post = {}
         a = {
@@ -66,7 +62,7 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None):
 
         return post
 
-    request = MagicMock()
+    request = spritzle.tests.common.create_mock_request()
     request.post = post
     request.scheme = 'http'
     request.host = 'localhost:8080'
@@ -76,9 +72,8 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None):
 
 @run_until_complete
 async def test_get_torrent():
-    await test_post_torrent()
+    request = await test_post_torrent()
 
-    request = MagicMock()
     request.match_info = {}
 
     torrents, response = await json_response(torrent.get_torrent(request))
@@ -111,10 +106,10 @@ async def test_post_torrent():
 
     assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
 
-    request = MagicMock()
     request.match_info = {}
     tlist, response = await json_response(torrent.get_torrent(request))
     assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
+    return request
 
 
 @run_until_complete
@@ -150,11 +145,10 @@ async def test_add_torrent_lt_runtime_error():
 
     add_torrent = MagicMock()
     add_torrent.side_effect = RuntimeError()
-
-    with patch('spritzle.core.core.session.add_torrent', add_torrent):
-        with assert_raises(aiohttp.web.HTTPInternalServerError):
-            _, response = await json_response(torrent.post_torrent(request))
-            assert response.status == 500
+    request.app['spritzle.core'].session.add_torrent = add_torrent
+    with assert_raises(aiohttp.web.HTTPInternalServerError):
+        _, response = await json_response(torrent.post_torrent(request))
+        assert response.status == 500
 
 
 @run_until_complete
@@ -210,10 +204,9 @@ async def test_add_torrent_url():
 
 @run_until_complete
 async def test_remove_torrent():
-    await test_post_torrent()
+    request = await test_post_torrent()
     tid = '44a040be6d74d8d290cd20128788864cbf770719'
 
-    request = MagicMock()
     request.match_info = {
         'tid': tid
     }
@@ -224,7 +217,6 @@ async def test_remove_torrent():
     response = await torrent.delete_torrent(request)
     assert response.status == 200
 
-    request = MagicMock()
     request.match_info = {}
     response = await torrent.get_torrent(request)
     assert response.status == 200
@@ -234,7 +226,7 @@ async def test_remove_torrent():
 async def test_remove_torrent_all():
     await test_post_torrent()
 
-    request = MagicMock()
+    request = create_mock_request()
     request.match_info = {}
     request.GET = {
         'delete_files': True,
@@ -242,4 +234,5 @@ async def test_remove_torrent_all():
 
     response = await torrent.delete_torrent(request)
     assert response.status == 200
-    assert len(torrent.get_torrent_list()) == 0
+    core = request.app['spritzle.core']
+    assert len(torrent.get_torrent_list(core)) == 0

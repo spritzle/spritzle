@@ -21,14 +21,15 @@
 #
 
 from aiohttp import web
-from spritzle.core import core
 
 
 async def get_settings(request):
+    core = request.app['spritzle.core']
     return web.json_response(core.session.get_settings())
 
 
 async def put_settings(request):
+    core = request.app['spritzle.core']
     settings = await request.json()
     core.session.apply_settings(settings)
     return web.json_response()

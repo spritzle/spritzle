@@ -27,13 +27,12 @@ import json
 import aiohttp
 from aiohttp import web
 
-from spritzle.core import core
 import spritzle.common as common
 
 import libtorrent as lt
 
 
-def get_valid_handle(tid):
+def get_valid_handle(core, tid):
     """
     Either returns a valid torrent_handle or aborts with a client-error (400)
     """
@@ -44,17 +43,18 @@ def get_valid_handle(tid):
     return handle
 
 
-def get_torrent_list():
+def get_torrent_list(core):
     return [str(th.info_hash()) for th in core.session.get_torrents()]
 
 
 async def get_torrent(request):
+    core = request.app['spritzle.core']
     tid = request.match_info.get('tid', None)
 
     if tid is None:
-        return web.json_response(get_torrent_list())
+        return web.json_response(get_torrent_list(core))
     else:
-        handle = get_valid_handle(tid)
+        handle = get_valid_handle(core, tid)
 
         # We don't want to return all of the keys as they are just an enum
         ignored = (['states', 'handle', 'torrent_file'] +
@@ -78,9 +78,11 @@ async def post_torrent(request):
 
     http://libtorrent.org/reference-Session.html#add_torrent_params
     """
+    core = request.app['spritzle.core']
+    config = request.app['spritzle.config']
 
     atp = {
-        'save_path': core.config.get('add_torrent_params.save_path', '')
+        'save_path': config.get('add_torrent_params.save_path', '')
     }
 
     post = await request.post()
@@ -138,6 +140,7 @@ async def post_torrent(request):
 
 
 async def delete_torrent(request):
+    core = request.app['spritzle.core']
     tid = request.match_info.get('tid', None)
 
     # see libtorrent.options_t for valid options
@@ -148,12 +151,12 @@ async def delete_torrent(request):
 
     if tid is None:
         # If tid is None, we remove all the torrents
-        tids = get_torrent_list()
+        tids = get_torrent_list(core)
     else:
         tids = [tid]
 
     for tid in tids:
-        handle = get_valid_handle(tid)
+        handle = get_valid_handle(core, tid)
         core.session.remove_torrent(handle, options)
 
     return web.Response()

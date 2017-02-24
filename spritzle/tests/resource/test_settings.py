@@ -20,18 +20,15 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import MagicMock
-
-from spritzle.main import bootstrap
 from spritzle.resource import settings
-from spritzle.tests.common import run_until_complete, json_response
-
-bootstrap()
+from spritzle.tests.common import (
+    run_until_complete, json_response, create_mock_request)
 
 
 @run_until_complete
 async def test_get_settings():
-    s, response = await json_response(settings.get_settings(MagicMock()))
+    request = create_mock_request()
+    s, response = await json_response(settings.get_settings(request))
 
     assert isinstance(s, dict)
     assert len(s) > 0
@@ -39,13 +36,13 @@ async def test_get_settings():
 
 @run_until_complete
 async def test_put_settings():
-    old, response = await json_response(settings.get_settings(MagicMock()))
+    request = create_mock_request()
+    old, response = await json_response(settings.get_settings(request))
     test_key = 'peer_connect_timeout'
 
     async def json():
         return {test_key: old[test_key] + 1}
 
-    request = MagicMock()
     request.configure_mock(**{
         'json.return_value': json(),
     })
@@ -53,7 +50,7 @@ async def test_put_settings():
     response = await settings.put_settings(request)
     assert response.status == 200
 
-    new, response = await json_response(settings.get_settings(MagicMock()))
+    new, response = await json_response(settings.get_settings(request))
 
     assert old[test_key] != new[test_key]
     assert old[test_key] == new[test_key] - 1

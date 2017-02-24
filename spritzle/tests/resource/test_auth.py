@@ -20,24 +20,24 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import MagicMock, patch
 from nose.tools import assert_raises
 from datetime import datetime, timedelta
 
 import aiohttp.errors
 import jwt
 
+import spritzle.tests.common
 from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
 
 
-def create_mock_request(password=None):
+def create_mock_request(password=None, config=None):
     async def post():
         return {
             'password': password,
         }
 
-    request = MagicMock()
+    request = spritzle.tests.common.create_mock_request(config=config)
     request.post = post
     return request
 
@@ -50,14 +50,13 @@ async def test_post_auth():
         'auth_secret': 'secret',
     }
 
-    with patch('spritzle.core.core.config', config):
+    _, response = await json_response(
+        auth.post_auth(create_mock_request('password', config)))
+    assert response.status == 200
+    with assert_raises(aiohttp.web.HTTPUnauthorized):
         _, response = await json_response(
-            auth.post_auth(create_mock_request('password')))
-        assert response.status == 200
-        with assert_raises(aiohttp.web.HTTPUnauthorized):
-            _, response = await json_response(
-                auth.post_auth(create_mock_request('badpassword')))
-            assert response.status == 401
+            auth.post_auth(create_mock_request('badpassword', config)))
+        assert response.status == 401
 
 
 @run_until_complete
@@ -65,12 +64,12 @@ async def test_auth_middleware():
     async def handler(request):
         request.handled = True
 
-    request = MagicMock()
+    request = create_mock_request()
     request.headers = {}
     request.handled = False
     request.rel_url.path = '/auth'
 
-    mw = await auth.auth_middleware(MagicMock(), handler)
+    mw = await auth.auth_middleware(request.app, handler)
     await mw(request)
     assert request.handled
 
@@ -95,6 +94,6 @@ async def test_auth_middleware():
     }
     token = jwt.encode(payload, config['auth_secret'], 'HS256').decode('utf8')
     request.headers['authorization'] = token
-    with patch('spritzle.core.core.config', config):
-        await mw(request)
-        assert request.handled
+    request.app['spritzle.config'] = config
+    await mw(request)
+    assert request.handled
