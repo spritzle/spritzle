@@ -46,6 +46,11 @@ async def post_auth(request):
 async def auth_middleware(app, handler):
     async def middleware(request):
         config = app['spritzle.config']
+
+        peername = request.transport.get_extra_info('peername')
+        if peername and peername[0] in config['auth_allow_hosts']:
+                return await handler(request)
+
         if request.rel_url.path == '/auth':
             return await handler(request)
 

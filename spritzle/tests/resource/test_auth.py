@@ -48,6 +48,7 @@ async def test_post_auth():
         'auth_password': 'password',
         'auth_timeout': 120,
         'auth_secret': 'secret',
+        'auth_allowed_hosts': [],
     }
 
     _, response = await json_response(
@@ -88,6 +89,7 @@ async def test_auth_middleware():
 
     config = {
         'auth_secret': 'secret',
+        'auth_allow_hosts': [],
     }
     payload = {
         'exp': (datetime.utcnow() + timedelta(seconds=120))
@@ -97,3 +99,25 @@ async def test_auth_middleware():
     request.app['spritzle.config'] = config
     await mw(request)
     assert request.handled
+
+
+@run_until_complete
+async def test_auth_allow_hosts():
+    async def handler(request):
+        request.handled = True
+
+    request = create_mock_request()
+    request.headers = {}
+    request.handled = False
+    request.rel_url.path = '/'
+    request.transport.get_extra_info.return_value = ('127.0.0.1', 12345)
+
+    mw = await auth.auth_middleware(request.app, handler)
+    await mw(request)
+    assert request.handled
+
+    request.handled = False
+    request.transport.get_extra_info.return_value = ('128.8.8.8', 12345)
+    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+        await mw(request)
+    assert e.exception.reason == 'Authorization token required'
