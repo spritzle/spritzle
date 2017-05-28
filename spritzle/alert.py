@@ -28,7 +28,8 @@ log = logging.getLogger('spritzle')
 
 
 def debug_handler(alert):
-    log.debug('{} {}'.format(type(alert).__name__, alert))
+    if type(alert).__name__ not in ['stats_alert']:
+        log.debug('{} {}'.format(type(alert).__name__, alert))
 
 
 class Alert(object):

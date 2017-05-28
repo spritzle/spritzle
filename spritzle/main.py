@@ -44,12 +44,13 @@ async def debug_middleware(app, handler):
         body = await request.text()
         post = await request.post()
         log = app['spritzle.log']
-        log.debug('*'*40)
-        log.debug(f'{request.method}:{request.rel_url}')
+        log.debug('*'*20 + 'REQUEST' + '*'*20)
+        log.debug(f'URL: {request.rel_url}')
+        log.debug(f'METHOD: {request.method}')
         log.debug(f'HEADERS: {request.headers}')
         log.debug(f'BODY: {body}')
         log.debug(f'POST: {post}')
-        log.debug('*'*40)
+        log.debug('*'*47)
         return await handler(request)
     return middleware
 
