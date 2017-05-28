@@ -23,9 +23,12 @@
 import asyncio
 import functools
 
+import logging
+log = logging.getLogger('spritzle')
+
 
 def debug_handler(alert):
-    print('alert: {} {}'.format(type(alert).__name__, alert))
+    log.debug('{} {}'.format(type(alert).__name__, alert))
 
 
 class Alert(object):

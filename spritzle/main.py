@@ -36,9 +36,26 @@ import spritzle.resource.torrent
 
 from spritzle.core import Core
 from spritzle.config import Config
+from spritzle.logger import setup_logger
+
+
+async def debug_middleware(app, handler):
+    async def middleware(request):
+        body = await request.text()
+        post = await request.post()
+        log = app['spritzle.log']
+        log.debug('*'*40)
+        log.debug(f'{request.method}:{request.rel_url}')
+        log.debug(f'HEADERS: {request.headers}')
+        log.debug(f'BODY: {body}')
+        log.debug(f'POST: {post}')
+        log.debug('*'*40)
+        return await handler(request)
+    return middleware
 
 app = aiohttp.web.Application(
-    middlewares=[spritzle.resource.auth.auth_middleware])
+    middlewares=[debug_middleware,
+                 spritzle.resource.auth.auth_middleware])
 
 
 def setup_routes():
@@ -102,7 +119,12 @@ def main():
         '--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
     parser.add_argument('-c', '--config_dir', dest='config_dir', type=str)
+    parser.add_argument('-l', '--log-level', default='INFO',
+                        dest='log_level', type=str)
 
     args = parser.parse_args()
 
+    log = setup_logger(name='spritzle', level=args.log_level)
+    log.info(f'spritzled starting.. args: {args}')
+    app['spritzle.log'] = log
     Main(args.port, args.debug, args.config_dir).start()
