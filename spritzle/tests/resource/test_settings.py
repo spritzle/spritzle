@@ -20,6 +20,9 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from nose.tools import assert_raises
+import aiohttp.web
+
 from spritzle.resource import settings
 from spritzle.tests.common import (
     run_until_complete, json_response, create_mock_request)
@@ -54,3 +57,34 @@ async def test_put_settings():
 
     assert old[test_key] != new[test_key]
     assert old[test_key] == new[test_key] - 1
+
+
+@run_until_complete
+async def test_put_settings_bad_key():
+    request = create_mock_request()
+
+    async def json():
+        return {'bad_key': 1}
+
+    request.configure_mock(**{
+        'json.return_value': json(),
+    })
+
+    with assert_raises(aiohttp.web.HTTPBadRequest):
+        response = await settings.put_settings(request)
+        assert response.status == 400
+
+
+@run_until_complete
+async def test_put_settings_type_coercion():
+    request = create_mock_request()
+
+    async def json():
+        return {'peer_connect_timeout': '1'}
+
+    request.configure_mock(**{
+        'json.return_value': json(),
+    })
+
+    response = await settings.put_settings(request)
+    assert response.status == 200

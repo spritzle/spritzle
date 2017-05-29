@@ -70,6 +70,10 @@ def setup_routes():
                          spritzle.resource.session.get_session)
     app.router.add_route('GET', '/session/dht',
                          spritzle.resource.session.get_session_dht)
+    app.router.add_route('GET', '/settings',
+                         spritzle.resource.settings.get_settings)
+    app.router.add_route('PUT', '/settings',
+                         spritzle.resource.settings.put_settings)
     app.router.add_route('GET', '/torrent',
                          spritzle.resource.torrent.get_torrent)
     app.router.add_route('GET', '/torrent/{tid}',

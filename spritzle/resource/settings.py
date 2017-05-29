@@ -31,5 +31,16 @@ async def get_settings(request):
 async def put_settings(request):
     core = request.app['spritzle.core']
     settings = await request.json()
-    core.session.apply_settings(settings)
+    current = core.session.get_settings()
+
+    # Do our best to coerce what the client sent into the proper types that
+    # libtorrent expects.
+    for key, value in current.items():
+        if key in settings and type(settings[key]) != type(value):
+            settings[key] = type(value)(settings[key])
+
+    try:
+        core.session.apply_settings(settings)
+    except KeyError as e:
+        raise web.HTTPBadRequest(reason=e)
     return web.json_response()
