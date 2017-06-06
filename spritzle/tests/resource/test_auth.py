@@ -23,7 +23,7 @@
 from nose.tools import assert_raises
 from datetime import datetime, timedelta
 
-import aiohttp.errors
+import aiohttp
 import jwt
 
 import spritzle.tests.common
