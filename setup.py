@@ -39,5 +39,11 @@ setup(
         'console_scripts': [
             'spritzled =  spritzle.main:main'
         ]
-    }
+    },
+    install_requires=[
+        'aiohttp',
+        'pyjwt',
+        'PyYAML',
+        'vext.libtorrent',
+    ],
 )
