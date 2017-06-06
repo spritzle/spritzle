@@ -41,15 +41,17 @@ from spritzle.logger import setup_logger
 
 async def debug_middleware(app, handler):
     async def middleware(request):
-        body = await request.text()
-        post = await request.post()
+        if request.content_type in ('application/x-www-form-urlencoded',
+                                    'multipart/form-data'):
+            body = await request.post()
+        else:
+            body = await request.text()
         log = app['spritzle.log']
         log.debug('*'*20 + 'REQUEST' + '*'*20)
         log.debug(f'URL: {request.rel_url}')
         log.debug(f'METHOD: {request.method}')
         log.debug(f'HEADERS: {request.headers}')
         log.debug(f'BODY: {body}')
-        log.debug(f'POST: {post}')
         log.debug('*'*47)
         return await handler(request)
     return middleware
