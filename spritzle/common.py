@@ -22,6 +22,9 @@
 
 import datetime
 import libtorrent as lt
+import logging
+
+log = logging.getLogger('spritzle')
 
 
 def struct_to_dict(struct, ignore_keys=None):
@@ -76,7 +79,7 @@ def struct_to_dict(struct, ignore_keys=None):
         # Skip values that cannot be json encoded
         if (type(value) not in (dict, list, str, int, float, bool) and
                 value is not None):
-            print(f'skipping key: {key} value: {value}')
+            log.debug(f'skipping key: {key} value: {value}')
             continue
 
         d[key] = value
