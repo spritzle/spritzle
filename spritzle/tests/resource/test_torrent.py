@@ -27,7 +27,7 @@ from unittest.mock import patch, MagicMock
 from nose.tools import assert_raises
 
 import aiohttp.web
-from aiohttp.web_reqrep import FileField
+from aiohttp.web import FileField
 
 from spritzle.resource import torrent
 from spritzle.tests.common import run_until_complete, json_response
@@ -37,7 +37,8 @@ torrent_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'torrents')
 
 
-def create_mock_request(filename=None, url=None, info_hash=None, args=None):
+def create_mock_request(filename=None, url=None, info_hash=None, args=None,
+                        tags=None):
     async def post():
         post = {}
         a = {
@@ -51,7 +52,8 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None):
 
         if filename:
             filepath = os.path.join(torrent_dir, filename)
-            f = FileField("file", filename, open(filepath, 'rb'), 'text/plain')
+            f = FileField(
+                'file', filename, open(filepath, 'rb'), 'text/plain', {})
             post['file'] = f
 
         if url:
@@ -59,6 +61,9 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None):
 
         if info_hash:
             post['info_hash'] = info_hash
+
+        if tags:
+            post['tags'] = json.dumps(tags)
 
         return post
 
@@ -81,10 +86,13 @@ async def test_get_torrent():
     assert len(torrents) > 0
 
     request.match_info['tid'] = '44a040be6d74d8d290cd20128788864cbf770719'
+    request.app['spritzle.core'].torrent_data = {
+        '44a040be6d74d8d290cd20128788864cbf770719': {'spritzle.tags': ['foo']}}
 
     ts, response = await json_response(torrent.get_torrent(request))
     assert isinstance(ts, dict)
     assert ts['info_hash'] == '44a040be6d74d8d290cd20128788864cbf770719'
+    assert ts['spritzle.tags'] == ['foo']
 
     with assert_raises(aiohttp.web.HTTPNotFound):
         request.match_info['tid'] = 'a0'*20

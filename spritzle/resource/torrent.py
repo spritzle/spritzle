@@ -64,6 +64,10 @@ async def get_torrent(request):
             handle.status(),
             ignore_keys=ignored,
         )
+
+        if tid in core.torrent_data:
+            status.update(core.torrent_data[tid])
+
         return web.json_response(status)
 
 
@@ -130,6 +134,11 @@ async def post_torrent(request):
             reason="Error in session.add_torrent(): {}".format(str(e)))
 
     info_hash = str(th.info_hash())
+
+    if 'tags' in post:
+        tags = json.loads(post['tags'])
+        core.torrent_data.setdefault(
+            info_hash, {})['spritzle.tags'] = tags
 
     return web.json_response(
         {'info_hash': info_hash},

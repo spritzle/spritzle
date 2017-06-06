@@ -40,6 +40,10 @@ class Core(object):
 
         self.session_stats_future = None
 
+        # A place to keep additional data on torrents, that isn't stored in
+        # libtorrent.  This is key'd on info_hash.
+        self.torrent_data = {}
+
     def start(self):
         self.session = lt.session({
             'alert_mask': (int(lt.alert.category_t.error_notification) |
