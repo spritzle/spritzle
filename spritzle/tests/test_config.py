@@ -114,3 +114,26 @@ def test_get():
         assert c.get('foo', 1) == 1
         c['foo'] = 2
         assert c.get('foo') == 2
+
+
+def test_initial():
+    c = Config(in_memory=True, initial={'foo': 1})
+    assert c.get('foo') == 1
+
+
+def test_defaults():
+    c = Config(in_memory=True, defaults={'foo': 1})
+    assert c.get('foo') == 1
+    c['foo'] = 2
+    assert c.get('foo') == 2
+    del c['foo']
+    assert c.get('foo') == 1
+
+
+def test_init_load():
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir)
+        c['foo'] = 1
+        c.save()
+        c = Config(config_dir=tempdir)
+        assert c.get('foo') == 1
