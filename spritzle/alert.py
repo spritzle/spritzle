@@ -38,10 +38,9 @@ class Alert(object):
         self.loop = asyncio.get_event_loop()
         self.pop_alerts_task = None
         self.handlers = {
-            '*': [],
+            '*': [debug_handler],
         }
         self.run = True
-        self.register_handler('*', debug_handler)
 
     def start(self, session):
         self.stop()
@@ -55,10 +54,7 @@ class Alert(object):
             self.pop_alerts_task.cancel()
 
     def register_handler(self, alert_type, handler):
-        if alert_type not in self.handlers:
-            self.handlers[alert_type] = []
-
-        self.handlers[alert_type].append(handler)
+        self.handlers.setdefault(alert_type, []).append(handler)
 
     async def pop_alerts(self, run_once=False):
         while self.run or run_once:
@@ -66,8 +62,10 @@ class Alert(object):
                     None, functools.partial(self.session.wait_for_alert), 200):
                 for alert in self.session.pop_alerts():
                     alert_type = type(alert).__name__
+                    category = alert.category_t.values[alert.category()].name
 
                     handlers = set(
+                        self.handlers.get(category, []) +
                         self.handlers.get(alert_type, []) +
                         self.handlers['*'])
 

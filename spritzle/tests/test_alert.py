@@ -21,17 +21,34 @@
 #
 
 from unittest.mock import MagicMock
+from collections import namedtuple
 
 import spritzle.alert
 from spritzle.tests.common import run_until_complete
 
 
-class AlertTestOne(object):
+class CategoryT:
+    values = {
+        0: namedtuple('_', 'name')('test_category0'),
+        1: namedtuple('_', 'name')('test_category1'),
+    }
+
+
+class AlertTest:
+
+    def category(self):
+        return 0
+    category_t = CategoryT
+
+
+class AlertTestOne(AlertTest):
     pass
 
 
-class AlertTestTwo(object):
-    pass
+class AlertTestTwo(AlertTest):
+
+    def category(self):
+        return 1
 
 
 def test_alert_stop():
@@ -65,7 +82,12 @@ async def test_pop_alerts():
     a.register_handler('AlertTestTwo', handler_two)
     assert 'AlertTestTwo' in a.handlers
 
+    handler_three = MagicMock()
+    a.register_handler('test_category0', handler_three)
+    assert 'test_category0' in a.handlers
+
     await a.pop_alerts(run_once=True)
 
     handler_one.assert_called_with(alert_test_one)
     handler_two.assert_called_with(alert_test_two)
+    handler_three.assert_called_with(alert_test_one)
