@@ -33,12 +33,13 @@ def debug_handler(alert):
 
 
 class Alert(object):
+
     def __init__(self):
         self.session = None
         self.loop = asyncio.get_event_loop()
         self.pop_alerts_task = None
         self.handlers = {
-            '*': [debug_handler],
+            'all_categories': [debug_handler],
         }
         self.run = True
 
@@ -61,13 +62,13 @@ class Alert(object):
             if await self.loop.run_in_executor(
                     None, functools.partial(self.session.wait_for_alert), 200):
                 for alert in self.session.pop_alerts():
-                    alert_type = type(alert).__name__
-                    category = alert.category_t.values[alert.category()].name
+                    handlers = set()
+                    handlers.update(
+                        self.handlers.get(type(alert).__name__, []))
 
-                    handlers = set(
-                        self.handlers.get(category, []) +
-                        self.handlers.get(alert_type, []) +
-                        self.handlers['*'])
+                    for k, v in alert.category_t.values.items():
+                        if alert.category() & k:
+                            handlers.update(self.handlers.get(v.name, []))
 
                     for handler in handlers:
                         handler(alert)

@@ -29,15 +29,16 @@ from spritzle.tests.common import run_until_complete
 
 class CategoryT:
     values = {
-        0: namedtuple('_', 'name')('test_category0'),
         1: namedtuple('_', 'name')('test_category1'),
+        2: namedtuple('_', 'name')('test_category2'),
+        268435455: namedtuple('_', 'name')('all_categories'),
     }
 
 
 class AlertTest:
 
     def category(self):
-        return 0
+        return 1
     category_t = CategoryT
 
 
@@ -48,7 +49,7 @@ class AlertTestOne(AlertTest):
 class AlertTestTwo(AlertTest):
 
     def category(self):
-        return 1
+        return 2
 
 
 def test_alert_stop():
@@ -83,8 +84,8 @@ async def test_pop_alerts():
     assert 'AlertTestTwo' in a.handlers
 
     handler_three = MagicMock()
-    a.register_handler('test_category0', handler_three)
-    assert 'test_category0' in a.handlers
+    a.register_handler('test_category1', handler_three)
+    assert 'test_category1' in a.handlers
 
     await a.pop_alerts(run_once=True)
 
