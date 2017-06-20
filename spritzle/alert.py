@@ -63,8 +63,7 @@ class Alert(object):
                     None, functools.partial(self.session.wait_for_alert), 200):
                 for alert in self.session.pop_alerts():
                     handlers = set()
-                    handlers.update(
-                        self.handlers.get(type(alert).__name__, []))
+                    handlers.update(self.handlers.get(alert.what(), []))
 
                     for k, v in alert.category_t.values.items():
                         if alert.category() & k:

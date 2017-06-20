@@ -37,6 +37,9 @@ class CategoryT:
 
 class AlertTest:
 
+    def what(self):
+        return self.__class__.__name__
+
     def category(self):
         return 1
     category_t = CategoryT
