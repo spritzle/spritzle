@@ -97,7 +97,7 @@ class Main(object):
         self.loop.set_debug(self.debug)
 
         app['spritzle.config'] = Config('spritzle.conf', config_dir)
-        app['spritzle.core'] = Core()
+        app['spritzle.core'] = Core(app['spritzle.config'])
 
         # Create an executor so that we can call shutdown(wait=True) on it
         # when we shutdown the server.  This is done to allow Tasks to

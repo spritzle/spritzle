@@ -22,27 +22,34 @@
 
 import asyncio
 import pkg_resources
+from pathlib import Path
 
 import libtorrent as lt
 
 from spritzle.alert import Alert
+from spritzle.hooks import Hooks
 
 
 class Core(object):
-    def __init__(self):
+
+    def __init__(self, config):
+        self.config = config
         self.session = None
+        self.hooks = Hooks(Path(self.config.dir, 'hooks'))
+        self.session_stats_future = None
+        # A place to keep additional data on torrents, that isn't stored in
+        # libtorrent.  This is key'd on info_hash.
+        self.torrent_data = {}
 
         self.alert = Alert()
         self.alert.register_handler(
             'session_stats_alert',
             self.on_session_stats_alert
         )
-
-        self.session_stats_future = None
-
-        # A place to keep additional data on torrents, that isn't stored in
-        # libtorrent.  This is key'd on info_hash.
-        self.torrent_data = {}
+        self.alert.register_handler(
+            'status_notification',
+            self.on_status_notification_alert
+        )
 
     def start(self):
         self.session = lt.session({
@@ -79,3 +86,16 @@ class Core(object):
 
         await self.session_stats_future
         return self.session_stats_future.result()
+
+    def get_torrent_tags(self, info_hash):
+        return self.torrent_data.get(info_hash, {}).get('spritzle.tags', [])
+
+    def on_status_notification_alert(self, alert):
+        if hasattr(alert, 'handle'):
+            if alert.what() == 'torrent_removed_alert':
+                info_hash = str(alert.info_hash)
+            info_hash = str(alert.handle.info_hash())
+            self.hooks.run_hooks(
+                alert.what(),
+                info_hash,
+                ','.join(self.get_torrent_tags(info_hash)))

@@ -20,32 +20,45 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle.error import InvalidHook
+import asyncio
+from pathlib import Path
+import os
+import logging
+import subprocess
 
-_defaults = {}
-_handlers = {}
-
-
-def dispatch(hook_name, *args):
-    if hook_name in _handlers:
-        for handler in _handlers[hook_name]:
-            result = handler(*args)
-            if result is None:
-                continue
-            return result
-
-    if hook_name in _defaults:
-        return _defaults[hook_name](*args)
+log = logging.getLogger('spritzle')
 
 
-def register(hook_name, handler):
-    if hook_name not in _defaults:
-        raise InvalidHook(
-            "The hook %s does not have a default handler!" % hook_name)
+class Hooks:
+    def __init__(self, path):
+        self.path = Path(path)
 
-    handlers = _handlers.setdefault(hook_name, [])
-    handlers.append(handler)
+    def find_hooks(self, hook):
+        hooks = []
+        if self.path.exists():
+            for p in self.path.iterdir():
+                if not p.is_file():
+                    continue
+                if not p.name[0].isalnum():
+                    continue
+                if not os.access(p, os.X_OK):
+                    continue
+                if p.name.endswith(hook):
+                    hooks.append(p.resolve())
 
+        return sorted(hooks)
 
-def register_default(hook_name, handler):
-    _defaults[hook_name] = handler
+    async def run_hook(self, hook, *args):
+        log.info(f'run_hook start hook={hook} args={args}')
+        try:
+            p = subprocess.run([hook, *args], check=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            log.error((f'run_hook fail retcode={e.returncode} cmd={e.cmd}'
+                       f' output={e.output}'))
+        else:
+            log.info(f'run_hook success args={p.args}')
+
+    def run_hooks(self, hook_name, *args):
+        for hook in self.find_hooks(hook_name):
+            asyncio.ensure_future(self.run_hook(hook, *args))

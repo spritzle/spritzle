@@ -20,84 +20,57 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle import hooks
-from spritzle import error
-from nose.tools import assert_raises, with_setup
+import tempfile
+from pathlib import Path
 
-old_defaults = {}
-old_handlers = {}
+from spritzle.hooks import Hooks
 
-
-def setup_module():
-    global old_defaults
-    old_defaults = hooks._defaults
-    hooks._defaults = {}
-
-    global old_handlers
-    old_handlers = hooks._handlers
-    hooks._handlers = {}
+from spritzle.tests.common import run_until_complete
 
 
-def teardown_module():
-    hooks._defaults = old_defaults
-    hooks._handlers = old_handlers
+def test_find_hooks():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        h = Hooks(tmpdir)
+        hooks = h.find_hooks('foobar')
+        assert len(hooks) == 0
+
+        Path(tmpdir, '_foobar').touch()
+        hooks = h.find_hooks('foobar')
+        assert len(hooks) == 0
+        Path(tmpdir, '_foobar').unlink()
+
+        Path(tmpdir, 'foobar', exist_ok=True).mkdir()
+        hooks = h.find_hooks('foobar')
+        assert len(hooks) == 0
+        Path(tmpdir, 'foobar').rmdir()
+
+        Path(tmpdir, 'foobar').touch()
+        hooks = h.find_hooks('foobar')
+        assert len(hooks) == 0
+        Path(tmpdir, 'foobar').unlink()
+
+        Path(tmpdir, '100_foobar').touch(mode=0o777)
+        Path(tmpdir, 'foobar').touch(mode=0o777)
+        hooks = h.find_hooks('foobar')
+        assert len(hooks) == 2
+        assert hooks[0] == Path(tmpdir, '100_foobar')
 
 
-def setup():
-    hooks._defaults = {}
-    hooks._handlers = {}
+@run_until_complete
+async def test_run_hook_success():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p = Path(tmpdir, 'foobar')
+        p.write_bytes(b'#!/bin/sh\nexit 0')
+        p.chmod(0o777)
+        h = Hooks(tmpdir)
+        await h.run_hook(p)
 
 
-@with_setup(setup)
-def test_register_default():
-    assert "test_hook" not in hooks._defaults
-    hooks.register_default("test_hook", None)
-    assert "test_hook" in hooks._defaults
-
-
-@with_setup(setup)
-def test_register():
-    assert "test_hook" not in hooks._handlers
-    assert "test_hook" not in hooks._defaults
-
-    with assert_raises(error.InvalidHook):
-        hooks.register("test_hook", lambda x: x)
-
-    assert "test_hook" not in hooks._handlers
-    assert "test_hook" not in hooks._defaults
-
-    hooks.register_default("test_hook", lambda x: x)
-
-    hooks.register("test_hook", lambda x: x)
-
-    assert "test_hook" in hooks._handlers
-
-
-@with_setup(setup)
-def test_dispatch():
-    global called_default
-    called_default = False
-
-    def handler_default(*args, **kwargs):
-        global called_default
-        called_default = True
-        return
-    global called
-    called = False
-
-    def handler(*args, **kwargs):
-        global called
-        called = True
-        return args[0]
-
-    hooks.register_default("test_hook", handler_default)
-    hooks.register("test_hook", handler)
-
-    hooks.dispatch("test_hook", 1)
-    assert not called_default
-    assert called
-    called_default = False
-    called = False
-    hooks.dispatch("test_hook", None)
-    assert called_default
-    assert called
+@run_until_complete
+async def test_run_hook_fail():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p = Path(tmpdir, 'foobar')
+        p.write_bytes(b'#!/bin/sh\nexit 1')
+        p.chmod(0o777)
+        h = Hooks(tmpdir)
+        await h.run_hook(p)
