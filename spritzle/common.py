@@ -66,11 +66,11 @@ def struct_to_dict(struct, ignore_keys=None):
     keys = [x for x in dir(struct) if not x.startswith('_')]
 
     for key in keys:
-        value = getattr(struct, key)
-        vtype = type(value)
-
         if ignore_keys and key in ignore_keys:
             continue
+
+        value = getattr(struct, key)
+        vtype = type(value)
 
         # Convert the value if necessary
         if vtype in type_converters:
