@@ -20,33 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import patch, MagicMock
-
+from unittest.mock import patch
 import spritzle.main
-
-
-def test_main_start():
-    main = spritzle.main.Main(12345)
-    assert main.port == 12345
-    main.loop = MagicMock()
-    with patch('spritzle.main.app') as app:
-        with patch('aiohttp.web.run_app') as run_app:
-            main.start()
-            run_app.assert_called_once_with(spritzle.main.app)
-        assert app['spritzle.core'].start.called
-    assert main.loop.add_signal_handler.called
-
-
-def test_main_stop():
-    # pylint: disable=E1101
-    main = spritzle.main.Main(12345)
-    main.executor = MagicMock()
-    main.loop = MagicMock()
-    with patch('spritzle.main.app') as app:
-        main.stop()
-        assert app['spritzle.core'].stop.called
-    assert main.loop.stop.called
-    assert main.executor.shutdown.called
 
 
 def test_main_entry_point():
