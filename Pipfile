@@ -1,0 +1,26 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+
+[packages]
+
+aiohttp = "*"
+pyjwt = ">=1.4.2"
+pyyaml = ">=3.12"
+"vext.libtorrent" = "*"
+
+
+[dev-packages]
+
+asynctest = ">=0.10.1"
+coverage = ">=4.0.3"
+pytest = "*"
+nose = "*"
+
+
+[requires]
+
+python_version = "3.6"

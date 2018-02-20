@@ -1,4 +1,0 @@
-coverage>=4.0.3
-aiohttp>=0.21.0
-pyjwt>=1.4.2
-PyYAML>=3.12
