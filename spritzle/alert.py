@@ -22,14 +22,26 @@
 
 import asyncio
 import functools
-
 import logging
+
+import libtorrent as lt
+
 log = logging.getLogger('spritzle')
 
 
-def debug_handler(alert):
+async def debug_handler(alert):
     if type(alert).__name__ not in ['stats_alert']:
         log.debug('{} {}'.format(type(alert).__name__, alert))
+
+
+def build_categories():
+    # Creates a mapping of category -> int which is used for category alert
+    # handlers.
+    categories = {}
+    for c in dir(lt.alert.category_t):
+        if not c.startswith('__'):
+            categories[c] = getattr(lt.alert.category_t, c)
+    return categories
 
 
 class Alert(object):
@@ -41,18 +53,21 @@ class Alert(object):
         self.handlers = {
             'all_categories': [debug_handler],
         }
+        self.categories = build_categories()
         self.run = True
 
-    def start(self, session):
-        self.stop()
+    async def start(self, session):
+        log.debug('Alert starting..')
         self.session = session
         self.run = True
         self.pop_alerts_task = asyncio.ensure_future(self.pop_alerts())
 
-    def stop(self):
+    async def stop(self):
+        log.debug('Alert stopping..')
         self.run = False
         if self.pop_alerts_task:
-            self.pop_alerts_task.cancel()
+            await self.pop_alerts_task
+        log.debug('Alert stopped.')
 
     def register_handler(self, alert_type, handler):
         self.handlers.setdefault(alert_type, []).append(handler)
@@ -61,16 +76,24 @@ class Alert(object):
         while self.run or run_once:
             if await self.loop.run_in_executor(
                     None, functools.partial(self.session.wait_for_alert), 200):
+                if not (self.run or run_once):
+                    break
+
+                futures = []
                 for alert in self.session.pop_alerts():
                     handlers = set()
                     handlers.update(self.handlers.get(alert.what(), []))
 
-                    for k, v in alert.category_t.values.items():
-                        if alert.category() & k:
-                            handlers.update(self.handlers.get(v.name, []))
-
+                    for k, v in self.categories.items():
+                        if alert.category() & v:
+                            handlers.update(self.handlers.get(k, []))
                     for handler in handlers:
-                        handler(alert)
+                        futures.append(asyncio.ensure_future(handler(alert)))
+
+                # We have to make sure all alert handlers have completed before
+                # calling pop_alerts() again as it will invalidate all previous
+                # libtorrent alert objects.
+                await asyncio.gather(*futures)
 
             if run_once:
                 break

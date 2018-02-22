@@ -21,7 +21,7 @@
 #
 
 from unittest.mock import MagicMock
-from nose.tools import assert_raises
+import pytest
 
 from spritzle.tests.common import run_until_complete
 from spritzle.resource import config
@@ -29,11 +29,11 @@ from spritzle.resource import config
 
 @run_until_complete
 async def test_get_config():
-    with assert_raises(NotImplementedError):
+    with pytest.raises(NotImplementedError):
         await config.get_config(MagicMock())
 
 
 @run_until_complete
 async def test_put_config():
-    with assert_raises(NotImplementedError):
+    with pytest.raises(NotImplementedError):
         await config.put_config(MagicMock())

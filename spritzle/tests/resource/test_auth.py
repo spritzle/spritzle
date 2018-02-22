@@ -20,7 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from nose.tools import assert_raises
+import pytest
 from datetime import datetime, timedelta
 
 import aiohttp
@@ -31,13 +31,13 @@ from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
 
 
-def create_mock_request(password=None, config=None):
+async def create_mock_request(password=None, config=None):
     async def post():
         return {
             'password': password,
         }
 
-    request = spritzle.tests.common.create_mock_request(config=config)
+    request = await spritzle.tests.common.create_mock_request(config=config)
     request.post = post
     return request
 
@@ -52,11 +52,11 @@ async def test_post_auth():
     }
 
     _, response = await json_response(
-        auth.post_auth(create_mock_request('password', config)))
+        auth.post_auth(await create_mock_request('password', config)))
     assert response.status == 200
-    with assert_raises(aiohttp.web.HTTPUnauthorized):
+    with pytest.raises(aiohttp.web.HTTPUnauthorized):
         _, response = await json_response(
-            auth.post_auth(create_mock_request('badpassword', config)))
+            auth.post_auth(await create_mock_request('badpassword', config)))
         assert response.status == 401
 
 
@@ -65,7 +65,7 @@ async def test_auth_middleware():
     async def handler(request):
         request.handled = True
 
-    request = create_mock_request()
+    request = await create_mock_request()
     request.headers = {}
     request.handled = False
     request.rel_url.path = '/auth'
@@ -77,15 +77,15 @@ async def test_auth_middleware():
     request.handled = False
     request.rel_url.path = '/'
 
-    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
         await mw(request)
-    assert e.exception.reason == 'Authorization token required'
+        assert e.exception.reason == 'Authorization token required'
 
     request.headers['authorization'] = 'badtoken'
 
-    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
         await mw(request)
-    assert e.exception.reason == 'Token is invalid'
+        assert e.exception.reason == 'Token is invalid'
 
     config = {
         'auth_secret': 'secret',
@@ -106,7 +106,7 @@ async def test_auth_allow_hosts():
     async def handler(request):
         request.handled = True
 
-    request = create_mock_request()
+    request = await create_mock_request()
     request.headers = {}
     request.handled = False
     request.rel_url.path = '/'
@@ -118,6 +118,6 @@ async def test_auth_allow_hosts():
 
     request.handled = False
     request.transport.get_extra_info.return_value = ('128.8.8.8', 12345)
-    with assert_raises(aiohttp.web.HTTPUnauthorized) as e:
+    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
         await mw(request)
-    assert e.exception.reason == 'Authorization token required'
+        assert e.exception.reason == 'Authorization token required'

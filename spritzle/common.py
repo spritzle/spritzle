@@ -79,7 +79,8 @@ def struct_to_dict(struct, ignore_keys=None):
         # Skip values that cannot be json encoded
         if (type(value) not in (dict, list, str, int, float, bool) and
                 value is not None):
-            log.debug(f'skipping key: {key} value: {value}')
+            log.debug(
+                f'skipping key: {key} type: {type(value)} value: {value}')
             continue
 
         d[key] = value

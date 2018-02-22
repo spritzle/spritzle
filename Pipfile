@@ -8,8 +8,8 @@ name = "pypi"
 [packages]
 
 aiohttp = "*"
-pyjwt = ">=1.4.2"
-pyyaml = ">=3.12"
+PyJWT = ">=1.4.2"
+PyYAML = ">=3.12"
 "vext.libtorrent" = "*"
 
 
@@ -18,7 +18,6 @@ pyyaml = ">=3.12"
 asynctest = ">=0.10.1"
 coverage = ">=4.0.3"
 pytest = "*"
-nose = "*"
 
 
 [requires]

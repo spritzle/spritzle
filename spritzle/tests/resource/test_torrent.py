@@ -22,10 +22,10 @@
 
 import os
 import json
-
 from unittest.mock import patch, MagicMock
-from nose.tools import assert_raises
+import pytest
 
+import libtorrent as lt
 import aiohttp.web
 from aiohttp.web import FileField
 
@@ -37,13 +37,13 @@ torrent_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'torrents')
 
 
-def create_mock_request(filename=None, url=None, info_hash=None, args=None,
-                        tags=None):
+async def create_mock_request(core=None, filename=None, url=None,
+                              info_hash=None, args=None, tags=None):
     async def post():
         post = {}
         a = {
             'ti': None,
-            'paused': True,
+            'flags': lt.torrent_flags.paused,
         }
         if args:
             a.update(args)
@@ -67,7 +67,7 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None,
 
         return post
 
-    request = spritzle.tests.common.create_mock_request()
+    request = await spritzle.tests.common.create_mock_request(core=core)
     request.post = post
     request.scheme = 'http'
     request.host = 'localhost:8080'
@@ -76,8 +76,8 @@ def create_mock_request(filename=None, url=None, info_hash=None, args=None,
 
 
 @run_until_complete
-async def test_get_torrent():
-    request = await test_post_torrent()
+async def test_get_torrent(core):
+    request = await test_post_torrent(core)
 
     request.match_info = {}
 
@@ -94,15 +94,17 @@ async def test_get_torrent():
     assert ts['info_hash'] == '44a040be6d74d8d290cd20128788864cbf770719'
     assert ts['spritzle.tags'] == ['foo']
 
-    with assert_raises(aiohttp.web.HTTPNotFound):
+    with pytest.raises(aiohttp.web.HTTPNotFound):
         request.match_info['tid'] = 'a0'*20
         _, response = await torrent.get_torrent(request)
         assert response.status == 404
 
 
 @run_until_complete
-async def test_post_torrent():
-    request = create_mock_request(filename='random_one_file.torrent')
+async def test_post_torrent(core):
+    request = await create_mock_request(core=core,
+                                        filename='random_one_file.torrent',
+                                        tags=['foo'])
 
     body, response = await json_response(torrent.post_torrent(request))
     assert 'info_hash' in body
@@ -121,24 +123,9 @@ async def test_post_torrent():
 
 
 @run_until_complete
-async def test_post_torrent_bad_body():
-    request = create_mock_request(filename='random_one_file.torrent')
-
-    async def json():
-        return b'\xc3\x28'.decode("utf8")
-
-    request.json = json
-    body, response = await json_response(torrent.post_torrent(request))
-    assert 'info_hash' in body
-
-    info_hash = body['info_hash']
-
-    assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'
-
-
-@run_until_complete
-async def test_post_torrent_info_hash():
-    request = create_mock_request(
+async def test_post_torrent_info_hash(core):
+    request = await create_mock_request(
+        core=core,
         info_hash='44a040be6d74d8d290cd20128788864cbf770719')
 
     body, response = await json_response(torrent.post_torrent(request))
@@ -148,40 +135,57 @@ async def test_post_torrent_info_hash():
 
 
 @run_until_complete
-async def test_add_torrent_lt_runtime_error():
-    request = create_mock_request(filename='random_one_file.torrent')
+async def test_add_torrent_lt_runtime_error(core):
+    request = await create_mock_request(core=core,
+                                        filename='random_one_file.torrent')
 
     add_torrent = MagicMock()
     add_torrent.side_effect = RuntimeError()
     request.app['spritzle.core'].session.add_torrent = add_torrent
-    with assert_raises(aiohttp.web.HTTPInternalServerError):
+    with pytest.raises(aiohttp.web.HTTPInternalServerError):
         _, response = await json_response(torrent.post_torrent(request))
         assert response.status == 500
 
 
 @run_until_complete
-async def test_add_torrent_bad_file():
-    request = create_mock_request('empty.torrent')
+async def test_add_torrent_bad_file(core):
+    request = await create_mock_request(core=core, filename='empty.torrent')
 
-    with assert_raises(aiohttp.web.HTTPBadRequest):
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
         _, response = await json_response(torrent.post_torrent(request))
         assert response.status == 400
 
 
 @run_until_complete
-async def test_add_torrent_bad_number_args():
-    request = create_mock_request(
+async def test_add_torrent_bad_number_args(core):
+    request = await create_mock_request(
+        core=core,
         url='http://testing/test.torrent',
         info_hash='a0'*20)
 
-    with assert_raises(aiohttp.web.HTTPBadRequest):
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
         _, response = await json_response(torrent.post_torrent(request))
         assert response.status == 400
 
 
 @run_until_complete
-async def test_add_torrent_url():
-    request = create_mock_request(url='http://localhost/test.torrent')
+async def test_add_torrent_bad_args(core):
+    request = await create_mock_request(
+        core=core,
+        filename='random_one_file.torrent',
+        args={'bad_key': True},
+    )
+
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
+        _, response = await json_response(torrent.post_torrent(request))
+        assert response.status == 400
+
+
+@run_until_complete
+async def test_add_torrent_url(core):
+    request = await create_mock_request(
+        core=core,
+        url='http://localhost/test.torrent')
     data = open(
         os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb').read()
 
@@ -211,8 +215,8 @@ async def test_add_torrent_url():
 
 
 @run_until_complete
-async def test_remove_torrent():
-    request = await test_post_torrent()
+async def test_remove_torrent(core):
+    request = await test_post_torrent(core)
     tid = '44a040be6d74d8d290cd20128788864cbf770719'
 
     request.match_info = {
@@ -231,10 +235,10 @@ async def test_remove_torrent():
 
 
 @run_until_complete
-async def test_remove_torrent_all():
-    await test_post_torrent()
+async def test_remove_torrent_all(core):
+    await test_post_torrent(core)
 
-    request = create_mock_request()
+    request = await create_mock_request(core=core)
     request.match_info = {}
     request.GET = {
         'delete_files': True,

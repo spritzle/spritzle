@@ -23,6 +23,7 @@ import asyncio
 import functools
 import binascii
 import json
+import logging
 
 import aiohttp
 from aiohttp import web
@@ -30,6 +31,8 @@ from aiohttp import web
 import spritzle.common as common
 
 import libtorrent as lt
+
+log = logging.getLogger('spritzle')
 
 
 def get_valid_handle(core, tid):
@@ -126,19 +129,27 @@ async def post_torrent(request):
     elif 'info_hash' in post:
         atp['info_hash'] = binascii.unhexlify(post['info_hash'])
 
-    try:
-        th = await asyncio.get_event_loop().run_in_executor(
-                None, functools.partial(core.session.add_torrent), atp)
-    except RuntimeError as e:
-        raise web.HTTPInternalServerError(
-            reason="Error in session.add_torrent(): {}".format(str(e)))
+    info_hash = None
 
-    info_hash = str(th.info_hash())
+    if 'ti' in atp:
+        info_hash = str(atp['ti'].info_hash())
+    elif 'info_hash' in atp:
+        info_hash = binascii.hexlify(atp['info_hash']).decode()
 
-    if 'tags' in post:
+    if info_hash and 'tags' in post:
         tags = json.loads(post['tags'])
         core.torrent_data.setdefault(
             info_hash, {})['spritzle.tags'] = tags
+
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+                None, functools.partial(core.session.add_torrent), atp)
+    except KeyError as e:
+        raise web.HTTPBadRequest(
+            reason=str(e))
+    except RuntimeError as e:
+        raise web.HTTPInternalServerError(
+            reason="Error in session.add_torrent(): {}".format(str(e)))
 
     return web.json_response(
         {'info_hash': info_hash},
@@ -156,7 +167,10 @@ async def delete_torrent(request):
     options = 0
 
     for key in request.GET.keys():
-        options = options | lt.options_t.names[key]
+        try:
+            options = options | getattr(lt.options_t, key)
+        except AttributeError as e:
+            log.warning(f'Invalid option key: {key}')
 
     if tid is None:
         # If tid is None, we remove all the torrents

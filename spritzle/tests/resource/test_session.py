@@ -26,15 +26,15 @@ from spritzle.tests.common import (
 
 
 @run_until_complete
-async def test_get_session():
-    request = create_mock_request()
+async def test_get_session(core):
+    request = await create_mock_request(core=core)
     s, response = await json_response(session.get_session(request))
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
 @run_until_complete
-async def test_get_session_dht():
-    request = create_mock_request()
+async def test_get_session_dht(core):
+    request = await create_mock_request(core=core)
     b, response = await json_response(session.get_session_dht(request))
-    assert b
+    assert isinstance(b, bool)

@@ -20,8 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from nose.tools import assert_raises
 import aiohttp.web
+import pytest
 
 from spritzle.resource import settings
 from spritzle.tests.common import (
@@ -29,8 +29,8 @@ from spritzle.tests.common import (
 
 
 @run_until_complete
-async def test_get_settings():
-    request = create_mock_request()
+async def test_get_settings(core):
+    request = await create_mock_request(core=core)
     s, response = await json_response(settings.get_settings(request))
 
     assert isinstance(s, dict)
@@ -38,8 +38,8 @@ async def test_get_settings():
 
 
 @run_until_complete
-async def test_put_settings():
-    request = create_mock_request()
+async def test_put_settings(core):
+    request = await create_mock_request(core=core)
     old, response = await json_response(settings.get_settings(request))
     test_key = 'peer_connect_timeout'
 
@@ -60,8 +60,8 @@ async def test_put_settings():
 
 
 @run_until_complete
-async def test_put_settings_bad_key():
-    request = create_mock_request()
+async def test_put_settings_bad_key(core):
+    request = await create_mock_request(core=core)
 
     async def json():
         return {'bad_key': 1}
@@ -70,14 +70,14 @@ async def test_put_settings_bad_key():
         'json.return_value': json(),
     })
 
-    with assert_raises(aiohttp.web.HTTPBadRequest):
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
         response = await settings.put_settings(request)
         assert response.status == 400
 
 
 @run_until_complete
-async def test_put_settings_type_coercion():
-    request = create_mock_request()
+async def test_put_settings_type_coercion(core):
+    request = await create_mock_request(core=core)
 
     async def json():
         return {'peer_connect_timeout': '1'}

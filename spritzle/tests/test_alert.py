@@ -21,18 +21,16 @@
 #
 
 from unittest.mock import MagicMock
-from collections import namedtuple
+import asynctest
 
 import spritzle.alert
 from spritzle.tests.common import run_until_complete
 
 
 class CategoryT:
-    values = {
-        1: namedtuple('_', 'name')('test_category1'),
-        2: namedtuple('_', 'name')('test_category2'),
-        268435455: namedtuple('_', 'name')('all_categories'),
-    }
+    test_category1 = 1
+    test_category2 = 2
+    all_categories = 268435455
 
 
 class AlertTest:
@@ -42,7 +40,6 @@ class AlertTest:
 
     def category(self):
         return 1
-    category_t = CategoryT
 
 
 class AlertTestOne(AlertTest):
@@ -55,16 +52,17 @@ class AlertTestTwo(AlertTest):
         return 2
 
 
-def test_alert_stop():
+@run_until_complete
+async def test_alert_stop():
     a = spritzle.alert.Alert()
     assert a.run
-    a.start(MagicMock())
-    a.stop()
+    await a.start(MagicMock())
+    await a.stop()
     assert not a.run
 
 
 @run_until_complete
-async def test_pop_alerts():
+async def test_pop_alerts(monkeypatch):
     session = MagicMock()
 
     alert_test_one = AlertTestOne()
@@ -75,18 +73,19 @@ async def test_pop_alerts():
         'pop_alerts.return_value': [alert_test_one, alert_test_two],
     })
 
+    monkeypatch.setattr('libtorrent.alert.category_t', CategoryT)
     a = spritzle.alert.Alert()
     a.session = session
 
-    handler_one = MagicMock()
+    handler_one = asynctest.CoroutineMock()
     a.register_handler('AlertTestOne', handler_one)
     assert 'AlertTestOne' in a.handlers
 
-    handler_two = MagicMock()
+    handler_two = asynctest.CoroutineMock()
     a.register_handler('AlertTestTwo', handler_two)
     assert 'AlertTestTwo' in a.handlers
 
-    handler_three = MagicMock()
+    handler_three = asynctest.CoroutineMock()
     a.register_handler('test_category1', handler_three)
     assert 'test_category1' in a.handlers
 

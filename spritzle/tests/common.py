@@ -27,11 +27,11 @@ async def json_response(cr):
     return json.loads(response.text), response
 
 
-def create_mock_request(core=None, config=None):
+async def create_mock_request(core=None, config=None):
     config = Config(in_memory=True, config_dir='/tmp', initial=config)
     if core is None:
         core = Core(config)
-        core.start()
+        await core.start()
 
     request = MagicMock()
     request.app = {

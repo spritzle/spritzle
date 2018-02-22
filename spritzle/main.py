@@ -22,9 +22,6 @@
 
 import argparse
 import asyncio
-import signal
-import functools
-import concurrent
 
 import aiohttp
 
@@ -88,38 +85,6 @@ def setup_routes():
                          spritzle.resource.torrent.delete_torrent)
 
 
-class Main(object):
-
-    def __init__(self, port, debug=False, config_dir=None):
-        self.port = port
-        self.debug = debug
-        self.loop = asyncio.get_event_loop()
-        self.loop.set_debug(self.debug)
-
-        app['spritzle.config'] = Config('spritzle.conf', config_dir)
-        app['spritzle.core'] = Core(app['spritzle.config'])
-
-        # Create an executor so that we can call shutdown(wait=True) on it
-        # when we shutdown the server.  This is done to allow Tasks to
-        # properly finish execution on shutdown.
-        self.executor = concurrent.futures.ThreadPoolExecutor(5)
-        self.loop.set_default_executor(self.executor)
-
-    def stop(self):
-        app['spritzle.core'].stop()
-        self.executor.shutdown(wait=True)
-        self.loop.stop()
-
-    def start(self):
-        setup_routes()
-
-        for s in (signal.SIGINT, signal.SIGTERM):
-            self.loop.add_signal_handler(s, functools.partial(self.stop))
-
-        app['spritzle.core'].start()
-        aiohttp.web.run_app(app)
-
-
 def main():
     parser = argparse.ArgumentParser(description='Spritzled')
     parser.add_argument(
@@ -128,10 +93,25 @@ def main():
     parser.add_argument('-c', '--config_dir', dest='config_dir', type=str)
     parser.add_argument('-l', '--log-level', default='INFO',
                         dest='log_level', type=str)
-
     args = parser.parse_args()
 
     log = setup_logger(name='spritzle', level=args.log_level)
     log.info(f'spritzled starting.. args: {args}')
     app['spritzle.log'] = log
-    Main(args.port, args.debug, args.config_dir).start()
+
+    loop = asyncio.get_event_loop()
+    loop.set_debug(args.debug)
+
+    app['spritzle.config'] = Config('spritzle.conf', args.config_dir)
+    app['spritzle.core'] = Core(app['spritzle.config'])
+
+    async def on_startup(app):
+        await app['spritzle.core'].start()
+
+    async def on_shutdown(app):
+        await app['spritzle.core'].stop()
+
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    setup_routes()
+    aiohttp.web.run_app(app)
