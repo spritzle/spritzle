@@ -177,7 +177,7 @@ class Core(object):
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
             f'Error saving resume_data for torrent {alert.torrent_name} '
-            'error: {alert.error}')
+            f'error: {alert.error.message()}')
 
     async def on_add_torrent_alert(self, alert):
         log.info('add_torrent_alert saving resume data')
