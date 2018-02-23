@@ -53,6 +53,9 @@ class Core(object):
         # libtorrent.  This is key'd on info_hash.
         self.torrent_data = {}
 
+        # Store state of outstanding save resume data alerts
+        self.resume_data_futures = {}
+
         self.alert = Alert()
         self.alert.register_handler(
             'session_stats_alert',
@@ -106,6 +109,7 @@ class Core(object):
 
     async def stop(self):
         log.debug('Core stopping..')
+        await self.save_resume_data()
         await self.alert.stop()
         del self.session
         self.session = None
@@ -157,33 +161,41 @@ class Core(object):
                 info_hash,
                 ','.join(self.get_torrent_tags(info_hash)))
 
-    def save_resume_data(self):
-        for torrent in self.core.get_torrents():
+    async def save_resume_data(self):
+        for torrent in self.session.get_torrents():
             if torrent.need_save_resume_data():
+                self.resume_data_futures[str(torrent.info_hash())] = asyncio.Future()
                 torrent.save_resume_data(
                     flags=(
                         int(lt.save_resume_flags_t.flush_disk_cache) |
                         int(lt.save_resume_flags_t.save_info_dict)
                     ),
                 )
+        await asyncio.gather(*self.resume_data_futures.values())
 
     async def on_save_resume_data_alert(self, alert):
+        info_hash = str(alert.handle.info_hash())
         p = Path(self.state_dir, alert.torrent_name + '.resume')
         r = lt.write_resume_data(alert.params)
-        print(self.torrent_data)
-        r.update(self.torrent_data[str(alert.handle.info_hash())])
+        r.update(self.torrent_data[info_hash])
         p.write_bytes(lt.bencode(r))
+        if info_hash in self.resume_data_futures:
+            self.resume_data_futures.pop(info_hash).set_result(True)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
             f'Error saving resume_data for torrent {alert.torrent_name} '
             f'error: {alert.error.message()}')
+        info_hash = str(alert.handle.info_hash())
+        if info_hash in self.resume_data_futures:
+            # We don't really care if this fails right now, maybe in the future
+            # we should raise an exception.
+            self.resume_data_futures.pop(info_hash).set_result(True)
 
     async def on_add_torrent_alert(self, alert):
-        log.info('add_torrent_alert saving resume data')
         try:
             alert.handle.save_resume_data()
         except RuntimeError as e:
             # An invalid handle can occur here if a torrent is added and
-            # removed is quick succession.
+            # removed in quick succession.
             log.error(e)
