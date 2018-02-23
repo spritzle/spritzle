@@ -25,6 +25,7 @@ def core():
                 'enable_dht': False,
                 'anonymous_mode': True,
                 'alert_mask': 0,
+                'stop_tracker_timeout': 0,
             }
         )
     core_start()
