@@ -111,7 +111,7 @@ async def test_post_torrent(core):
     info_hash = body['info_hash']
 
     assert response.headers['LOCATION'] == \
-        'http://localhost:8080/torrent/{}'.format(info_hash)
+        f'http://localhost:8080/torrent/{info_hash}'
     assert response.status == 201
 
     assert info_hash == '44a040be6d74d8d290cd20128788864cbf770719'

@@ -31,7 +31,7 @@ log = logging.getLogger('spritzle')
 
 async def debug_handler(alert):
     if type(alert).__name__ not in ['stats_alert']:
-        log.debug('{} {}'.format(type(alert).__name__, alert))
+        log.debug(f'{type(alert).__name__} {alert}')
 
 
 def build_categories():

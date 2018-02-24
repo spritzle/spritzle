@@ -113,7 +113,7 @@ async def post_torrent(request):
             atp['ti'] = lt.torrent_info(lt.bdecode(data))
         except RuntimeError as e:
             raise web.HTTPBadRequest(
-                reason='Not a valid torrent file: {}'.format(e))
+                reason=f'Not a valid torrent file: {e}')
 
     if 'file' in post:
         generate_torrent_info(post['file'].file.read())
@@ -149,13 +149,12 @@ async def post_torrent(request):
             reason=str(e))
     except RuntimeError as e:
         raise web.HTTPInternalServerError(
-            reason="Error in session.add_torrent(): {}".format(str(e)))
+            reason=f'Error in session.add_torrent(): {e}')
 
     return web.json_response(
         {'info_hash': info_hash},
         status=201,
-        headers={'Location': '{}://{}/torrent/{}'.format(
-            request.scheme, request.host, info_hash)}
+        headers={'Location': f'{request.scheme}://{request.host}/torrent/{info_hash}'}
         )
 
 
