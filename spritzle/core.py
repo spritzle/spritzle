@@ -199,3 +199,7 @@ class Core(object):
             # An invalid handle can occur here if a torrent is added and
             # removed in quick succession.
             log.error(e)
+
+    async def on_state_changed_alert(self, alert):
+        if alert.handle.need_save_resume_data():
+            alert.handle.save_resume_data()
