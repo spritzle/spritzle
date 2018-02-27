@@ -129,17 +129,17 @@ async def post_torrent(request):
     elif 'info_hash' in post:
         atp['info_hash'] = binascii.unhexlify(post['info_hash'])
 
-    info_hash = None
-
     if 'ti' in atp:
         info_hash = str(atp['ti'].info_hash())
     elif 'info_hash' in atp:
         info_hash = binascii.hexlify(atp['info_hash']).decode()
 
-    if info_hash and 'tags' in post:
+    if info_hash not in core.torrent_data:
+        core.torrent_data[info_hash] = {}
+
+    if 'tags' in post:
         tags = json.loads(post['tags'])
-        core.torrent_data.setdefault(
-            info_hash, {})['spritzle.tags'] = tags
+        core.torrent_data[info_hash]['spritzle.tags'] = tags
 
     try:
         await asyncio.get_event_loop().run_in_executor(
