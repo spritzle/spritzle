@@ -102,18 +102,32 @@ class Core(object):
                     lt.__version__),
             }
         self.session = lt.session(settings)
-
+        await self.load_session_state()
         await self.alert.start(self.session)
         await self.load_resume_data()
         log.debug('Core started.')
 
     async def stop(self):
         log.debug('Core stopping..')
+        await self.save_session_state()
         await self.save_resume_data()
         await self.alert.stop()
         del self.session
         self.session = None
         log.debug('Core stopped..')
+
+    async def save_session_state(self):
+        state = await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(self.session.save_state))
+        f = Path(self.state_dir, 'session.state')
+        f.write_bytes(lt.bencode(state))
+
+    async def load_session_state(self):
+        f = Path(self.state_dir, 'session.state')
+        log.info(f'Loading session state from: {f}')
+        if f.exists():
+            await asyncio.get_event_loop().run_in_executor(
+                None, functools.partial(self.session.load_state), f.read_bytes())
 
     async def load_resume_data(self):
         log.info(f'Loading resume data from {self.state_dir}')
