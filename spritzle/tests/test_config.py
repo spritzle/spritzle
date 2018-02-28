@@ -23,25 +23,24 @@
 import tempfile
 import os
 import shutil
+from pathlib import Path
 
 from spritzle.config import Config
 
 
 def test_config_init_no_dir():
-    tmpdir = os.path.join(tempfile.gettempdir(), 'spritzletmpdir')
+    tmpdir = Path(tempfile.gettempdir(), 'spritzletmpdir')
     home = os.environ['HOME']
-    os.environ['HOME'] = tmpdir
+    os.environ['HOME'] = str(tmpdir)
 
     c = Config()
 
     os.environ['HOME'] = home
 
-    assert c.file == os.path.join(
+    assert c.config_file == Path(
         tmpdir, '.config', 'spritzle', 'spritzle.conf')
 
-    assert os.path.isfile(
-        os.path.join(
-            tmpdir, '.config', 'spritzle', 'spritzle.conf'))
+    assert Path(tmpdir, '.config', 'spritzle', 'spritzle.conf').is_file()
 
     shutil.rmtree(tmpdir)
 
@@ -64,7 +63,7 @@ def test_config_save():
         c = Config(config_dir=tempdir, in_memory=True)
         c['foo'] = 1
         c.save()
-        assert not os.path.exists(os.path.join(tempdir, 'spritzle.conf'))
+        assert not Path(tempdir, 'spritzle.conf').exists()
 
 
 def test_config_load():

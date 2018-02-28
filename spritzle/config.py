@@ -20,9 +20,9 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import os
 import yaml
 import collections.abc
+from pathlib import Path
 
 DEFAULTS = {
     'auth_password': 'password',
@@ -43,21 +43,15 @@ class Config(collections.abc.MutableMapping):
             self.data.update(initial)
 
         if config_dir is None:
-            self.dir = os.path.join(
-                os.path.expanduser('~'),
-                '.config',
-                'spritzle'
-            )
+            self.path = Path(Path.home(), '.config', 'spritzle')
         else:
-            self.dir = config_dir
+            self.path = Path(config_dir)
 
         if not self.in_memory:
-            self.file = os.path.join(self.dir, filename)
+            self.config_file = Path(self.path, filename)
+            self.path.mkdir(parents=True, exist_ok=True)
 
-            if not os.path.isdir(self.dir):
-                os.makedirs(self.dir)
-
-            if os.path.isfile(self.file):
+            if self.config_file.is_file():
                 self.load()
             else:
                 self.save()
@@ -66,28 +60,28 @@ class Config(collections.abc.MutableMapping):
         if self.in_memory:
             return
 
-        if os.path.isfile(self.file):
-            self.data = yaml.safe_load(open(self.file, 'r')) or {}
+        if self.config_file.is_file():
+            self.data = yaml.safe_load(self.config_file.open()) or {}
 
     def save(self):
         if self.in_memory:
             return
 
-        f = open(self.file, 'w')
-        f.write(
-            '''#
+        with self.config_file.open(mode='w') as f:
+            f.write(
+                '''#
 # Configuration file for Spritzle. The format is YAML.
 #
 # Default values:
 #
 ''')
-        for key, value in sorted(self.defaults.items()):
-            f.write(f'# {key}: {value}\n')
+            for key, value in sorted(self.defaults.items()):
+                f.write(f'# {key}: {value}\n')
 
-        f.write('#\n# Overrides should be made below this line\n\n')
-        if self.data:
-            for k, v in sorted(self.data.items()):
-                yaml.safe_dump({k: v}, f, default_flow_style=False)
+            f.write('#\n# Overrides should be made below this line\n\n')
+            if self.data:
+                for k, v in sorted(self.data.items()):
+                    yaml.safe_dump({k: v}, f, default_flow_style=False)
 
     def __len__(self):
         return len(self.data)

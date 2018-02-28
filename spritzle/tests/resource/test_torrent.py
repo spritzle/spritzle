@@ -20,8 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import os
 import json
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
@@ -33,8 +33,7 @@ from spritzle.resource import torrent
 from spritzle.tests.common import run_until_complete, json_response
 import spritzle.tests.common
 
-torrent_dir = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'torrents')
+torrent_dir = Path(Path(__file__).resolve().parent, 'torrents')
 
 
 async def create_mock_request(core=None, filename=None, url=None,
@@ -51,9 +50,9 @@ async def create_mock_request(core=None, filename=None, url=None,
         post['args'] = json.dumps(a)
 
         if filename:
-            filepath = os.path.join(torrent_dir, filename)
+            filepath = Path(torrent_dir, filename)
             f = FileField(
-                'file', filename, open(filepath, 'rb'), 'text/plain', {})
+                'file', filename, filepath.open(mode='rb'), 'text/plain', {})
             post['file'] = f
 
         if url:
@@ -186,8 +185,7 @@ async def test_add_torrent_url(core):
     request = await create_mock_request(
         core=core,
         url='http://localhost/test.torrent')
-    data = open(
-        os.path.join(torrent_dir, 'random_one_file.torrent'), 'rb').read()
+    data = Path(torrent_dir, 'random_one_file.torrent').read_bytes()
 
     class AsyncContextManager:
         async def __aenter__(self):

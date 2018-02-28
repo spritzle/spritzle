@@ -40,7 +40,7 @@ class Core(object):
     def __init__(self, config, state_dir=None):
         self.config = config
         self.session = None
-        self.hooks = Hooks(Path(self.config.dir, 'hooks'))
+        self.hooks = Hooks(Path(self.config.path, 'hooks'))
         if state_dir is None:
             self.state_dir = Path(
                 Path.home(), '.local', 'share', 'spritzle', 'state')
