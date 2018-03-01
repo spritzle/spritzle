@@ -8,9 +8,16 @@ from spritzle.core import Core
 from spritzle.config import Config
 from spritzle.tests.common import run_until_complete
 
+import asyncio
+
 
 @pytest.fixture(scope='function')
 def core():
+    # Create a new event loop for each core so that tests can't interfere with eachothers executor pools.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.set_debug(True)
+
     config = Config(in_memory=True, config_dir='/tmp')
     state_dir = Path(tempfile.mkdtemp(prefix='spritzle-test'))
     core = Core(config, state_dir)
