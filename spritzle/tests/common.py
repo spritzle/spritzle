@@ -3,7 +3,6 @@ import asyncio
 import functools
 from unittest.mock import MagicMock
 
-from spritzle.core import Core
 from spritzle.config import Config
 
 
@@ -29,10 +28,7 @@ async def json_response(cr):
 
 async def create_mock_request(core=None, config=None):
     config = Config(in_memory=True, config_dir='/tmp', initial=config)
-    if core is None:
-        core = Core(config)
-        await core.start()
-
+    core.config = config
     request = MagicMock()
     request.app = {
         'spritzle.core': core,

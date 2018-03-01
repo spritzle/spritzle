@@ -31,19 +31,19 @@ from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
 
 
-async def create_mock_request(password=None, config=None):
+async def create_mock_request(core=None, password=None, config=None):
     async def post():
         return {
             'password': password,
         }
 
-    request = await spritzle.tests.common.create_mock_request(config=config)
+    request = await spritzle.tests.common.create_mock_request(core=core, config=config)
     request.post = post
     return request
 
 
 @run_until_complete
-async def test_post_auth():
+async def test_post_auth(core):
     config = {
         'auth_password': 'password',
         'auth_timeout': 120,
@@ -52,20 +52,20 @@ async def test_post_auth():
     }
 
     _, response = await json_response(
-        auth.post_auth(await create_mock_request('password', config)))
+        auth.post_auth(await create_mock_request(core, 'password', config)))
     assert response.status == 200
     with pytest.raises(aiohttp.web.HTTPUnauthorized):
         _, response = await json_response(
-            auth.post_auth(await create_mock_request('badpassword', config)))
+            auth.post_auth(await create_mock_request(core, 'badpassword', config)))
         assert response.status == 401
 
 
 @run_until_complete
-async def test_auth_middleware():
+async def test_auth_middleware(core):
     async def handler(request):
         request.handled = True
 
-    request = await create_mock_request()
+    request = await create_mock_request(core)
     request.headers = {}
     request.handled = False
     request.rel_url.path = '/auth'
@@ -102,11 +102,11 @@ async def test_auth_middleware():
 
 
 @run_until_complete
-async def test_auth_allow_hosts():
+async def test_auth_allow_hosts(core):
     async def handler(request):
         request.handled = True
 
-    request = await create_mock_request()
+    request = await create_mock_request(core)
     request.headers = {}
     request.handled = False
     request.rel_url.path = '/'
