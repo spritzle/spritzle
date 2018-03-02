@@ -26,7 +26,7 @@ from pathlib import Path
 
 DEFAULTS = {
     'auth_password': 'password',
-    'auth_secret': 'secret',
+    'auth_secret': '',
     'auth_timeout': 120,
     'auth_allow_hosts': ['127.0.0.1'],
 }

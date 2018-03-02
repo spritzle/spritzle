@@ -22,6 +22,7 @@
 
 import argparse
 import asyncio
+import secrets
 
 import aiohttp
 
@@ -102,7 +103,11 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(args.debug)
 
-    app['spritzle.config'] = Config('spritzle.conf', args.config_dir)
+    config = Config('spritzle.conf', args.config_dir)
+    if not config['auth_secret']:
+        config['auth_secret'] = secrets.token_hex()
+
+    app['spritzle.config'] = config
     app['spritzle.core'] = Core(app['spritzle.config'])
 
     async def on_startup(app):
