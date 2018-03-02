@@ -122,7 +122,7 @@ async def post_torrent(request):
     # info-hash when we need it.
     # See: https://github.com/arvidn/libtorrent/issues/481
     elif 'url' in post:
-        with aiohttp.ClientSession() as client:
+        async with aiohttp.ClientSession() as client:
             async with client.get(post['url']) as resp:
                 generate_torrent_info(await resp.read())
 

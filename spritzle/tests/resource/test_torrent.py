@@ -198,10 +198,10 @@ async def test_add_torrent_url(core):
             return data
 
     class ClientSession:
-        def __enter__(self):
+        async def __aenter__(self):
             return self
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
             return
 
         def get(self, url):
