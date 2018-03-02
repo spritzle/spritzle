@@ -8,7 +8,7 @@ curl -i -H "Authorization: ${TOKEN}" -X POST -F "file=@resource/torrents/random_
 echo
 
 echo "Adding torrent by URL.."
-curl -i -H "Authorization: ${TOKEN}" -X POST -d 'url=https://www.archlinux.org/releng/releases/2016.02.01/torrent/&args={"save_path": "/tmp"}' http://localhost:8080/torrent
+curl -i -H "Authorization: ${TOKEN}" -X POST -d 'url=https://www.archlinux.org/releng/releases/2017.02.01/torrent/&args={"save_path": "/tmp"}' http://localhost:8080/torrent
 echo
 
 echo "Adding torrent by info_hash.."
