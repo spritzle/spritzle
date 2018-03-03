@@ -25,6 +25,7 @@ import collections.abc
 from pathlib import Path
 
 DEFAULTS = {
+    'add_torrent_params.save_path': '',
     'auth_password': 'password',
     'auth_secret': '',
     'auth_timeout': 120,
