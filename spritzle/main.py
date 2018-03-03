@@ -22,7 +22,10 @@
 
 import argparse
 import asyncio
+import fcntl
+from pathlib import Path
 import secrets
+import sys
 
 import aiohttp
 
@@ -104,6 +107,16 @@ def main():
     loop.set_debug(args.debug)
 
     config = Config('spritzle.conf', args.config_dir)
+
+    # Prevent more than one process using the same config path from running.
+    f = Path(config.path, 'spritzled.lock').open(mode='w')
+    try:
+        fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError as e:
+        log.error(f'Another instance of Spritzle is running: {e}')
+        log.error('Exiting..')
+        sys.exit(0)
+
     if not config['auth_secret']:
         config['auth_secret'] = secrets.token_hex()
 
