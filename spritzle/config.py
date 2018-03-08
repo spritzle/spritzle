@@ -34,7 +34,7 @@ DEFAULTS = {
 
 
 class Config(collections.abc.MutableMapping):
-    def __init__(self, filename='spritzle.conf', config_dir=None,
+    def __init__(self, filename='spritzled.conf', config_dir=None,
                  defaults=None, in_memory=False, initial=None):
 
         self.in_memory = in_memory

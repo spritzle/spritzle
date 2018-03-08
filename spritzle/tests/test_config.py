@@ -38,9 +38,9 @@ def test_config_init_no_dir():
     os.environ['HOME'] = home
 
     assert c.config_file == Path(
-        tmpdir, '.config', 'spritzle', 'spritzle.conf')
+        tmpdir, '.config', 'spritzle', 'spritzled.conf')
 
-    assert Path(tmpdir, '.config', 'spritzle', 'spritzle.conf').is_file()
+    assert c.config_file.is_file()
 
     shutil.rmtree(tmpdir)
 
