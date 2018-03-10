@@ -85,8 +85,6 @@ async def test_get_torrent(core):
     assert len(torrents) > 0
 
     request.match_info['tid'] = '44a040be6d74d8d290cd20128788864cbf770719'
-    request.app['spritzle.core'].torrent_data = {
-        '44a040be6d74d8d290cd20128788864cbf770719': {'spritzle.tags': ['foo']}}
 
     ts, response = await json_response(torrent.get_torrent(request))
     assert isinstance(ts, dict)
