@@ -137,9 +137,8 @@ async def post_torrent(request):
     if info_hash not in core.torrent_data:
         core.torrent_data[info_hash] = {}
 
-    if 'tags' in post:
-        tags = json.loads(post['tags'])
-        core.torrent_data[info_hash]['spritzle.tags'] = tags
+    tags = json.loads(post['tags']) if 'tags' in post else []
+    core.torrent_data[info_hash]['spritzle.tags'] = tags
 
     try:
         await asyncio.get_event_loop().run_in_executor(
