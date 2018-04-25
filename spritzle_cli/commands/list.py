@@ -12,17 +12,17 @@ from tabulate import tabulate
 @click.option('--header/--no-header', default=True,
               help='Print header in output.')
 @click.pass_obj
-def main(ctx, fields, header):
-    ctx.do_command(f, fields, header)
+def command(client, fields, header):
+    client.do_command(f, fields, header)
 
 
-async def f(ctx, fields, header):
+async def f(client, fields, header):
     type_formatters = {
         list: list_formatter,
     }
 
     fields = fields.split(',')
-    async with ctx.session.get(ctx.url('torrent')) as resp:
+    async with client.session.get(client.url('torrent')) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)
@@ -30,7 +30,7 @@ async def f(ctx, fields, header):
 
     table = []
     for torrent in torrents:
-        async with ctx.session.get(ctx.url(f'torrent/{torrent}')) as resp:
+        async with client.session.get(client.url(f'torrent/{torrent}')) as resp:
             t = await resp.json()
             values = []
             for field in fields:

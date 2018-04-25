@@ -8,16 +8,16 @@ import click
 @click.option('--delete-files', default=False, is_flag=True,
               help='Delete downloaded files.')
 @click.pass_obj
-def main(ctx, info_hash, delete_files):
-    ctx.do_command(f, info_hash, delete_files)
+def command(client, info_hash, delete_files):
+    client.do_command(f, info_hash, delete_files)
 
 
-async def f(ctx, info_hash, delete_files):
-    url = ctx.url(f'torrent/{info_hash}')
+async def f(client, info_hash, delete_files):
+    url = client.url(f'torrent/{info_hash}')
     if delete_files:
         url += '?delete_files'
 
-    async with ctx.session.delete(url) as resp:
+    async with client.session.delete(url) as resp:
         if resp.status != 200:
             click.echo(
                 f'Error removing torrent: {resp.status} {resp.reason}',
