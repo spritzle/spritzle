@@ -22,12 +22,16 @@
 
 from aiohttp import web
 
+routes = web.RouteTableDef()
 
+
+@routes.get('/settings')
 async def get_settings(request):
     core = request.app['spritzle.core']
     return web.json_response(core.session.get_settings())
 
 
+@routes.put('/settings')
 async def put_settings(request):
     core = request.app['spritzle.core']
     settings = await request.json()

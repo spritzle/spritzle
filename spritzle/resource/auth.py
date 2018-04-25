@@ -25,7 +25,10 @@ from datetime import datetime, timedelta
 import jwt
 from aiohttp import web
 
+routes = web.RouteTableDef()
 
+
+@routes.post('/auth')
 async def post_auth(request):
     config = request.app['spritzle.config']
     post = await request.post()

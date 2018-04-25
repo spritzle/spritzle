@@ -63,30 +63,11 @@ app = aiohttp.web.Application(
 
 
 def setup_routes():
-    app.router.add_route('POST', '/auth',
-                         spritzle.resource.auth.post_auth)
-    app.router.add_route('GET', '/config',
-                         spritzle.resource.config.get_config)
-    app.router.add_route('PUT', '/config',
-                         spritzle.resource.config.put_config)
-    app.router.add_route('GET', '/session',
-                         spritzle.resource.session.get_session)
-    app.router.add_route('GET', '/session/dht',
-                         spritzle.resource.session.get_session_dht)
-    app.router.add_route('GET', '/settings',
-                         spritzle.resource.settings.get_settings)
-    app.router.add_route('PUT', '/settings',
-                         spritzle.resource.settings.put_settings)
-    app.router.add_route('GET', '/torrent',
-                         spritzle.resource.torrent.get_torrent)
-    app.router.add_route('GET', '/torrent/{tid}',
-                         spritzle.resource.torrent.get_torrent)
-    app.router.add_route('POST', '/torrent',
-                         spritzle.resource.torrent.post_torrent)
-    app.router.add_route('DELETE', '/torrent',
-                         spritzle.resource.torrent.delete_torrent)
-    app.router.add_route('DELETE', '/torrent/{tid}',
-                         spritzle.resource.torrent.delete_torrent)
+    app.router.add_routes(spritzle.resource.auth.routes)
+    app.router.add_routes(spritzle.resource.config.routes)
+    app.router.add_routes(spritzle.resource.session.routes)
+    app.router.add_routes(spritzle.resource.settings.routes)
+    app.router.add_routes(spritzle.resource.torrent.routes)
 
 
 def main():
