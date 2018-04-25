@@ -10,23 +10,23 @@ from tabulate import tabulate
 @click.option('--set', '-s', 'set_value', type=str, nargs=2, multiple=True,
               help='Set a property value as: key value')
 @click.pass_obj
-def main(ctx, set_value):
+def command(client, set_value):
     if set_value:
-        ctx.do_command(setter, set_value)
+        client.do_command(setter, set_value)
     else:
-        ctx.do_command(show)
+        client.do_command(show)
 
 
-async def setter(ctx, set_value):
+async def setter(client, set_value):
     data = json.dumps(dict(set_value))
-    async with ctx.session.put(ctx.url('settings'), data=data) as resp:
+    async with client.session.put(client.url('settings'), data=data) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)
 
 
-async def show(ctx):
-    async with ctx.session.get(ctx.url('settings')) as resp:
+async def show(client):
+    async with client.session.get(client.url('settings')) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)

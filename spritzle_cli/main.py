@@ -1,6 +1,7 @@
 import asyncio
+import importlib
 from pathlib import Path
-import os
+import pkgutil
 import sys
 
 import aiohttp
@@ -10,7 +11,7 @@ import yaml
 CONTEXT_SETTINGS = dict(auto_envvar_prefix='SPRITZLE')
 
 
-class Context(object):
+class Client(object):
     def __init__(self, host, port, config, token):
         self.host = host
         self.port = port
@@ -41,43 +42,33 @@ class Context(object):
         loop.run_until_complete(_do_command(cmd, *args))
 
 
-cmd_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), 'commands'))
+cmd_dir = Path(__file__).parent/'commands'
 
 
-class Main(click.MultiCommand):
-
-    def list_commands(self, ctx):
-        cmds = []
-        for fn in os.listdir(cmd_dir):
-            if not fn.startswith('_') and fn.endswith('.py'):
-                cmds.append(fn[:-3])
-        return sorted(cmds)
-
-    def get_command(self, ctx, name):
-        cmds = self.list_commands(ctx)
-        if name not in cmds:
-            cmds = ', '.join(cmds)
-            click.echo(f'Valid commands: {cmds}')
-            return
-        try:
-            mod = __import__('spritzle_cli.commands.' + name,
-                             None, None, ['main'])
-        except ImportError as e:
-            click.echo(e, file=sys.stderr)
-        return mod.main
-
-
-@click.command(cls=Main, context_settings=CONTEXT_SETTINGS)
+@click.group(context_settings=CONTEXT_SETTINGS)
 @click.option('-c', '--config', default=Path(Path.home(), '.config', 'spritzle'), show_default=True)
 @click.option('-h', '--host', default='127.0.0.1', show_default=True)
 @click.option('-p', '--port', default=8080, type=int, show_default=True)
 @click.option('-t', '--token', default='')
 @click.pass_context
-def main(ctx, config, host, port, token):
+def cli(ctx, config, host, port, token):
     """Command-line interface for Spritzle."""
-    ctx.obj = Context(host, port, config, token)
+    ctx.obj = Client(host, port, config, token)
+
+
+def load_commands():
+    """Adds all commands found in 'commands' subdirectory."""
+    for module_info in pkgutil.iter_modules([cmd_dir]):
+        try:
+            mod = importlib.import_module('spritzle_cli.commands.' + module_info.name)
+        except ImportError as e:
+            click.echo(e, file=sys.stderr)
+        else:
+            cli.add_command(mod.command, name=module_info.name)
+
+
+load_commands()
 
 
 if __name__ == "__main__":
-    main()
+    cli()

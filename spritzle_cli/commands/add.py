@@ -14,11 +14,11 @@ import click
               help=('Tag to apply to the torrent. Can be specified multiple '
                     'times.'))
 @click.pass_obj
-def main(ctx, path, option, tag):
-    ctx.do_command(f, path, option, tag)
+def command(client, path, option, tag):
+    client.do_command(f, path, option, tag)
 
 
-async def f(ctx, path, option, tag):
+async def f(client, path, option, tag):
     args = dict([o.split('=') for o in option])
     data = {
         'args': json.dumps(args),
@@ -30,7 +30,7 @@ async def f(ctx, path, option, tag):
     else:
         data['url'] = path
 
-    async with ctx.session.post(ctx.url('torrent'), data=data) as resp:
+    async with client.session.post(client.url('torrent'), data=data) as resp:
         if resp.status != 201:
             click.echo(
                 f'Error adding torrent: {resp.status} {resp.reason}',

@@ -36,7 +36,7 @@ setup(
     packages=['spritzle_cli', 'spritzle_cli.commands'],
     entry_points={
         'console_scripts': [
-            'spritzle = spritzle_cli.main:main'
+            'spritzle = spritzle_cli.main:cli'
         ]
     },
     install_requires=[
