@@ -27,9 +27,23 @@ routes = web.RouteTableDef()
 
 @routes.get('/config')
 async def get_config(request):
-    raise NotImplementedError
+    config = request.app['spritzle.config']
+    return web.json_response(dict(config))
 
 
 @routes.put('/config')
 async def put_config(request):
-    raise NotImplementedError
+    config = request.app['spritzle.config']
+    new_values = await request.json()
+    config.data = new_values
+    config.save()
+    return web.Response()
+
+
+@routes.patch('/config')
+async def patch_config(request):
+    config = request.app['spritzle.config']
+    new_values = await request.json()
+    config.update(new_values)
+    config.save()
+    return web.Response()
