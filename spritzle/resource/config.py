@@ -20,10 +20,16 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from aiohttp import web
 
+routes = web.RouteTableDef()
+
+
+@routes.get('/config')
 async def get_config(request):
     raise NotImplementedError
 
 
+@routes.put('/config')
 async def put_config(request):
     raise NotImplementedError

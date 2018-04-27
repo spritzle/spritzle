@@ -33,6 +33,7 @@ import spritzle.common as common
 import libtorrent as lt
 
 log = logging.getLogger('spritzle')
+routes = web.RouteTableDef()
 
 
 def get_valid_handle(core, tid):
@@ -50,6 +51,8 @@ def get_torrent_list(core):
     return [str(th.info_hash()) for th in core.session.get_torrents()]
 
 
+@routes.get('/torrent')
+@routes.get('/torrent/{tid}')
 async def get_torrent(request):
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid', None)
@@ -74,6 +77,7 @@ async def get_torrent(request):
         return web.json_response(status)
 
 
+@routes.post('/torrent')
 async def post_torrent(request):
     """
     libtorrent requires one of these three fields: ti, url, info_hash
@@ -157,6 +161,8 @@ async def post_torrent(request):
         )
 
 
+@routes.delete('/torrent')
+@routes.delete('/torrent/{tid}')
 async def delete_torrent(request):
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid', None)

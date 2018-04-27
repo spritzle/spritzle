@@ -22,13 +22,17 @@
 
 from aiohttp import web
 
+routes = web.RouteTableDef()
 
+
+@routes.get('/session')
 async def get_session(request):
     core = request.app['spritzle.core']
     status = await core.get_session_status()
     return web.json_response(status)
 
 
+@routes.get('/session/dht')
 async def get_session_dht(request):
     core = request.app['spritzle.core']
     return web.json_response(core.session.is_dht_running())
