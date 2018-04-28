@@ -189,3 +189,10 @@ CONTENT-LENGTH: 0
 DATE: Fri, 26 Feb 2016 06:03:01 GMT
 SERVER: Python/3.5 aiohttp/0.21.0
 ```
+
+Core
+----
+### /core
+#### DELETE
+
+Initiates Spritzle shutdown.
