@@ -34,16 +34,6 @@ async def debug_handler(alert):
         log.debug(f'{type(alert).__name__} {alert}')
 
 
-def build_categories():
-    # Creates a mapping of category -> int which is used for category alert
-    # handlers.
-    categories = {}
-    for c in dir(lt.alert.category_t):
-        if not c.startswith('__'):
-            categories[c] = getattr(lt.alert.category_t, c)
-    return categories
-
-
 class Alert(object):
 
     def __init__(self):
@@ -53,7 +43,7 @@ class Alert(object):
         self.handlers = {
             'all_categories': [debug_handler],
         }
-        self.categories = build_categories()
+        self.categories = lt.alert.category_t.names
         self.run = True
 
     async def start(self, session):
