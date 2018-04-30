@@ -153,7 +153,7 @@ class Core(object):
     async def on_session_stats_alert(self, alert):
         self.session_stats_future.set_result(alert.values)
 
-    async def get_session_status(self):
+    async def get_session_stats(self):
         if self.session_stats_future is None or \
                 self.session_stats_future.done():
             self.session_stats_future = asyncio.Future()

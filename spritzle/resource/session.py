@@ -25,11 +25,36 @@ from aiohttp import web
 routes = web.RouteTableDef()
 
 
-@routes.get('/session')
-async def get_session(request):
+@routes.get('/session/settings')
+async def get_session_settings(request):
     core = request.app['spritzle.core']
-    status = await core.get_session_status()
-    return web.json_response(status)
+    return web.json_response(core.session.get_settings())
+
+
+@routes.put('/session/settings')
+async def put_session_settings(request):
+    core = request.app['spritzle.core']
+    settings = await request.json()
+    current = core.session.get_settings()
+
+    # Do our best to coerce what the client sent into the proper types that
+    # libtorrent expects.
+    for key, value in current.items():
+        if key in settings and type(settings[key]) != type(value):
+            settings[key] = type(value)(settings[key])
+
+    try:
+        core.session.apply_settings(settings)
+    except KeyError as e:
+        raise web.HTTPBadRequest(reason=e)
+    return web.json_response()
+
+
+@routes.get('/session/stats')
+async def get_session_stats(request):
+    core = request.app['spritzle.core']
+    stats = await core.get_session_stats()
+    return web.json_response(stats)
 
 
 @routes.get('/session/dht')

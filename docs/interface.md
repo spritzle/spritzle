@@ -9,15 +9,26 @@ Session
 
 The session resource contains information about the libtorrent session.
 
-### /session
+### /session/settings
 #### GET
 
-Returns a dictionary of the session status.
+Returns a dictionary of the session settings.
+
+### /session/stats
+#### PUT
+
+Allows changing the session settings. New settings should be JSON format in the
+body of request.
+
+### /session/stats
+#### GET
+
+Returns a dictionary of the session stats.
 
 **Example**
 
 ```shell
-$ curl -i -X GET http://localhost:8080/session
+$ curl -i -X GET http://localhost:8080/session/stats
 HTTP/1.1 200 OK
 CONTENT-TYPE: application/json; charset=utf-8
 CONTENT-LENGTH: 8997
