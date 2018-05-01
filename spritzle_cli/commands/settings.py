@@ -19,14 +19,14 @@ def command(client, set_value):
 
 async def setter(client, set_value):
     data = json.dumps(dict(set_value))
-    async with client.session.put(client.url('settings'), data=data) as resp:
+    async with client.session.put(client.url('session/settings'), data=data) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)
 
 
 async def show(client):
-    async with client.session.get(client.url('settings')) as resp:
+    async with client.session.get(client.url('session/settings')) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)
