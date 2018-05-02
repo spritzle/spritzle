@@ -20,20 +20,57 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import MagicMock
-import pytest
-
-from spritzle.tests.common import run_until_complete
 from spritzle.resource import config
+from spritzle.tests.common import (
+    run_until_complete, json_response, create_mock_request)
 
 
 @run_until_complete
-async def test_get_config():
-    with pytest.raises(NotImplementedError):
-        await config.get_config(MagicMock())
+async def test_get_config(core):
+    config_data = {"key1": "value1"}
+    request = await create_mock_request(core=core, config=config_data)
+    s, response = await json_response(config.get_config(request))
+
+    assert s == config_data
 
 
 @run_until_complete
-async def test_put_config():
-    with pytest.raises(NotImplementedError):
-        await config.put_config(MagicMock())
+async def test_put_config(core):
+    orig_config = {"key1": "value1"}
+    new_config = {"key2": "value2"}
+    request = await create_mock_request(core=core, config=orig_config)
+
+    async def json():
+        return new_config
+
+    request.configure_mock(**{
+        'json.return_value': json(),
+    })
+
+    response = await config.put_config(request)
+    assert response.status == 200
+
+    s, response = await json_response(config.get_config(request))
+
+    assert s == new_config
+
+@run_until_complete
+async def test_patch_config(core):
+    orig_config = {"key1": "value1"}
+    patch_config = {"key2": "value2"}
+    new_config = {**orig_config, **patch_config}
+    request = await create_mock_request(core=core, config=orig_config)
+
+    async def json():
+        return patch_config
+
+    request.configure_mock(**{
+        'json.return_value': json(),
+    })
+
+    response = await config.patch_config(request)
+    assert response.status == 200
+
+    s, response = await json_response(config.get_config(request))
+
+    assert s == new_config

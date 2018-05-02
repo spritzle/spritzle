@@ -20,6 +20,8 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+from json import JSONDecodeError
+
 from aiohttp import web
 
 routes = web.RouteTableDef()
@@ -34,7 +36,10 @@ async def get_config(request):
 @routes.put('/config')
 async def put_config(request):
     config = request.app['spritzle.config']
-    new_values = await request.json()
+    try:
+        new_values = await request.json()
+    except JSONDecodeError as e:
+        raise web.HTTPBadRequest(text=f'Invalid JSON body: {e}')
     config.data = new_values
     config.save()
     return web.Response()
@@ -43,7 +48,10 @@ async def put_config(request):
 @routes.patch('/config')
 async def patch_config(request):
     config = request.app['spritzle.config']
-    new_values = await request.json()
+    try:
+        new_values = await request.json()
+    except JSONDecodeError as e:
+        raise web.HTTPBadRequest(text=f'Invalid JSON body: {e}')
     config.update(new_values)
     config.save()
     return web.Response()

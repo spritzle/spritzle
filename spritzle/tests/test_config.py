@@ -21,21 +21,17 @@
 #
 
 import tempfile
-import os
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
 from spritzle.config import Config
 
 
 def test_config_init_no_dir():
     tmpdir = Path(tempfile.gettempdir(), 'spritzletmpdir')
-    home = os.environ['HOME']
-    os.environ['HOME'] = str(tmpdir)
-
-    c = Config()
-
-    os.environ['HOME'] = home
+    with patch('pathlib.Path.home', return_value=tmpdir):
+        c = Config()
 
     assert c.config_file == Path(
         tmpdir, '.config', 'spritzle', 'spritzled.conf')
