@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 
 import asyncio
+from base64 import b64decode
 import functools
 import binascii
 import json
@@ -96,17 +97,10 @@ async def post_torrent(request):
         'save_path': config.get('add_torrent_params.save_path', '')
     }
 
-    post = await request.post()
-
-    if 'args' in post:
-        args = json.loads(post['args'])
-        for key, value in args.items():
-            if key in ('ti', 'info_hash'):
-                continue
-            atp[key] = value
+    atp.update(await common.form_or_json(request))
 
     # We require that only one of file, url or info_hash is set
-    if len(set([*post.keys()]).intersection(
+    if len(set(atp.keys()).intersection(
             ('file', 'url', 'info_hash'))) != 1:
         raise web.HTTPBadRequest(
             reason="One of and only one 'file', 'url' or 'info_hash' allowed."
@@ -119,19 +113,19 @@ async def post_torrent(request):
             raise web.HTTPBadRequest(
                 reason=f'Not a valid torrent file: {e}')
 
-    if 'file' in post:
-        generate_torrent_info(post['file'].file.read())
+    if 'file' in atp:
+        generate_torrent_info(atp.pop('file'))
     # We do not use libtorrent's ability to download torrents as it will
     # probably be removed in future versions and cannot provide the
     # info-hash when we need it.
     # See: https://github.com/arvidn/libtorrent/issues/481
-    elif 'url' in post:
+    elif 'url' in atp:
         async with aiohttp.ClientSession() as client:
-            async with client.get(post['url']) as resp:
+            async with client.get(atp.pop('url')) as resp:
                 generate_torrent_info(await resp.read())
 
-    elif 'info_hash' in post:
-        atp['info_hash'] = binascii.unhexlify(post['info_hash'])
+    elif 'info_hash' in atp:
+        atp['info_hash'] = binascii.unhexlify(atp.pop('info_hash'))
 
     if 'ti' in atp:
         info_hash = str(atp['ti'].info_hash())
@@ -141,7 +135,7 @@ async def post_torrent(request):
     if info_hash not in core.torrent_data:
         core.torrent_data[info_hash] = {}
 
-    tags = json.loads(post['tags']) if 'tags' in post else []
+    tags = atp.pop('tags', [])
     core.torrent_data[info_hash]['spritzle.tags'] = tags
 
     try:

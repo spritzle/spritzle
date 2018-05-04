@@ -19,10 +19,13 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 #
-
+import json
+from base64 import b64decode
 import datetime
 import libtorrent as lt
 import logging
+
+from aiohttp.web import FileField
 
 log = logging.getLogger('spritzle')
 
@@ -98,3 +101,29 @@ def update_struct_with_dict(struct, dictionary):
         if hasattr(struct, key):
             setattr(struct, key, value)
     return struct
+
+
+async def form_or_json(request):
+    """
+    Parse out a dict from `request` body, unifying either JSON or form encoding.
+    """
+    if request.content_type in ('application/x-www-form-urlencoded',
+                                'multipart/form-data'):
+        result = {}
+        data = await request.post()
+        for key in data:
+            val = data.getall(key)
+            if len(val) == 1:
+                val = val[0]
+            if key == 'file':
+                val = val.file.read()
+            result[key] = val
+    else:
+        result = await request.json()
+        if 'file' in result:
+            result['file'] = b64decode(result['file'])
+    return result
+
+
+
+

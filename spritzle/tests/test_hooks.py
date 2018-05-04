@@ -25,8 +25,6 @@ from pathlib import Path
 
 from spritzle.hooks import Hooks
 
-from spritzle.tests.common import run_until_complete
-
 
 def test_find_hooks():
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -56,7 +54,6 @@ def test_find_hooks():
         assert hooks[0] == Path(tmpdir, '100_foobar')
 
 
-@run_until_complete
 async def test_run_hook_success():
     with tempfile.TemporaryDirectory() as tmpdir:
         p = Path(tmpdir, 'foobar')
@@ -66,7 +63,6 @@ async def test_run_hook_success():
         await h.run_hook(p)
 
 
-@run_until_complete
 async def test_run_hook_fail():
     with tempfile.TemporaryDirectory() as tmpdir:
         p = Path(tmpdir, 'foobar')

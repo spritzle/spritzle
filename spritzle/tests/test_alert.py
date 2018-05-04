@@ -24,7 +24,6 @@ from unittest.mock import MagicMock
 import asynctest
 
 import spritzle.alert
-from spritzle.tests.common import run_until_complete
 
 
 class CategoryT:
@@ -52,7 +51,6 @@ class AlertTestTwo(AlertTest):
         return 2
 
 
-@run_until_complete
 async def test_alert_stop():
     a = spritzle.alert.Alert()
     assert a.run
@@ -61,7 +59,6 @@ async def test_alert_stop():
     assert not a.run
 
 
-@run_until_complete
 async def test_pop_alerts(monkeypatch):
     session = MagicMock()
 
