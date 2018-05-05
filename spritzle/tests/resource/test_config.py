@@ -20,57 +20,32 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from spritzle.resource import config
-from spritzle.tests.common import (
-    run_until_complete, json_response, create_mock_request)
+
+async def test_get_config(core, cli):
+    config_data = {'key1': 'value1'}
+    core.config.data = config_data
+    response = await cli.get('/config')
+    data = await response.json()
+
+    assert data == config_data
 
 
-@run_until_complete
-async def test_get_config(core):
-    config_data = {"key1": "value1"}
-    request = await create_mock_request(core=core, config=config_data)
-    s, response = await json_response(config.get_config(request))
-
-    assert s == config_data
-
-
-@run_until_complete
-async def test_put_config(core):
+async def test_put_config(core, cli):
     orig_config = {"key1": "value1"}
     new_config = {"key2": "value2"}
-    request = await create_mock_request(core=core, config=orig_config)
+    core.config.data = orig_config
 
-    async def json():
-        return new_config
-
-    request.configure_mock(**{
-        'json.return_value': json(),
-    })
-
-    response = await config.put_config(request)
+    response = await cli.put('/config', json=new_config)
     assert response.status == 200
+    assert core.config.data == new_config
 
-    s, response = await json_response(config.get_config(request))
 
-    assert s == new_config
-
-@run_until_complete
-async def test_patch_config(core):
+async def test_patch_config(core, cli):
     orig_config = {"key1": "value1"}
     patch_config = {"key2": "value2"}
     new_config = {**orig_config, **patch_config}
-    request = await create_mock_request(core=core, config=orig_config)
+    core.config.data = orig_config
 
-    async def json():
-        return patch_config
-
-    request.configure_mock(**{
-        'json.return_value': json(),
-    })
-
-    response = await config.patch_config(request)
+    response = await cli.patch('/config', json=patch_config)
     assert response.status == 200
-
-    s, response = await json_response(config.get_config(request))
-
-    assert s == new_config
+    assert core.config.data == new_config

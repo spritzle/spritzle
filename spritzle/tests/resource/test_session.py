@@ -20,86 +20,48 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import aiohttp.web
-import pytest
 
-from spritzle.resource import session
-from spritzle.tests.common import (
-    run_until_complete, json_response, create_mock_request)
-
-
-@run_until_complete
-async def test_get_session_stats(core):
-    request = await create_mock_request(core=core)
-    s, response = await json_response(session.get_session_stats(request))
+async def test_get_session_stats(cli):
+    response = await cli.get('/session/stats')
+    s = await response.json()
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
-@run_until_complete
-async def test_get_session_dht(core):
-    request = await create_mock_request(core=core)
-    b, response = await json_response(session.get_session_dht(request))
+async def test_get_session_dht(cli):
+    response = await cli.get('/session/dht')
+    b = await response.json()
     assert isinstance(b, bool)
 
 
-@run_until_complete
-async def test_get_settings(core):
-    request = await create_mock_request(core=core)
-    s, response = await json_response(session.get_session_settings(request))
-
+async def test_get_settings(cli):
+    response = await cli.get('/session/settings')
+    s = await response.json()
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
-@run_until_complete
-async def test_put_settings(core):
-    request = await create_mock_request(core=core)
-    old, response = await json_response(session.get_session_settings(request))
+async def test_put_settings(cli):
+    response = await cli.get('/session/settings')
+    old = await response.json()
     test_key = 'peer_connect_timeout'
 
-    async def json():
-        return {test_key: old[test_key] + 1}
-
-    request.configure_mock(**{
-        'json.return_value': json(),
-    })
-
-    response = await session.put_session_settings(request)
+    response = await cli.put('/session/settings',
+                             json={test_key: old[test_key] + 1})
     assert response.status == 200
 
-    new, response = await json_response(session.get_session_settings(request))
+    response = await cli.get('/session/settings')
+    new = await response.json()
 
     assert old[test_key] != new[test_key]
     assert old[test_key] == new[test_key] - 1
 
 
-@run_until_complete
-async def test_put_settings_bad_key(core):
-    request = await create_mock_request(core=core)
-
-    async def json():
-        return {'bad_key': 1}
-
-    request.configure_mock(**{
-        'json.return_value': json(),
-    })
-
-    with pytest.raises(aiohttp.web.HTTPBadRequest):
-        response = await session.put_session_settings(request)
-        assert response.status == 400
+async def test_put_settings_bad_key(cli):
+    response = await cli.put('/session/settings', json={'bad_key': 1})
+    assert response.status == 400
 
 
-@run_until_complete
-async def test_put_settings_type_coercion(core):
-    request = await create_mock_request(core=core)
-
-    async def json():
-        return {'peer_connect_timeout': '1'}
-
-    request.configure_mock(**{
-        'json.return_value': json(),
-    })
-
-    response = await session.put_session_settings(request)
+async def test_put_settings_type_coercion(cli):
+    response = await cli.put('/session/settings', json={'peer_connect_timeout': '1'})
     assert response.status == 200

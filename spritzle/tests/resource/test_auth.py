@@ -20,104 +20,69 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import pytest
-from datetime import datetime, timedelta
-
 import aiohttp
-import jwt
+import pytest
 
-import spritzle.tests.common
-from spritzle.tests.common import run_until_complete, json_response
 from spritzle.resource import auth
 
 
-async def create_mock_request(core=None, password=None, config=None):
-    async def post():
-        return {
-            'password': password,
-        }
+@pytest.fixture
+def cli(loop, core, app, aiohttp_client):
+    config = {
+        'auth_password': 'password',
+        'auth_timeout': 120,
+        'auth_secret': 'secret',
+        'auth_allow_hosts': [],
+    }
+    core.config.data = config
 
-    request = await spritzle.tests.common.create_mock_request(core=core, config=config)
-    request.post = post
-    return request
+    async def get_nothing(request):
+        return aiohttp.web.Response()
+
+    app.router.add_route('GET', '/', get_nothing)
+    app.middlewares.append(auth.auth_middleware)
+    return loop.run_until_complete(aiohttp_client(app))
 
 
-@run_until_complete
-async def test_post_auth(core):
+async def test_post_auth(core, cli):
     config = {
         'auth_password': 'password',
         'auth_timeout': 120,
         'auth_secret': 'secret',
         'auth_allowed_hosts': [],
     }
-
-    _, response = await json_response(
-        auth.post_auth(await create_mock_request(core, 'password', config)))
+    core.config.data = config
+    response = await cli.post('/auth', data={'password': 'password'})
     assert response.status == 200
-    with pytest.raises(aiohttp.web.HTTPUnauthorized):
-        _, response = await json_response(
-            auth.post_auth(await create_mock_request(core, 'badpassword', config)))
-        assert response.status == 401
+
+    response = await cli.post('/auth', data={'password': 'badpassword'})
+    assert response.status == 401
 
 
-@run_until_complete
-async def test_auth_middleware(core):
-    async def handler(request):
-        request.handled = True
+async def test_auth_middleware(cli):
+    response = await cli.get('/')
+    assert response.status == 401
+    assert response.reason == 'Authorization token required'
 
-    request = await create_mock_request(core)
-    request.headers = {}
-    request.handled = False
-    request.rel_url.path = '/auth'
+    response = await cli.get('/', headers={'authorization': 'badtoken'})
+    assert response.status == 401
+    assert response.reason == 'Token is invalid'
 
-    mw = await auth.auth_middleware(request.app, handler)
-    await mw(request)
-    assert request.handled
+    response = await cli.post('/auth', data={'password': 'password'})
+    data = await response.json()
+    token = data['token']
 
-    request.handled = False
-    request.rel_url.path = '/'
-
-    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
-        await mw(request)
-        assert e.exception.reason == 'Authorization token required'
-
-    request.headers['authorization'] = 'badtoken'
-
-    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
-        await mw(request)
-        assert e.exception.reason == 'Token is invalid'
-
-    config = {
-        'auth_secret': 'secret',
-        'auth_allow_hosts': [],
-    }
-    payload = {
-        'exp': (datetime.utcnow() + timedelta(seconds=120))
-    }
-    token = jwt.encode(payload, config['auth_secret'], 'HS256').decode('utf8')
-    request.headers['authorization'] = token
-    request.app['spritzle.config'] = config
-    await mw(request)
-    assert request.handled
+    response = await cli.get('/', headers={'authorization': token})
+    assert response.status == 200
 
 
-@run_until_complete
-async def test_auth_allow_hosts(core):
-    async def handler(request):
-        request.handled = True
+async def test_auth_allow_hosts(core, cli):
+    core.config['auth_allow_hosts'] = []
 
-    request = await create_mock_request(core)
-    request.headers = {}
-    request.handled = False
-    request.rel_url.path = '/'
-    request.transport.get_extra_info.return_value = ('127.0.0.1', 12345)
+    response = await cli.get('/')
+    assert response.status == 401
 
-    mw = await auth.auth_middleware(request.app, handler)
-    await mw(request)
-    assert request.handled
+    core.config['auth_allow_hosts'] = ['127.0.0.1']
 
-    request.handled = False
-    request.transport.get_extra_info.return_value = ('128.8.8.8', 12345)
-    with pytest.raises(aiohttp.web.HTTPUnauthorized) as e:
-        await mw(request)
-        assert e.exception.reason == 'Authorization token required'
+    response = await cli.get('/')
+    assert response.status == 200
