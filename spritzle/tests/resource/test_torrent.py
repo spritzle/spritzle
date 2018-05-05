@@ -75,7 +75,7 @@ async def test_get_torrent(cli):
 
 async def test_post_torrent(cli):
     post_data = create_torrent_post_data(filename='random_one_file.torrent',
-                                        tags=['foo'])
+                                         tags=['foo'])
     response = await cli.post('/torrent', data=post_data)
     body = await response.json()
     assert 'info_hash' in body
