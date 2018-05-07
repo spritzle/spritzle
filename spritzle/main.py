@@ -26,8 +26,9 @@ import fcntl
 from pathlib import Path
 import secrets
 import sys
+import traceback
 
-import aiohttp
+import aiohttp.web
 
 import spritzle.resource.auth
 import spritzle.resource.config
@@ -40,26 +41,44 @@ from spritzle.config import Config
 from spritzle.logger import setup_logger
 
 
-async def debug_middleware(app, handler):
-    async def middleware(request):
-        if request.content_type in ('application/x-www-form-urlencoded',
-                                    'multipart/form-data'):
-            body = await request.post()
-        else:
-            body = await request.text()
-        log = app['spritzle.log']
-        log.debug('*'*20 + 'REQUEST' + '*'*20)
-        log.debug(f'URL: {request.rel_url}')
-        log.debug(f'METHOD: {request.method}')
-        log.debug(f'HEADERS: {request.headers}')
-        log.debug(f'BODY: {body}')
-        log.debug('*'*47)
-        return await handler(request)
-    return middleware
+@aiohttp.web.middleware
+async def debug_middleware(request, handler):
+    if request.content_type in ('application/x-www-form-urlencoded',
+                                'multipart/form-data'):
+        body = await request.post()
+    else:
+        body = await request.text()
+    log = request.app['spritzle.log']
+    log.debug('*' * 20 + 'REQUEST' + '*' * 20)
+    log.debug(f'URL: {request.rel_url}')
+    log.debug(f'METHOD: {request.method}')
+    log.debug(f'HEADERS: {request.headers}')
+    log.debug(f'BODY: {body}')
+    log.debug('*' * 47)
+    return await handler(request)
 
-app = aiohttp.web.Application(
-    middlewares=[debug_middleware,
-                 spritzle.resource.auth.auth_middleware])
+
+@aiohttp.web.middleware
+async def error_middleware(request, handler):
+    try:
+        response = await handler(request)
+    except aiohttp.web.HTTPException as ex:
+        response = ex
+    except Exception:
+        # Unhandled exception, this is a bug in Spritzle
+        tb = ''.join(traceback.format_exception(*sys.exc_info()))
+        response = aiohttp.web.Response(status=500, reason='Spritzle Bug',
+                                        text=tb)
+    if response.status < 400:
+        return response
+    return aiohttp.web.json_response({
+        'status': response.status,
+        'reason': response.reason,
+        'message': response.text
+    }, status=response.status, reason=response.reason)
+
+
+app = aiohttp.web.Application()
 
 
 def setup_app(app, core, log, settings=None):
@@ -70,6 +89,8 @@ def setup_app(app, core, log, settings=None):
     app['spritzle.log'] = log
     app['spritzle.core'] = core
     app['spritzle.config'] = config
+
+    app.middlewares.extend([error_middleware, debug_middleware])
 
     async def on_startup(app):
         await app['spritzle.core'].start(settings=settings)
@@ -115,4 +136,6 @@ def main():
         sys.exit(0)
 
     setup_app(app, Core(config), log)
+    # Auth middleware is outside setup_app because we don't want it for unit tests
+    app.middlewares.append(spritzle.resource.auth.auth_middleware)
     aiohttp.web.run_app(app)
