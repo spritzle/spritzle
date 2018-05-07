@@ -30,6 +30,7 @@ DEFAULTS = {
     'auth_secret': '',
     'auth_timeout': 120,
     'auth_allow_hosts': ['127.0.0.1'],
+    'resume_data_save_frequency': 60,
 }
 
 

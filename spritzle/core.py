@@ -25,12 +25,12 @@ import pkg_resources
 from pathlib import Path
 import logging
 import functools
-import binascii
 
 import libtorrent as lt
 
 from spritzle.alert import Alert
 from spritzle.hooks import Hooks
+from spritzle.resume_data import ResumeData
 
 log = logging.getLogger('spritzle')
 
@@ -53,10 +53,8 @@ class Core(object):
         # libtorrent.  This is key'd on info_hash.
         self.torrent_data = {}
 
-        # Store state of outstanding save resume data alerts
-        self.resume_data_futures = {}
-
         self.alert = Alert()
+        self.resume_data = ResumeData(self)
         self.alert.register_handler(
             'session_stats_alert',
             self.on_session_stats_alert
@@ -64,18 +62,6 @@ class Core(object):
         self.alert.register_handler(
             'status_notification',
             self.on_status_notification_alert
-        )
-        self.alert.register_handler(
-            'save_resume_data_alert',
-            self.on_save_resume_data_alert
-        )
-        self.alert.register_handler(
-            'save_resume_data_failed_alert',
-            self.on_save_resume_data_failed_alert
-        )
-        self.alert.register_handler(
-            'add_torrent_alert',
-            self.on_add_torrent_alert
         )
 
     async def start(self, settings=None):
@@ -104,13 +90,14 @@ class Core(object):
         self.session = lt.session(settings)
         await self.load_session_state()
         await self.alert.start(self.session)
-        await self.load_resume_data()
+        await self.resume_data.start()
         log.debug('Core started.')
 
     async def stop(self):
         log.debug('Core stopping..')
         await self.save_session_state()
-        await self.save_resume_data()
+        self.session.pause()
+        await self.resume_data.stop()
         await self.alert.stop()
         del self.session
         self.session = None
@@ -128,27 +115,6 @@ class Core(object):
         if f.exists():
             await asyncio.get_event_loop().run_in_executor(
                 None, functools.partial(self.session.load_state), f.read_bytes())
-
-    async def load_resume_data(self):
-        log.info(f'Loading resume data from {self.state_dir}')
-        for f in self.state_dir.iterdir():
-            if f.suffix == '.resume':
-                log.info(f'Found {f.name}, attempting add..')
-                b = f.read_bytes()
-                atp = lt.read_resume_data(b)
-                try:
-                    await asyncio.get_event_loop().run_in_executor(
-                        None, functools.partial(self.session.add_torrent), atp)
-                except RuntimeError as e:
-                    log.error(f'Error loading resume data {f}: {e}')
-
-                d = lt.bdecode(b)
-
-                info_hash = binascii.hexlify(d[b'info-hash']).decode()
-                self.torrent_data[info_hash] = {}
-                for key, value in d.items():
-                    if key.startswith(b'spritzle.'):
-                        self.torrent_data[info_hash][key.decode()] = value
 
     async def on_session_stats_alert(self, alert):
         self.session_stats_future.set_result(alert.values)
@@ -174,45 +140,6 @@ class Core(object):
                 alert.what(),
                 info_hash,
                 ','.join(self.get_torrent_tags(info_hash)))
-
-    async def save_resume_data(self):
-        for torrent in self.session.get_torrents():
-            if torrent.need_save_resume_data():
-                self.resume_data_futures[str(torrent.info_hash())] = asyncio.Future()
-                torrent.save_resume_data(
-                    flags=(
-                        int(lt.save_resume_flags_t.flush_disk_cache) |
-                        int(lt.save_resume_flags_t.save_info_dict)
-                    ),
-                )
-        await asyncio.gather(*self.resume_data_futures.values())
-
-    async def on_save_resume_data_alert(self, alert):
-        info_hash = str(alert.handle.info_hash())
-        p = Path(self.state_dir, alert.torrent_name + '.resume')
-        r = lt.write_resume_data(alert.params)
-        r.update(self.torrent_data[info_hash])
-        p.write_bytes(lt.bencode(r))
-        if info_hash in self.resume_data_futures:
-            self.resume_data_futures.pop(info_hash).set_result(True)
-
-    async def on_save_resume_data_failed_alert(self, alert):
-        log.error(
-            f'Error saving resume_data for torrent {alert.torrent_name} '
-            f'error: {alert.error.message()}')
-        info_hash = str(alert.handle.info_hash())
-        if info_hash in self.resume_data_futures:
-            # We don't really care if this fails right now, maybe in the future
-            # we should raise an exception.
-            self.resume_data_futures.pop(info_hash).set_result(True)
-
-    async def on_add_torrent_alert(self, alert):
-        try:
-            alert.handle.save_resume_data()
-        except RuntimeError as e:
-            # An invalid handle can occur here if a torrent is added and
-            # removed in quick succession.
-            log.error(e)
 
     async def on_state_changed_alert(self, alert):
         if alert.handle.need_save_resume_data():

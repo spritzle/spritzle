@@ -28,8 +28,7 @@ import libtorrent as lt
 import aiohttp.web
 
 from spritzle.resource import torrent
-
-torrent_dir = Path(Path(__file__).resolve().parent, 'torrents')
+from spritzle.tests import torrent_dir
 
 
 def create_torrent_post_data(filename=None, tags=None, args=None, **kwargs):

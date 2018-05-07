@@ -1,7 +1,9 @@
+from functools import partial
 import tempfile
 import logging
 from pathlib import Path
 import shutil
+from unittest.mock import patch
 
 import aiohttp.web
 import pytest
@@ -18,13 +20,6 @@ def core(loop):
     config = Config(in_memory=True, config_dir='/tmp')
     state_dir = Path(tempfile.mkdtemp(prefix='spritzle-test'))
     core = Core(config, state_dir)
-    yield core
-    shutil.rmtree(str(state_dir))
-
-
-@pytest.fixture
-def app(core):
-    app = aiohttp.web.Application()
     settings = {
         'enable_upnp': False,
         'enable_natpmp': False,
@@ -34,9 +29,19 @@ def app(core):
         'alert_mask': 0,
         'stop_tracker_timeout': 0,
     }
+    with patch.object(core, 'start', partial(core.start, settings=settings)):
+        yield core
+    if core.session is not None:
+        loop.run_until_complete(core.stop())
+    shutil.rmtree(str(state_dir))
+
+
+@pytest.fixture
+def app(core):
+    app = aiohttp.web.Application()
     log = logging.getLogger('spritzle')
     logging.basicConfig(level=logging.DEBUG)
-    setup_app(app, core, log, settings=settings)
+    setup_app(app, core, log)
     return app
 
 

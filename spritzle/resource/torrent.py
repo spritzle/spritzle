@@ -106,7 +106,7 @@ async def post_torrent(request):
             atp[key] = value
 
     # We require that only one of file, url or info_hash is set
-    if len(set([*post.keys()]).intersection(
+    if len(set(post.keys()).intersection(
             ('file', 'url', 'info_hash'))) != 1:
         raise web.HTTPBadRequest(
             reason="One of and only one 'file', 'url' or 'info_hash' allowed."
@@ -145,14 +145,16 @@ async def post_torrent(request):
     core.torrent_data[info_hash]['spritzle.tags'] = tags
 
     try:
-        await asyncio.get_event_loop().run_in_executor(
-                None, functools.partial(core.session.add_torrent), atp)
+        torrent_handle = await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(core.session.add_torrent), atp)
     except KeyError as e:
         raise web.HTTPBadRequest(
             reason=str(e))
     except RuntimeError as e:
         raise web.HTTPInternalServerError(
             reason=f'Error in session.add_torrent(): {e}')
+
+    await core.resume_data.save_torrent(torrent_handle)
 
     return web.json_response(
         {'info_hash': info_hash},
