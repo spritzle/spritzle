@@ -16,7 +16,7 @@ async def f(client, password):
     data = {
         'password': password,
     }
-    async with client.session.post(client.url('auth'), data=data) as resp:
+    async with client.session.post(client.url('auth'), json=data) as resp:
         if resp.status != 200:
             click.echo(f'Error: {resp}', file=sys.stderr)
             sys.exit(1)

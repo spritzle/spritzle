@@ -1,6 +1,6 @@
-from urllib.parse import urlparse
-import json
+from base64 import b64encode
 import sys
+from urllib.parse import urlparse
 
 import click
 
@@ -19,18 +19,16 @@ def command(client, path, option, tag):
 
 
 async def f(client, path, option, tag):
-    args = dict([o.split('=') for o in option])
-    data = {
-        'args': json.dumps(args),
-        'tags': json.dumps(tag),
-    }
+    data = dict([o.split('=') for o in option])
+    data['spritzle.tags'] = tag
 
     if not urlparse(path).scheme:
-        data['file'] = open(path, 'rb')
+        with open(path, 'rb') as f:
+            data['file'] =  b64encode(f.read()).decode('ascii')
     else:
         data['url'] = path
 
-    async with client.session.post(client.url('torrent'), data=data) as resp:
+    async with client.session.post(client.url('torrent'), json=data) as resp:
         if resp.status != 201:
             click.echo(
                 f'Error adding torrent: {resp.status} {resp.reason}',
