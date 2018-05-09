@@ -21,6 +21,7 @@
 #
 
 from datetime import datetime, timedelta
+from json import JSONDecodeError
 
 import jwt
 from aiohttp import web
@@ -31,7 +32,13 @@ routes = web.RouteTableDef()
 @routes.post('/auth')
 async def post_auth(request):
     config = request.app['spritzle.config']
-    post = await request.post()
+    try:
+        post = await request.json()
+    except JSONDecodeError as ex:
+        raise web.HTTPBadRequest(
+            reason='Invalid JSON',
+            text=ex.msg
+        )
 
     if post.get('password', None) != config['auth_password']:
         raise web.HTTPUnauthorized(reason='Incorrect password')

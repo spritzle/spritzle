@@ -52,10 +52,10 @@ async def test_post_auth(core, cli):
         'auth_allowed_hosts': [],
     }
     core.config.data = config
-    response = await cli.post('/auth', data={'password': 'password'})
+    response = await cli.post('/auth', json={'password': 'password'})
     assert response.status == 200
 
-    response = await cli.post('/auth', data={'password': 'badpassword'})
+    response = await cli.post('/auth', json={'password': 'badpassword'})
     assert response.status == 401
 
 
@@ -68,7 +68,7 @@ async def test_auth_middleware(cli):
     assert response.status == 401
     assert response.reason == 'Token is invalid'
 
-    response = await cli.post('/auth', data={'password': 'password'})
+    response = await cli.post('/auth', json={'password': 'password'})
     data = await response.json()
     token = data['token']
 
