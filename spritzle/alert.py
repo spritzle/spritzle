@@ -44,6 +44,23 @@ def build_categories():
     return categories
 
 
+def build_alert_types():
+    """
+    Creates a list of valid alert names.
+    """
+    alerts = []
+    for name in dir(lt):
+        val = getattr(lt, name)
+        if val is lt.alert:
+            continue
+        if not isinstance(val, type):
+            continue
+        if not issubclass(val, lt.alert):
+            continue
+        alerts.append(name)
+    return alerts
+
+
 class Alert(object):
 
     def __init__(self):
@@ -54,6 +71,7 @@ class Alert(object):
             'all_categories': [debug_handler],
         }
         self.categories = build_categories()
+        self.alert_types = build_alert_types()
         self.run = True
 
     async def start(self, session):
@@ -70,6 +88,10 @@ class Alert(object):
         log.debug('Alert stopped.')
 
     def register_handler(self, alert_type, handler):
+        if alert_type not in self.alert_types and alert_type not in self.categories:
+            raise ValueError('Not a valid alert type or category.')
+        if not asyncio.iscoroutinefunction(handler):
+            raise ValueError('Alert handlers must by coroutine functions.')
         self.handlers.setdefault(alert_type, []).append(handler)
 
     async def pop_alerts(self, run_once=False):
