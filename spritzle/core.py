@@ -143,4 +143,4 @@ class Core(object):
 
     async def on_state_changed_alert(self, alert):
         if alert.handle.need_save_resume_data():
-            alert.handle.save_resume_data()
+            self.resume_data.save_torrent(alert.handle)
