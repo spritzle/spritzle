@@ -36,7 +36,7 @@ async def test_load(core):
     await core.start()
     torrents = core.session.get_torrents()
     assert len(torrents) == 1
-    assert torrents[0].name() == 'tmprandomfile'
+    assert torrents[0].status().name == 'tmprandomfile'
     await core.stop()
 
 
