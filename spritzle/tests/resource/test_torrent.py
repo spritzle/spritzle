@@ -166,14 +166,14 @@ async def test_pause_resume_torrent(cli):
 
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert data['paused'] == True
+    assert data['paused']
 
     await cli.post(f'/torrent/{tid}', json={'action': 'resume'})
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert data['paused'] == False
+    assert not data['paused']
 
     await cli.post(f'/torrent/{tid}', json={'action': 'pause'})
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert data['paused'] == True
+    assert data['paused']
