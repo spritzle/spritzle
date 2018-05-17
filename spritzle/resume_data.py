@@ -51,7 +51,7 @@ class ResumeData(object):
             'save_resume_data_failed_alert',
             self.on_save_resume_data_failed_alert
         )
-        self.save_loop_task = asyncio.ensure_future(self.save_loop())
+        self.save_loop_task = self.loop.create_task(self.save_loop())
 
     async def stop(self):
         log.debug("Resume data manager stopping...")
@@ -62,17 +62,17 @@ class ResumeData(object):
         log.debug("Resume data manager stopped.")
 
     async def save_loop(self):
-        save_fut = None
+        save_all_task = None
         try:
             while True:
                 await asyncio.sleep(
                     self.core.config['resume_data_save_frequency'])
                 # Don't interrupt save process when loop is cancelled
-                save_fut = asyncio.ensure_future(self.save_all())
-                await asyncio.shield(save_fut)
+                save_all_task = self.loop.create_task(self.save_all())
+                await asyncio.shield(save_all_task)
         except asyncio.CancelledError:
-            if save_fut and not save_fut.done():
-                await save_fut
+            if save_all_task and not save_all_task.done():
+                await save_all_task
 
     async def on_save_resume_data_alert(self, alert):
         info_hash = str(alert.handle.info_hash())

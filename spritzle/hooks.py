@@ -61,4 +61,4 @@ class Hooks:
 
     def run_hooks(self, hook_name, *args):
         for hook in self.find_hooks(hook_name):
-            asyncio.ensure_future(self.run_hook(hook, *args))
+            asyncio.get_event_loop().create_task(self.run_hook(hook, *args))
