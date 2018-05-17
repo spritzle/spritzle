@@ -221,3 +221,17 @@ async def test_edit_queue_position(cli):
     r = await cli.get(f'/torrent/{t1_id}')
     status = await r.json()
     assert status['queue_position'] == 0
+
+
+async def test_set_torrent_priority(cli):
+    tid = await test_post_torrent(cli)
+
+    await cli.post(f'/torrent/{tid}', json={'action': 'set_priority', 'arg': 10})
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['priority'] == 10
+
+    await cli.post(f'/torrent/{tid}', json={'action': 'set_priority', 'arg': 255})
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['priority'] == 255
