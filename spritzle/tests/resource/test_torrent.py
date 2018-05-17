@@ -168,12 +168,12 @@ async def test_pause_resume_torrent(cli):
     data = await response.json()
     assert data['paused']
 
-    await cli.post(f'/torrent/{tid}', json={'action': 'resume'})
+    await cli.post(f'/torrent/{tid}/resume')
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
     assert not data['paused']
 
-    await cli.post(f'/torrent/{tid}', json={'action': 'pause'})
+    await cli.post(f'/torrent/{tid}/pause')
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
     assert data['paused']
@@ -202,22 +202,22 @@ async def test_edit_queue_position(cli):
     assert status['queue_position'] == 2
 
     # Test queue movement actions
-    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_down'})
+    await cli.post(f'/torrent/{t1_id}/queue_position_down')
     r = await cli.get(f'/torrent/{t1_id}')
     status = await r.json()
     assert status['queue_position'] == 1
 
-    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_up'})
+    await cli.post(f'/torrent/{t1_id}/queue_position_up')
     r = await cli.get(f'/torrent/{t1_id}')
     status = await r.json()
     assert status['queue_position'] == 0
 
-    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_bottom'})
+    await cli.post(f'/torrent/{t1_id}/queue_position_bottom')
     r = await cli.get(f'/torrent/{t1_id}')
     status = await r.json()
     assert status['queue_position'] == 2
 
-    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_top'})
+    await cli.post(f'/torrent/{t1_id}/queue_position_top')
     r = await cli.get(f'/torrent/{t1_id}')
     status = await r.json()
     assert status['queue_position'] == 0
@@ -226,12 +226,28 @@ async def test_edit_queue_position(cli):
 async def test_set_torrent_priority(cli):
     tid = await test_post_torrent(cli)
 
-    await cli.post(f'/torrent/{tid}', json={'action': 'set_priority', 'arg': 10})
+    await cli.post(f'/torrent/{tid}/set_priority', json=[10])
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
     assert status['priority'] == 10
 
-    await cli.post(f'/torrent/{tid}', json={'action': 'set_priority', 'arg': 255})
+    await cli.post(f'/torrent/{tid}/set_priority', json=[255])
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
     assert status['priority'] == 255
+
+
+async def test_torrent_trackers(cli):
+    tid = await test_post_torrent(cli)
+    tracker_url = 'http://localhost'
+    tracker_tier = 0
+
+    r = await cli.get(f'/torrent/{tid}/trackers')
+    trackers = await r.json()
+    assert trackers == []
+
+    await cli.post(f'/torrent/{tid}/add_tracker', json=[{'url': tracker_url, 'tier': tracker_tier}])
+    r = await cli.get(f'/torrent/{tid}/trackers')
+    trackers = await r.json()
+    assert trackers[0]['url'] == tracker_url
+    assert trackers[0]['tier'] == tracker_tier

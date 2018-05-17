@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 
 import asyncio
+import json
 from base64 import b64decode
 import binascii
 import functools
@@ -168,31 +169,30 @@ async def post_torrent(request):
     )
 
 
-@routes.post('/torrent/{tid}')
-async def post_torrent_action(request):
+@routes.get('/torrent/{tid}/{method}')
+@routes.post('/torrent/{tid}/{method}')
+async def get_post_torrent_method(request):
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid')
+    method_name = request.match_info.get('method')
     handle = get_valid_handle(core, tid)
 
-    body = await request.json()
-    if 'action' not in body:
-        raise web.HTTPBadRequest(reason="POST must have an 'action' key.")
+    body = await request.text()
+    if body:
+        args = json.loads(body)
+    else:
+        args = []
 
-    method = getattr(handle, body['action'], None)
+    method = getattr(handle, method_name, None)
     if not method or not callable(method):
-        raise web.HTTPBadRequest(reason=f"Invalid action '{body['action']}'")
+        raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
 
-    args = []
-    if 'args' in body:
-        args = body['args']
-    elif 'arg' in body:
-        args.append(body['arg'])
     try:
-        method(*args)
+        result = method(*args)
     except Exception as ex:
         raise web.HTTPBadRequest(text=f'Something went wrong: {ex}')
 
-    return web.Response()
+    return web.json_response(result)
 
 
 @routes.delete('/torrent')
