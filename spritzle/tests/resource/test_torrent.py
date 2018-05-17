@@ -251,3 +251,21 @@ async def test_torrent_trackers(cli):
     trackers = await r.json()
     assert trackers[0]['url'] == tracker_url
     assert trackers[0]['tier'] == tracker_tier
+
+
+async def test_set_auto_managed(cli):
+    tid = await test_post_torrent(cli)
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['auto_managed']
+
+    await cli.post(f'/torrent/{tid}/auto_managed', json=[True])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['auto_managed']
+
+    await cli.post(f'/torrent/{tid}/auto_managed', json=[False])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['auto_managed']
