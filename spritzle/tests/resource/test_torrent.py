@@ -177,3 +177,47 @@ async def test_pause_resume_torrent(cli):
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
     assert data['paused']
+
+
+async def test_edit_queue_position(cli):
+    t1_url = str(cli.make_url('/test_torrents/testtorrent1.torrent'))
+    t2_url = str(cli.make_url('/test_torrents/testtorrent2.torrent'))
+    t3_url = str(cli.make_url('/test_torrents/testtorrent3.torrent'))
+    r = await cli.post('/torrent', json={'url': t1_url})
+    t1_id = (await r.json())['info_hash']
+    r = await cli.post('/torrent', json={'url': t2_url})
+    t2_id = (await r.json())['info_hash']
+    r = await cli.post('/torrent', json={'url': t3_url})
+    t3_id = (await r.json())['info_hash']
+
+    # Verify initial state
+    r = await cli.get(f'/torrent/{t1_id}')
+    status = await r.json()
+    assert status['queue_position'] == 0
+    r = await cli.get(f'/torrent/{t2_id}')
+    status = await r.json()
+    assert status['queue_position'] == 1
+    r = await cli.get(f'/torrent/{t3_id}')
+    status = await r.json()
+    assert status['queue_position'] == 2
+
+    # Test queue movement actions
+    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_down'})
+    r = await cli.get(f'/torrent/{t1_id}')
+    status = await r.json()
+    assert status['queue_position'] == 1
+
+    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_up'})
+    r = await cli.get(f'/torrent/{t1_id}')
+    status = await r.json()
+    assert status['queue_position'] == 0
+
+    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_bottom'})
+    r = await cli.get(f'/torrent/{t1_id}')
+    status = await r.json()
+    assert status['queue_position'] == 2
+
+    await cli.post(f'/torrent/{t1_id}', json={'action': 'queue_position_top'})
+    r = await cli.get(f'/torrent/{t1_id}')
+    status = await r.json()
+    assert status['queue_position'] == 0
