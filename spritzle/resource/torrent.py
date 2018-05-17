@@ -179,7 +179,12 @@ async def get_post_torrent_method(request):
 
     body = await request.text()
     if body:
-        args = json.loads(body)
+        try:
+            args = json.loads(body)
+        except JSONDecodeError as ex:
+            raise web.HTTPBadRequest(reason='Invalid JSON', text=ex.msg)
+        if not isinstance(args, list):
+            raise web.HTTPBadRequest(reason='Body must be a list of arguments.')
     else:
         args = []
 
