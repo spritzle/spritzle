@@ -31,6 +31,7 @@ import libtorrent as lt
 from spritzle.alert import Alert
 from spritzle.hooks import Hooks
 from spritzle.resume_data import ResumeData
+from spritzle.torrent import Torrent
 
 log = logging.getLogger('spritzle')
 
@@ -55,6 +56,7 @@ class Core(object):
 
         self.alert = Alert()
         self.resume_data = ResumeData(self)
+        self.torrent = Torrent(self)
         self.alert.register_handler(
             'session_stats_alert',
             self.on_session_stats_alert

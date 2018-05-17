@@ -11,6 +11,7 @@ import pytest
 from spritzle.core import Core
 from spritzle.config import Config
 from spritzle.main import setup_app
+from spritzle.tests import torrent_dir
 
 pytest_plugins = 'aiohttp.pytest_plugin'
 
@@ -42,6 +43,7 @@ def app(core):
     log = logging.getLogger('spritzle')
     logging.basicConfig(level=logging.DEBUG)
     setup_app(app, core, log)
+    app.router.add_static('/test_torrents', torrent_dir)
     return app
 
 

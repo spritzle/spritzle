@@ -20,22 +20,25 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from unittest.mock import patch, MagicMock
-import tempfile
-import os
-
-import spritzle.core
+import libtorrent as lt
 
 
-def test_save_state():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path_mock = MagicMock(return_value=os.path.join(tmpdir, "state"))
-        patch('os.path.expanduser', new=path_mock).start()
+async def test_save_session_state(core):
+    state_file = core.state_dir / 'session.state'
+    await core.start()
+    assert not state_file.is_file()
+    await core.save_session_state()
+    assert state_file.is_file()
+    with state_file.open(mode='rb') as f:
+        data = lt.bdecode(f.read())
+        assert b'settings' in data
 
-        core = spritzle.core.Core()
-        assert not os.path.exists(core.get_lt_state_file_path())
 
-        core.init(os.path.join(tmpdir, "config"))
-        core.save_state()
-
-        assert os.path.exists(core.get_lt_state_file_path())
+async def test_torrent_data(cli, core):
+    info_hash = '44a040be6d74d8d290cd20128788864cbf770719'
+    torrent_address = str(cli.make_url('/test_torrents/random_one_file.torrent'))
+    assert not core.torrent_data
+    await cli.post('/torrent', json={'url': torrent_address})
+    assert info_hash in core.torrent_data
+    await cli.delete('/torrent/44a040be6d74d8d290cd20128788864cbf770719')
+    assert not core.torrent_data
