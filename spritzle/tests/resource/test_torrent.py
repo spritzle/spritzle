@@ -81,6 +81,7 @@ async def test_post_torrent(cli):
     response = await cli.get('/torrent')
     tlist = await response.json()
     assert tlist == ['44a040be6d74d8d290cd20128788864cbf770719']
+    return info_hash
 
 
 async def test_post_torrent_info_hash(cli):
@@ -140,8 +141,7 @@ async def test_add_torrent_url(cli):
 
 
 async def test_remove_torrent(cli):
-    await test_post_torrent(cli)
-    tid = '44a040be6d74d8d290cd20128788864cbf770719'
+    tid = await test_post_torrent(cli)
 
     response = await cli.delete(f'/torrent/{tid}',
                                 params={'delete_files': 1})
@@ -159,3 +159,21 @@ async def test_remove_torrent_all(cli, core):
     response = await cli.delete('/torrent', params={'delete_files': 1})
     assert response.status == 200
     assert len(torrent.get_torrent_list(core)) == 0
+
+
+async def test_pause_resume_torrent(cli):
+    tid = await test_post_torrent(cli)
+
+    response = await cli.get(f'/torrent/{tid}')
+    data = await response.json()
+    assert data['paused'] == True
+
+    await cli.post(f'/torrent/{tid}', json={'action': 'resume'})
+    response = await cli.get(f'/torrent/{tid}')
+    data = await response.json()
+    assert data['paused'] == False
+
+    await cli.post(f'/torrent/{tid}', json={'action': 'pause'})
+    response = await cli.get(f'/torrent/{tid}')
+    data = await response.json()
+    assert data['paused'] == True

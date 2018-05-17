@@ -168,6 +168,28 @@ async def post_torrent(request):
     )
 
 
+@routes.post('/torrent/{tid}')
+async def post_torrent_action(request):
+    core = request.app['spritzle.core']
+    tid = request.match_info.get('tid')
+    handle = get_valid_handle(core, tid)
+
+    body = await request.json()
+    if 'action' not in body:
+        raise web.HTTPBadRequest(reason="POST must have an 'action' key.")
+
+    method = getattr(handle, body['action'], None)
+    if not method or not callable(method):
+        raise web.HTTPBadRequest(reason=f"Invalid action '{body['action']}'")
+
+    try:
+        method(*body.get('args', []))
+    except Exception as ex:
+        raise web.HTTPBadRequest(text=f'Something went wrong: {ex}')
+
+    return web.Response()
+
+
 @routes.delete('/torrent')
 @routes.delete('/torrent/{tid}')
 async def delete_torrent(request):
