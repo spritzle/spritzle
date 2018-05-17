@@ -182,8 +182,13 @@ async def post_torrent_action(request):
     if not method or not callable(method):
         raise web.HTTPBadRequest(reason=f"Invalid action '{body['action']}'")
 
+    args = []
+    if 'args' in body:
+        args = body['args']
+    elif 'arg' in body:
+        args.append(body['arg'])
     try:
-        method(*body.get('args', []))
+        method(*args)
     except Exception as ex:
         raise web.HTTPBadRequest(text=f'Something went wrong: {ex}')
 
