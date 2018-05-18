@@ -237,22 +237,6 @@ async def test_set_torrent_priority(cli):
     assert status['priority'] == 255
 
 
-async def test_torrent_trackers(cli):
-    tid = await test_post_torrent(cli)
-    tracker_url = 'http://localhost'
-    tracker_tier = 0
-
-    r = await cli.get(f'/torrent/{tid}/trackers')
-    trackers = await r.json()
-    assert trackers == []
-
-    await cli.post(f'/torrent/{tid}/add_tracker', json=[{'url': tracker_url, 'tier': tracker_tier}])
-    r = await cli.get(f'/torrent/{tid}/trackers')
-    trackers = await r.json()
-    assert trackers[0]['url'] == tracker_url
-    assert trackers[0]['tier'] == tracker_tier
-
-
 async def test_set_auto_managed(cli):
     tid = await test_post_torrent(cli)
 
