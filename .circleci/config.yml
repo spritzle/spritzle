@@ -1,0 +1,10 @@
+version: 2
+jobs:
+    build:
+        docker:
+            - image: spritzle/cci-python
+        steps:
+            - checkout
+            - run: pipenv --three --site-packages
+            - run: pipenv install --dev
+            - run: pipenv run pytest
