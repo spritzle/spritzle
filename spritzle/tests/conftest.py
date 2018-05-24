@@ -50,5 +50,5 @@ def app(core):
 @pytest.fixture
 def cli(loop, app, aiohttp_client):
     return loop.run_until_complete(
-        aiohttp_client(app, server_kwargs={'host': 'localhost', 'port': 8080})
+        aiohttp_client(app, server_kwargs={'host': '127.0.0.1', 'port': 8080})
     )

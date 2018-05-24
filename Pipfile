@@ -1,25 +1,18 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [packages]
-
 aiohttp = "*"
 PyJWT = ">=1.4.2"
 PyYAML = ">=3.12"
-"vext.libtorrent" = "*"
-
 
 [dev-packages]
-
 asynctest = ">=0.10.1"
 coverage = ">=4.0.3"
 pytest = "*"
-
+"e1839a8" = {path = ".", editable = true}
 
 [requires]
-
 python_version = "3.6"
