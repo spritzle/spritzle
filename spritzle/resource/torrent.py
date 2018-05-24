@@ -180,13 +180,19 @@ UNSUPPORTED_METHODS = [
     'replace_trackers',
     'trackers',
     'url_seeds',
+    'add_url_seed',
+    'remove_url_seed',
+    'http_seeds',
+    'add_http_seed',
+    'remove_http_seed',
     'add_extension',
     'save_resume_data',
     'piece_availability',
     'move_storage',
     'rename_file',
-    'native_handle'
+    'native_handle',
 ]
+
 
 @routes.post('/torrent/{tid}/{method}')
 async def get_post_torrent_method(request):

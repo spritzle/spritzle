@@ -19,7 +19,7 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 #
-
+import asyncio
 from base64 import b64encode
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -253,3 +253,72 @@ async def test_set_auto_managed(cli):
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
     assert not status['auto_managed']
+
+
+async def test_set_upload_mode(cli):
+    tid = await test_post_torrent(cli)
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['upload_mode']
+
+    await cli.post(f'/torrent/{tid}/set_upload_mode', json=[True])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['upload_mode']
+
+    await cli.post(f'/torrent/{tid}/set_upload_mode', json=[False])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['upload_mode']
+
+
+async def test_set_share_mode(cli):
+    tid = await test_post_torrent(cli)
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['share_mode']
+
+    await cli.post(f'/torrent/{tid}/set_share_mode', json=[True])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['share_mode']
+
+    await cli.post(f'/torrent/{tid}/set_share_mode', json=[False])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['share_mode']
+
+
+async def test_apply_ip_filter(cli):
+    tid = await test_post_torrent(cli)
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['ip_filter_applies']
+
+    await cli.post(f'/torrent/{tid}/apply_ip_filter', json=[True])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['ip_filter_applies']
+
+    await cli.post(f'/torrent/{tid}/apply_ip_filter', json=[False])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert not status['ip_filter_applies']
+
+
+async def test_force_recheck(cli):
+    tid = await test_post_torrent(cli)
+    await asyncio.sleep(1)
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['state'] != 'checking_resume_data'
+
+    await cli.post(f'/torrent/{tid}/force_recheck')
+
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['state'] == 'checking_resume_data'
