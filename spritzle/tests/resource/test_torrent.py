@@ -25,6 +25,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import libtorrent as lt
+import pytest
 
 from spritzle.resource import torrent
 from spritzle.tests import torrent_dir
@@ -236,77 +237,35 @@ async def test_set_torrent_priority(cli):
     status = await r.json()
     assert status['priority'] == 255
 
+# action endpoint, status dict key it controls
+boolean_actions = [
+    ('auto_managed', 'auto_managed'),
+    ('set_upload_mode', 'upload_mode'),
+    ('set_share_mode', 'share_mode'),
+    ('apply_ip_filter', 'ip_filter_applies'),
+    ('stop_when_ready', 'stop_when_ready'),
+]
 
-async def test_set_auto_managed(cli):
+
+@pytest.mark.parametrize('action, status_key', boolean_actions,
+                         ids=[a[0] for a in boolean_actions])
+async def test_boolean_actions(cli, action, status_key):
     tid = await test_post_torrent(cli)
 
+    await cli.post(f'/torrent/{tid}/{action}', json=[True])
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
-    assert not status['auto_managed']
+    assert status[status_key]
 
-    await cli.post(f'/torrent/{tid}/auto_managed', json=[True])
+    await cli.post(f'/torrent/{tid}/{action}', json=[False])
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
-    assert status['auto_managed']
+    assert not status[status_key]
 
-    await cli.post(f'/torrent/{tid}/auto_managed', json=[False])
+    await cli.post(f'/torrent/{tid}/{action}', json=[True])
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
-    assert not status['auto_managed']
-
-
-async def test_set_upload_mode(cli):
-    tid = await test_post_torrent(cli)
-
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['upload_mode']
-
-    await cli.post(f'/torrent/{tid}/set_upload_mode', json=[True])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status['upload_mode']
-
-    await cli.post(f'/torrent/{tid}/set_upload_mode', json=[False])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['upload_mode']
-
-
-async def test_set_share_mode(cli):
-    tid = await test_post_torrent(cli)
-
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['share_mode']
-
-    await cli.post(f'/torrent/{tid}/set_share_mode', json=[True])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status['share_mode']
-
-    await cli.post(f'/torrent/{tid}/set_share_mode', json=[False])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['share_mode']
-
-
-async def test_apply_ip_filter(cli):
-    tid = await test_post_torrent(cli)
-
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['ip_filter_applies']
-
-    await cli.post(f'/torrent/{tid}/apply_ip_filter', json=[True])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status['ip_filter_applies']
-
-    await cli.post(f'/torrent/{tid}/apply_ip_filter', json=[False])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status['ip_filter_applies']
+    assert status[status_key]
 
 
 async def test_force_recheck(cli):
