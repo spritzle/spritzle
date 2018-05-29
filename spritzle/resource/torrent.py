@@ -205,6 +205,10 @@ async def get_post_torrent_method(request):
     if method_name in UNSUPPORTED_METHODS:
         raise web.HTTPBadRequest(reason=f'Spritzle does not (yet) support the {method_name} method.')
 
+    method = getattr(handle, method_name, None)
+    if not method or not callable(method) or method_name.startswith('_'):
+        raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
+
     body = await request.text()
     if body:
         try:
@@ -215,10 +219,6 @@ async def get_post_torrent_method(request):
             raise web.HTTPBadRequest(reason='Body must be a list of arguments.')
     else:
         args = []
-
-    method = getattr(handle, method_name, None)
-    if not method or not callable(method):
-        raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
 
     try:
         result = method(*args)
