@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
 from unittest.mock import MagicMock
 
 import asynctest
@@ -55,8 +56,10 @@ class AlertTestTwo(AlertTest):
 
 async def test_alert_stop():
     a = spritzle.alert.Alert()
-    assert a.run
+    assert not a.run
     await a.start(MagicMock())
+    await asyncio.sleep(0)
+    assert a.run
     await a.stop()
     assert not a.run
 
@@ -68,13 +71,11 @@ async def test_pop_alerts(monkeypatch):
     alert_test_two = AlertTestTwo()
 
     session.configure_mock(**{
-        'wait_for_alert.return_value': True,
         'pop_alerts.return_value': [alert_test_one, alert_test_two],
     })
 
     monkeypatch.setattr('libtorrent.alert.category_t', CategoryT)
     a = spritzle.alert.Alert()
-    a.session = session
     a.alert_types = ['AlertTestOne', 'AlertTestTwo', 'AlertTestThree']
 
     handler_one = asynctest.CoroutineMock()
@@ -89,7 +90,11 @@ async def test_pop_alerts(monkeypatch):
     a.register_handler('test_category1', handler_three)
     assert 'test_category1' in a.handlers
 
-    await a.pop_alerts(run_once=True)
+    await a.start(session)
+    a.event.set()
+    # Make sure the event.set() has woken up pop_alerts() before stopping.
+    await asyncio.sleep(0)
+    await a.stop()
 
     handler_one.assert_called_with(alert_test_one)
     handler_two.assert_called_with(alert_test_two)

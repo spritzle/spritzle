@@ -21,7 +21,6 @@
 #
 
 import asyncio
-import functools
 import logging
 
 import libtorrent as lt
@@ -67,22 +66,26 @@ class Alert(object):
         self.session = None
         self.loop = asyncio.get_event_loop()
         self.pop_alerts_task = None
+        self.run = False
+        self.event = asyncio.Event()
         self.handlers = {
             'all_categories': [debug_handler],
         }
         self.categories = build_categories()
         self.alert_types = build_alert_types()
-        self.run = True
 
     async def start(self, session):
         log.debug('Alert starting..')
         self.session = session
         self.run = True
         self.pop_alerts_task = self.loop.create_task(self.pop_alerts())
+        self.session.set_alert_notify(self.alert_notify)
 
     async def stop(self):
         log.debug('Alert stopping..')
         self.run = False
+        self.event.set()
+        await asyncio.sleep(0)
         if self.pop_alerts_task:
             await self.pop_alerts_task
         log.debug('Alert stopped.')
@@ -94,28 +97,28 @@ class Alert(object):
             raise ValueError('Alert handlers must by coroutine functions.')
         self.handlers.setdefault(alert_type, []).append(handler)
 
-    async def pop_alerts(self, run_once=False):
-        while self.run or run_once:
-            if await self.loop.run_in_executor(
-                    None, functools.partial(self.session.wait_for_alert), 200):
-                if not (self.run or run_once):
-                    break
+    def alert_notify(self):
+        # This function is called from libtorrent so we must not block it. Return here
+        # as quickly as possible.
+        self.loop.call_soon_threadsafe(self.event.set)
 
-                tasks = []
-                for alert in self.session.pop_alerts():
-                    handlers = set()
-                    handlers.update(self.handlers.get(alert.what(), []))
+    async def pop_alerts(self):
+        while self.run:
+            await self.event.wait()
+            self.event.clear()
 
-                    for k, v in self.categories.items():
-                        if alert.category() & v:
-                            handlers.update(self.handlers.get(k, []))
-                    for handler in handlers:
-                        tasks.append(self.loop.create_task(handler(alert)))
+            tasks = []
+            for alert in self.session.pop_alerts():
+                handlers = set()
+                handlers.update(self.handlers.get(alert.what(), []))
 
-                # We have to make sure all alert handlers have completed before
-                # calling pop_alerts() again as it will invalidate all previous
-                # libtorrent alert objects.
-                await asyncio.gather(*tasks)
+                for k, v in self.categories.items():
+                    if alert.category() & v:
+                        handlers.update(self.handlers.get(k, []))
+                for handler in handlers:
+                    tasks.append(self.loop.create_task(handler(alert)))
 
-            if run_once:
-                break
+            # We have to make sure all alert handlers have completed before
+            # calling pop_alerts() again as it will invalidate all previous
+            # libtorrent alert objects.
+            await asyncio.gather(*tasks)
