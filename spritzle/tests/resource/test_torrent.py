@@ -281,3 +281,17 @@ async def test_force_recheck(cli):
     r = await cli.get(f'/torrent/{tid}')
     status = await r.json()
     assert status['state'] == 'checking_resume_data'
+
+
+async def test_set_max_uploads(cli):
+    tid = await test_post_torrent(cli)
+
+    await cli.post(f'/torrent/{tid}/set_max_uploads', json=[10])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['uploads_limit'] == 10
+
+    await cli.post(f'/torrent/{tid}/set_max_uploads', json=[255])
+    r = await cli.get(f'/torrent/{tid}')
+    status = await r.json()
+    assert status['uploads_limit'] == 255
