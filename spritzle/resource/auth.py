@@ -53,28 +53,27 @@ async def post_auth(request):
     return web.json_response({'token': jwt_token.decode('utf8')})
 
 
-async def auth_middleware(app, handler):
-    async def middleware(request):
-        config = app['spritzle.config']
+@web.middleware
+async def auth_middleware(request, handler):
+    config = request.app['spritzle.config']
 
-        peername = request.transport.get_extra_info('peername')
-        if peername and peername[0] in config['auth_allow_hosts']:
-                return await handler(request)
-
-        if request.rel_url.path == '/auth':
+    peername = request.transport.get_extra_info('peername')
+    if peername and peername[0] in config['auth_allow_hosts']:
             return await handler(request)
 
-        jwt_token = request.headers.get('authorization', None)
-        if jwt_token is None:
-            raise web.HTTPUnauthorized(reason='Authorization token required')
-
-        try:
-            jwt.decode(
-                jwt_token,
-                config['auth_secret'],
-                algorithms=['HS256'])
-        except (jwt.DecodeError, jwt.ExpiredSignatureError):
-            raise web.HTTPUnauthorized(reason='Token is invalid')
-
+    if request.rel_url.path == '/auth':
         return await handler(request)
-    return middleware
+
+    jwt_token = request.headers.get('authorization', None)
+    if jwt_token is None:
+        raise web.HTTPUnauthorized(reason='Authorization token required')
+
+    try:
+        jwt.decode(
+            jwt_token,
+            config['auth_secret'],
+            algorithms=['HS256'])
+    except (jwt.DecodeError, jwt.ExpiredSignatureError):
+        raise web.HTTPUnauthorized(reason='Token is invalid')
+
+    return await handler(request)
