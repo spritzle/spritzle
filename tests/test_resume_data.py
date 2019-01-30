@@ -27,7 +27,7 @@ from asynctest import patch
 import libtorrent as lt
 import pytest
 
-from spritzle.tests import resume_data_dir
+from .common import resume_data_dir
 
 
 async def test_load(core):

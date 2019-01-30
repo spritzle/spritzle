@@ -11,7 +11,7 @@ import pytest
 from spritzle.core import Core
 from spritzle.config import Config
 from spritzle.main import setup_app
-from spritzle.tests import torrent_dir
+from .common import torrent_dir
 
 pytest_plugins = 'aiohttp.pytest_plugin'
 

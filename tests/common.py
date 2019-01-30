@@ -1,5 +1,5 @@
 #
-# tests/__init__.py
+# tests/common.py
 #
 # Copyright (C) 2016 Andrew Resch <andrewresch@gmail.com>
 #
