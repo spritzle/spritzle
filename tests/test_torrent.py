@@ -21,7 +21,7 @@ class MockAlert(Alert):
 
     async def push_alert(self, alert_type, **kwargs):
         alert = Mock(**{
-            'what.return_value': alert_type,
+            '__class__.__name__': alert_type,
             'category.return_value': 0
         })
         alert.configure_mock(**kwargs)

@@ -110,7 +110,7 @@ class Alert(object):
             tasks = []
             for alert in self.session.pop_alerts():
                 handlers = set()
-                handlers.update(self.handlers.get(alert.what(), []))
+                handlers.update(self.handlers.get(type(alert).__name__, []))
 
                 for k, v in self.categories.items():
                     if alert.category() & v:
