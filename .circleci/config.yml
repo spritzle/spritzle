@@ -5,6 +5,5 @@ jobs:
             - image: spritzle/cci-python
         steps:
             - checkout
-            - run: pipenv --three --site-packages
-            - run: pipenv install --dev
-            - run: pipenv run pytest
+            - run: ~/.poetry/bin/poetry install
+            - run: ~/.poetry/bin/poetry run pytest

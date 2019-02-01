@@ -1,5 +1,4 @@
 import asyncio
-import threading
 from unittest.mock import Mock
 
 import libtorrent as lt
@@ -13,10 +12,6 @@ class MockAlert(Alert):
     def __init__(self):
         super().__init__()
         self._alerts = []
-        self.event = threading.Event()
-
-    def _wait_for_alerts(self, timeout):
-        return self.event.wait(timeout/1000)
 
     def _pop_alerts(self):
         result = self._alerts
@@ -26,7 +21,7 @@ class MockAlert(Alert):
 
     async def push_alert(self, alert_type, **kwargs):
         alert = Mock(**{
-            'what.return_value': alert_type,
+            '__class__.__name__': alert_type,
             'category.return_value': 0
         })
         alert.configure_mock(**kwargs)
@@ -35,7 +30,6 @@ class MockAlert(Alert):
 
     async def start(self, session):
         self.session = Mock(
-            wait_for_alerts=self._wait_for_alerts,
             pop_alerts=self._pop_alerts
         )
         self.run = True

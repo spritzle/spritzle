@@ -81,7 +81,7 @@ async def error_middleware(request, handler):
 app = aiohttp.web.Application()
 
 
-def setup_app(app, core, log, settings=None):
+def setup_app(app, core, log):
     config = core.config
     if not config['auth_secret']:
         config['auth_secret'] = secrets.token_hex()
@@ -93,7 +93,7 @@ def setup_app(app, core, log, settings=None):
     app.middlewares.extend([error_middleware, debug_middleware])
 
     async def on_startup(app):
-        await app['spritzle.core'].start(settings=settings)
+        await app['spritzle.core'].start()
 
     async def on_shutdown(app):
         await app['spritzle.core'].stop()

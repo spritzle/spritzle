@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "spritzle"
+version = "1.0"
+description = ""
+authors = ["Andrew Resch <andrewresch@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+aiohttp = "^3.5"
+PyJWT = "^1.7"
+PyYAML = "^3.13"
+"vext.libtorrent" = "^0.6.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "*"
+asynctest = "^0.12.2"
+coverage = "^4.5"
+black = {version = "^18.3-alpha.0",allows-prereleases = true}

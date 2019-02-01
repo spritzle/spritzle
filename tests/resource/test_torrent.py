@@ -28,7 +28,7 @@ import libtorrent as lt
 import pytest
 
 from spritzle.resource import torrent
-from spritzle.tests import torrent_dir
+from ..common import torrent_dir
 
 
 def create_torrent_post_data(filename=None, tags=None, **kwargs):
