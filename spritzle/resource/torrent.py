@@ -169,31 +169,6 @@ async def post_torrent(request):
     )
 
 
-UNSUPPORTED_METHODS = [
-    'read_piece',
-    'get_peer_info',
-    'status',
-    'get_download_queue',
-    'file_progress',
-    'file_status',
-    'add_tracker',
-    'replace_trackers',
-    'trackers',
-    'url_seeds',
-    'add_url_seed',
-    'remove_url_seed',
-    'http_seeds',
-    'add_http_seed',
-    'remove_http_seed',
-    'add_extension',
-    'save_resume_data',
-    'piece_availability',
-    'move_storage',
-    'rename_file',
-    'native_handle',
-]
-
-
 @routes.post('/torrent/{tid}/{method}')
 async def get_post_torrent_method(request):
 
@@ -201,9 +176,6 @@ async def get_post_torrent_method(request):
     tid = request.match_info.get('tid')
     method_name = request.match_info.get('method')
     handle = get_valid_handle(core, tid)
-
-    if method_name in UNSUPPORTED_METHODS:
-        raise web.HTTPBadRequest(reason=f'Spritzle does not (yet) support the {method_name} method.')
 
     method = getattr(handle, method_name, None)
     if not method or not callable(method) or method_name.startswith('_'):
@@ -240,7 +212,7 @@ async def delete_torrent(request):
     for key in request.query:
         try:
             options = options | getattr(lt.options_t, key)
-        except AttributeError as e:
+        except AttributeError:
             log.warning(f'Invalid option key: {key}')
 
     if tid is None:
@@ -253,7 +225,7 @@ async def delete_torrent(request):
         handle = get_valid_handle(core, tid)
         try:
             await core.torrent.remove(handle, options)
-        except AlertException as ex:
+        except AlertException:
             log.error(f'Error deleting files for {handle.name()}')
         core.resume_data.delete(tid)
         del core.torrent_data[tid]
