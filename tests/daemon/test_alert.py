@@ -26,7 +26,7 @@ from unittest.mock import MagicMock
 import asynctest
 import pytest
 
-import spritzle.alert
+import spritzle.daemon.alert
 
 
 class CategoryT:
@@ -55,7 +55,7 @@ class AlertTestTwo(AlertTest):
 
 
 async def test_alert_stop():
-    a = spritzle.alert.Alert()
+    a = spritzle.daemon.alert.Alert()
     assert not a.run
     await a.start(MagicMock())
     await asyncio.sleep(0)
@@ -75,7 +75,7 @@ async def test_pop_alerts(monkeypatch):
     })
 
     monkeypatch.setattr('libtorrent.alert.category_t', CategoryT)
-    a = spritzle.alert.Alert()
+    a = spritzle.daemon.alert.Alert()
     a.alert_types = ['AlertTestOne', 'AlertTestTwo', 'AlertTestThree']
 
     handler_one = asynctest.CoroutineMock()
@@ -108,7 +108,7 @@ async def test_handler_validation():
     def invalid_handler(alert):
         pass
 
-    a = spritzle.alert.Alert()
+    a = spritzle.daemon.alert.Alert()
     valid_alert_type = 'torrent_paused_alert'
     valid_category = 'storage_notification'
     invalid_alert_type = 'invalid_alert_type'

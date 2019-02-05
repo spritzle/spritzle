@@ -30,15 +30,16 @@ import traceback
 
 import aiohttp.web
 
-import spritzle.resource.auth
-import spritzle.resource.config
-import spritzle.resource.core
-import spritzle.resource.session
-import spritzle.resource.torrent
+from .resource.auth import routes as auth_routes
+from .resource.auth import auth_middleware
+from .resource.config import routes as config_routes
+from .resource.core import routes as core_routes
+from .resource.session import routes as session_routes
+from .resource.torrent import routes as torrent_routes
 
-from spritzle.core import Core
-from spritzle.config import Config
-from spritzle.logger import setup_logger
+from .core import Core
+from .config import Config
+from .logger import setup_logger
 
 
 @aiohttp.web.middleware
@@ -101,11 +102,11 @@ def setup_app(app, core, log):
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
 
-    app.router.add_routes(spritzle.resource.auth.routes)
-    app.router.add_routes(spritzle.resource.config.routes)
-    app.router.add_routes(spritzle.resource.core.routes)
-    app.router.add_routes(spritzle.resource.session.routes)
-    app.router.add_routes(spritzle.resource.torrent.routes)
+    app.router.add_routes(auth_routes)
+    app.router.add_routes(config_routes)
+    app.router.add_routes(core_routes)
+    app.router.add_routes(session_routes)
+    app.router.add_routes(torrent_routes)
 
 
 def main():
@@ -137,5 +138,5 @@ def main():
 
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
-    app.middlewares.append(spritzle.resource.auth.auth_middleware)
+    app.middlewares.append(auth_middleware)
     aiohttp.web.run_app(app)

@@ -22,7 +22,7 @@
 
 import binascii
 import libtorrent as lt
-import spritzle.common as common
+import spritzle.daemon.common as common
 
 
 def test_struct_to_dict():

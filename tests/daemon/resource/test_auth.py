@@ -23,7 +23,7 @@
 import aiohttp
 import pytest
 
-from spritzle.resource import auth
+from spritzle.daemon.resource import auth
 
 
 @pytest.fixture

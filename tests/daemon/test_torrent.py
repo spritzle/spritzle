@@ -4,8 +4,8 @@ from unittest.mock import Mock
 import libtorrent as lt
 import pytest
 
-from spritzle.alert import Alert
-from spritzle.torrent import Torrent
+from spritzle.daemon.alert import Alert
+from spritzle.daemon.torrent import Torrent
 
 
 class MockAlert(Alert):

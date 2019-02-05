@@ -27,7 +27,7 @@ from unittest.mock import MagicMock
 import libtorrent as lt
 import pytest
 
-from spritzle.resource import torrent
+from spritzle.daemon.resource import torrent
 from ..common import torrent_dir
 
 

@@ -8,10 +8,10 @@ from unittest.mock import patch
 import aiohttp.web
 import pytest
 
-from spritzle.core import Core
-from spritzle.config import Config
-from spritzle.main import setup_app
-from .common import torrent_dir
+from spritzle.daemon.core import Core
+from spritzle.daemon.config import Config
+from spritzle.daemon.main import setup_app
+from daemon.common import torrent_dir
 
 pytest_plugins = 'aiohttp.pytest_plugin'
 

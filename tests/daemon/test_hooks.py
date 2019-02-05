@@ -23,7 +23,7 @@
 import tempfile
 from pathlib import Path
 
-from spritzle.hooks import Hooks
+from spritzle.daemon.hooks import Hooks
 
 
 def test_find_hooks():

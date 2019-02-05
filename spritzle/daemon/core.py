@@ -28,10 +28,10 @@ import functools
 
 import libtorrent as lt
 
-from spritzle.alert import Alert
-from spritzle.hooks import Hooks
-from spritzle.resume_data import ResumeData
-from spritzle.torrent import Torrent
+from .alert import Alert
+from .hooks import Hooks
+from .resume_data import ResumeData
+from .torrent import Torrent
 
 log = logging.getLogger('spritzle')
 

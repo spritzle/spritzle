@@ -25,7 +25,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 
-from spritzle.config import Config
+from spritzle.daemon.config import Config
 
 
 def test_config_init_no_dir():

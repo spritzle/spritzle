@@ -30,8 +30,8 @@ import logging
 import aiohttp
 from aiohttp import web
 
-import spritzle.common as common
-from spritzle.torrent import AlertException
+import spritzle.daemon.common as common
+from spritzle.daemon.torrent import AlertException
 
 import libtorrent as lt
 
