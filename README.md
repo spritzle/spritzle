@@ -8,7 +8,7 @@ functionality should be provided by a hook extending spritzle.
 Interface
 ---------
 
-For a command-line interface, check out [spritzle-cli](https://github.com/spritzle/spritzle-cli).
+A command-line client is included as the `spritzle` command.
 
 Authors
 -------
