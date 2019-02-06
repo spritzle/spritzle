@@ -60,7 +60,7 @@ def load_commands():
     """Adds all commands found in 'commands' subdirectory."""
     for module_info in pkgutil.iter_modules([cmd_dir]):
         try:
-            mod = importlib.import_module('spritzle_cli.commands.' + module_info.name)
+            mod = importlib.import_module('spritzle.cli.commands.' + module_info.name)
         except ImportError as e:
             click.echo(e, file=sys.stderr)
         else:

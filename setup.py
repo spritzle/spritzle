@@ -1,9 +1,7 @@
-#!/usr/bin/env python
 #
 # setup.py
 #
-# Copyright (C) 2011 Andrew Resch <andrewresch@gmail.com>
-#               2011 Damien Churchill <damoxc@gmail.com>
+# Copyright (C) 2019 Andrew Resch <andrewresch@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,12 +30,13 @@ setup(
     author='Andrew Resch',
     author_email='andrewresch@gmail.com',
     keywords='torrent bittorrent p2p fileshare filesharing',
-    url='http://github.com/damoxc/spritzle',
+    url='http://github.com/spritzle/spritzle',
     license='GPLv3',
-    packages=['spritzle.daemon'],
+    packages=['spritzle.daemon', 'spritzle.cli'],
     entry_points={
         'console_scripts': [
-            'spritzled =  spritzle.daemon.main:main'
+            'spritzled = spritzle.daemon.main:main',
+            'spritzle = spritzle.cli.main:cli',
         ]
     },
 )

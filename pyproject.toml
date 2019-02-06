@@ -10,6 +10,8 @@ aiohttp = "^3.5"
 PyJWT = "^1.7"
 PyYAML = "^3.13"
 "vext.libtorrent" = "^0.6.1"
+click = "^7.0"
+tabulate = "^0.8.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"

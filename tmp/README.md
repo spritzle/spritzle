@@ -1,1 +1,0 @@
-# spritzle-cli
