@@ -170,7 +170,7 @@ async def post_torrent(request):
 
 
 @routes.post('/torrent/{tid}/{method}')
-async def get_post_torrent_method(request):
+async def post_torrent_method(request):
 
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid')
