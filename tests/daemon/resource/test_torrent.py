@@ -224,19 +224,6 @@ async def test_edit_queue_position(cli):
     assert status['queue_position'] == 0
 
 
-async def test_set_torrent_priority(cli):
-    tid = await test_post_torrent(cli)
-
-    await cli.post(f'/torrent/{tid}/set_priority', json=[10])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status['priority'] == 10
-
-    await cli.post(f'/torrent/{tid}/set_priority', json=[255])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status['priority'] == 255
-
 # action endpoint, status dict key it controls
 boolean_actions = [
     ('auto_managed', 'auto_managed'),
