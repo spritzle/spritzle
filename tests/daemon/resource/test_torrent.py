@@ -167,17 +167,17 @@ async def test_pause_resume_torrent(cli):
 
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert data['paused']
+    assert data['flags'] & lt.torrent_flags.paused
 
     await cli.post(f'/torrent/{tid}/resume')
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert not data['paused']
+    assert not data['flags'] & lt.torrent_flags.paused
 
     await cli.post(f'/torrent/{tid}/pause')
     response = await cli.get(f'/torrent/{tid}')
     data = await response.json()
-    assert data['paused']
+    assert data['flags'] & lt.torrent_flags.paused
 
 
 async def test_edit_queue_position(cli):

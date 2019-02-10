@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Getting token.."
-TOKEN=$(curl -X POST -d 'password=password' http://localhost:8080/auth | jq -r '.token')
+TOKEN=$(curl -X POST -d '{"password": "password"}' http://localhost:8080/auth | jq -r '.token')
 
 echo "Adding torrent by file.."
 curl -i -H "Authorization: ${TOKEN}" -X POST -F "file=@resource/torrents/random_one_file.torrent" -F 'args={"save_path": "/tmp"}' http://localhost:8080/torrent
