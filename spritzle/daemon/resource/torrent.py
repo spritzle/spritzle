@@ -169,35 +169,49 @@ async def post_torrent(request):
     )
 
 
-@routes.post('/torrent/{tid}/{method}')
-async def post_torrent_method(request):
-
+@routes.post('/torrent/{tid}/flags')
+@routes.post('/torrent/{tid}/flags/{flag}')
+async def post_flags(request):
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid')
-    method_name = request.match_info.get('method')
+    flag = request.match_info.get('flag', None)
     handle = get_valid_handle(core, tid)
 
-    method = getattr(handle, method_name, None)
-    if not method or not callable(method) or method_name.startswith('_'):
-        raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
+    body = await request.json()
 
-    body = await request.text()
-    if body:
-        try:
-            args = json.loads(body)
-        except JSONDecodeError as ex:
-            raise web.HTTPBadRequest(reason='Invalid JSON', text=ex.msg)
-        if not isinstance(args, list):
-            raise web.HTTPBadRequest(reason='Body must be a list of arguments.')
+    if flag:
+        body = {flag: body}
+
+    value = handle.flags()
+    for k, v in body.items():
+        fvalue = getattr(lt.torrent_flags, k)
+        if v:
+            value |= fvalue
+        else:
+            value ^= fvalue
+    handle.set_flags(value)
+
+    return web.Response()
+
+
+@routes.get('/torrent/{tid}/flags')
+@routes.get('/torrent/{tid}/flags/{flag}')
+async def get_flags(request):
+    core = request.app['spritzle.core']
+    tid = request.match_info.get('tid')
+    flag = request.match_info.get('flag', None)
+    handle = get_valid_handle(core, tid)
+
+    if flag is None:
+        ret = {}
+        for f in dir(lt.torrent_flags):
+            if f.startswith('_'):
+                continue
+            ret[f] = bool(handle.flags() & getattr(lt.torrent_flags, f))
     else:
-        args = []
+        ret = bool(handle.flags() & getattr(lt.torrent_flags, flag))
 
-    try:
-        result = method(*args)
-    except Exception as ex:
-        raise web.HTTPBadRequest(text=f'Something went wrong: {ex}')
-
-    return web.json_response(result)
+    return web.json_response(ret)
 
 
 @routes.delete('/torrent')
@@ -231,3 +245,34 @@ async def delete_torrent(request):
         del core.torrent_data[tid]
 
     return web.Response()
+
+
+@routes.post('/torrent/{tid}/{method}')
+async def post_torrent_method(request):
+
+    core = request.app['spritzle.core']
+    tid = request.match_info.get('tid')
+    method_name = request.match_info.get('method')
+    handle = get_valid_handle(core, tid)
+
+    method = getattr(handle, method_name, None)
+    if not method or not callable(method) or method_name.startswith('_'):
+        raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
+
+    body = await request.text()
+    if body:
+        try:
+            args = json.loads(body)
+        except JSONDecodeError as ex:
+            raise web.HTTPBadRequest(reason='Invalid JSON', text=ex.msg)
+        if not isinstance(args, list):
+            raise web.HTTPBadRequest(reason='Body must be a list of arguments.')
+    else:
+        args = []
+
+    try:
+        result = method(*args)
+    except Exception as ex:
+        raise web.HTTPBadRequest(text=f'Something went wrong: {ex}')
+
+    return web.json_response(result)

@@ -25,7 +25,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import libtorrent as lt
-import pytest
 
 from spritzle.daemon.resource import torrent
 from ..common import torrent_dir
@@ -224,35 +223,26 @@ async def test_edit_queue_position(cli):
     assert status['queue_position'] == 0
 
 
-# action endpoint, status dict key it controls
-boolean_actions = [
-    ('auto_managed', 'auto_managed'),
-    ('set_upload_mode', 'upload_mode'),
-    ('set_share_mode', 'share_mode'),
-    ('apply_ip_filter', 'ip_filter_applies'),
-    ('stop_when_ready', 'stop_when_ready'),
-]
-
-
-@pytest.mark.parametrize('action, status_key', boolean_actions,
-                         ids=[a[0] for a in boolean_actions])
-async def test_boolean_actions(cli, action, status_key):
+async def test_torrent_flags(cli):
     tid = await test_post_torrent(cli)
 
-    await cli.post(f'/torrent/{tid}/{action}', json=[True])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status[status_key]
+    r = await cli.get(f'/torrent/{tid}/flags')
+    flags = await r.json()
+    assert flags['default_flags']
 
-    await cli.post(f'/torrent/{tid}/{action}', json=[False])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert not status[status_key]
+    r = await cli.get(f'/torrent/{tid}/flags/auto_managed')
+    value = await r.json()
+    assert not value
 
-    await cli.post(f'/torrent/{tid}/{action}', json=[True])
-    r = await cli.get(f'/torrent/{tid}')
-    status = await r.json()
-    assert status[status_key]
+    await cli.post(f'/torrent/{tid}/flags/auto_managed', json=True)
+    r = await cli.get(f'/torrent/{tid}/flags')
+    flags = await r.json()
+    assert flags['default_flags']
+    assert flags['auto_managed']
+
+    r = await cli.get(f'/torrent/{tid}/flags/auto_managed')
+    value = await r.json()
+    assert value
 
 
 async def test_force_recheck(cli):
