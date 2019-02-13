@@ -228,7 +228,8 @@ async def test_torrent_flags(cli):
 
     r = await cli.get(f'/torrent/{tid}/flags')
     flags = await r.json()
-    assert flags['default_flags']
+    assert not flags['auto_managed']
+    assert not flags['seed_mode']
 
     r = await cli.get(f'/torrent/{tid}/flags/auto_managed')
     value = await r.json()
@@ -237,12 +238,19 @@ async def test_torrent_flags(cli):
     await cli.post(f'/torrent/{tid}/flags/auto_managed', json=True)
     r = await cli.get(f'/torrent/{tid}/flags')
     flags = await r.json()
-    assert flags['default_flags']
     assert flags['auto_managed']
 
     r = await cli.get(f'/torrent/{tid}/flags/auto_managed')
     value = await r.json()
     assert value
+
+    r = await cli.post(f'/torrent/{tid}/flags', json={'auto_managed': False, 'super_seeding': True})
+    flags = await r.json()
+    assert not flags['auto_managed']
+    assert flags['super_seeding']
+
+    r = await cli.post(f'/torrent/{tid}/flags', json={'bad_flag': True})
+    assert r.status == 400
 
 
 async def test_force_recheck(cli):

@@ -26,6 +26,7 @@ import binascii
 import functools
 from json import JSONDecodeError
 import logging
+from typing import Dict, List
 
 import aiohttp
 from aiohttp import web
@@ -182,16 +183,29 @@ async def post_flags(request):
     if flag:
         body = {flag: body}
 
-    value = handle.flags()
+    flags = 0
+    mask = 0
     for k, v in body.items():
+        if k not in get_lt_torrent_flags():
+            raise web.HTTPBadRequest(reason=f'{k} is not a valid libtorrent torrent_flag')
         fvalue = getattr(lt.torrent_flags, k)
         if v:
-            value |= fvalue
-        else:
-            value ^= fvalue
-    handle.set_flags(value)
+            flags |= fvalue
+        mask |= fvalue
+    handle.set_flags(flags, mask)
 
-    return web.Response()
+    return web.json_response(build_flags_dict(handle.flags()))
+
+
+def get_lt_torrent_flags() -> List[str]:
+    return [f for f in dir(lt.torrent_flags) if not f.startswith('_') and f != 'default_flags']
+
+
+def build_flags_dict(flags: int) -> Dict[str, bool]:
+    ret = {}
+    for f in get_lt_torrent_flags():
+        ret[f] = bool(flags & getattr(lt.torrent_flags, f))
+    return ret
 
 
 @routes.get('/torrent/{tid}/flags')
@@ -203,11 +217,7 @@ async def get_flags(request):
     handle = get_valid_handle(core, tid)
 
     if flag is None:
-        ret = {}
-        for f in dir(lt.torrent_flags):
-            if f.startswith('_'):
-                continue
-            ret[f] = bool(handle.flags() & getattr(lt.torrent_flags, f))
+        ret = build_flags_dict(handle.flags())
     else:
         ret = bool(handle.flags() & getattr(lt.torrent_flags, flag))
 
