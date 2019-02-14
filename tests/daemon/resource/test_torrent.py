@@ -235,7 +235,7 @@ async def test_torrent_flags(cli):
     value = await r.json()
     assert not value
 
-    await cli.post(f'/torrent/{tid}/flags/auto_managed', json=True)
+    await cli.put(f'/torrent/{tid}/flags/auto_managed', json=True)
     r = await cli.get(f'/torrent/{tid}/flags')
     flags = await r.json()
     assert flags['auto_managed']
@@ -244,12 +244,12 @@ async def test_torrent_flags(cli):
     value = await r.json()
     assert value
 
-    r = await cli.post(f'/torrent/{tid}/flags', json={'auto_managed': False, 'super_seeding': True})
+    r = await cli.put(f'/torrent/{tid}/flags', json={'auto_managed': False, 'super_seeding': True})
     flags = await r.json()
     assert not flags['auto_managed']
     assert flags['super_seeding']
 
-    r = await cli.post(f'/torrent/{tid}/flags', json={'bad_flag': True})
+    r = await cli.put(f'/torrent/{tid}/flags', json={'bad_flag': True})
     assert r.status == 400
 
 

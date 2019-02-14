@@ -170,9 +170,9 @@ async def post_torrent(request):
     )
 
 
-@routes.post('/torrent/{tid}/flags')
-@routes.post('/torrent/{tid}/flags/{flag}')
-async def post_flags(request):
+@routes.put('/torrent/{tid}/flags')
+@routes.put('/torrent/{tid}/flags/{flag}')
+async def put_flags(request):
     core = request.app['spritzle.core']
     tid = request.match_info.get('tid')
     flag = request.match_info.get('flag', None)
