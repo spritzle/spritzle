@@ -242,6 +242,70 @@ Date: Tue, 08 May 2018 01:12:36 GMT
 Server: Python/3.6 aiohttp/3.1.3
 ```
 
+### /torrent/<info-hash>/flags
+
+#### GET
+                                    
+Returns a (string, bool) dictionary of the torrent flags.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/torrent/0175df556a2123361a55c1f72ad1aa73d03d7830/flags Authorization:$TOKEN
+HTTP/1.1 200 OK
+Content-Length: 320
+Content-Type: application/json; charset=utf-8
+Date: Thu, 14 Feb 2019 05:30:52 GMT
+Server: Python/3.7 aiohttp/3.5.4
+
+{
+    "apply_ip_filter": true,
+    "auto_managed": true,
+    "duplicate_is_error": false,
+    "override_trackers": false,
+    "override_web_seeds": false,
+    "paused": false,
+    "seed_mode": false,
+    "sequential_download": false,
+    "share_mode": false,
+    "stop_when_ready": false,
+    "super_seeding": false,
+    "update_subscribe": false,
+    "upload_mode": false
+}
+```
+#### PUT
+
+Change the flags by passing in a dictionary (string, bool).
+
+**Example**
+
+```shell
+$ http PUT http://localhost:8080/torrent/0175df556a2123361a55c1f72ad1aa73d03d7830/flags Authorization:$TOKEN auto_managed:=false share_mode:=true
+
+HTTP/1.1 200 OK
+Content-Length: 320
+Content-Type: application/json; charset=utf-8
+Date: Thu, 14 Feb 2019 06:03:57 GMT
+Server: Python/3.7 aiohttp/3.5.4
+
+{
+    "apply_ip_filter": true,
+    "auto_managed": false,
+    "duplicate_is_error": false,
+    "override_trackers": false,
+    "override_web_seeds": false,
+    "paused": false,
+    "seed_mode": false,
+    "sequential_download": false,
+    "share_mode": true,
+    "stop_when_ready": false,
+    "super_seeding": false,
+    "update_subscribe": false,
+    "upload_mode": false
+}
+```
+
 Core
 ----
 ### /core
