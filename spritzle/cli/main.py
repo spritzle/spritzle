@@ -29,17 +29,17 @@ class Client(object):
     def url(self, path):
         return f'http://{self.host}:{self.port}/{path}'
 
-    def do_command(self, cmd, *args):
-        async def _do_command(cmd, *args):
+    def do_command(self, cmd, *args, **kwargs):
+        async def _do_command(cmd, *args, **kwargs):
             headers = {
                 'Authorization': self.token,
             }
             async with aiohttp.ClientSession(headers=headers) as session:
                 self.session = session
-                await cmd(self, *args)
+                await cmd(self, *args, **kwargs)
 
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(_do_command(cmd, *args))
+        loop.run_until_complete(_do_command(cmd, *args, **kwargs))
 
 
 cmd_dir = Path(__file__).parent/'commands'
