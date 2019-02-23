@@ -194,7 +194,7 @@ async def put_flags(request):
         mask |= fvalue
     handle.set_flags(flags, mask)
 
-    return web.json_response(build_flags_dict(handle.flags()))
+    return web.json_response()
 
 
 def get_lt_torrent_flags() -> List[str]:
