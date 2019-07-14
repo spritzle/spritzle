@@ -44,18 +44,20 @@ from .logger import setup_logger
 
 @aiohttp.web.middleware
 async def debug_middleware(request, handler):
-    if request.content_type in ('application/x-www-form-urlencoded',
-                                'multipart/form-data'):
+    if request.content_type in (
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+    ):
         body = await request.post()
     else:
         body = await request.text()
-    log = request.app['spritzle.log']
-    log.debug('*' * 20 + 'REQUEST' + '*' * 20)
-    log.debug(f'URL: {request.rel_url}')
-    log.debug(f'METHOD: {request.method}')
-    log.debug(f'HEADERS: {request.headers}')
-    log.debug(f'BODY: {body}')
-    log.debug('*' * 47)
+    log = request.app["spritzle.log"]
+    log.debug("*" * 20 + "REQUEST" + "*" * 20)
+    log.debug(f"URL: {request.rel_url}")
+    log.debug(f"METHOD: {request.method}")
+    log.debug(f"HEADERS: {request.headers}")
+    log.debug(f"BODY: {body}")
+    log.debug("*" * 47)
     return await handler(request)
 
 
@@ -67,16 +69,19 @@ async def error_middleware(request, handler):
         response = ex
     except Exception:
         # Unhandled exception, this is a bug in Spritzle
-        tb = ''.join(traceback.format_exception(*sys.exc_info()))
-        response = aiohttp.web.Response(status=500, reason='Spritzle Bug',
-                                        text=tb)
+        tb = "".join(traceback.format_exception(*sys.exc_info()))
+        response = aiohttp.web.Response(status=500, reason="Spritzle Bug", text=tb)
     if response.status < 400:
         return response
-    return aiohttp.web.json_response({
-        'status': response.status,
-        'reason': response.reason,
-        'message': response.text
-    }, status=response.status, reason=response.reason)
+    return aiohttp.web.json_response(
+        {
+            "status": response.status,
+            "reason": response.reason,
+            "message": response.text,
+        },
+        status=response.status,
+        reason=response.reason,
+    )
 
 
 app = aiohttp.web.Application()
@@ -84,20 +89,20 @@ app = aiohttp.web.Application()
 
 def setup_app(app, core, log):
     config = core.config
-    if not config['auth_secret']:
-        config['auth_secret'] = secrets.token_hex()
+    if not config["auth_secret"]:
+        config["auth_secret"] = secrets.token_hex()
 
-    app['spritzle.log'] = log
-    app['spritzle.core'] = core
-    app['spritzle.config'] = config
+    app["spritzle.log"] = log
+    app["spritzle.core"] = core
+    app["spritzle.config"] = config
 
     app.middlewares.extend([error_middleware, debug_middleware])
 
     async def on_startup(app):
-        await app['spritzle.core'].start()
+        await app["spritzle.core"].start()
 
     async def on_shutdown(app):
-        await app['spritzle.core'].stop()
+        await app["spritzle.core"].stop()
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
@@ -110,33 +115,31 @@ def setup_app(app, core, log):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Spritzled')
-    parser.add_argument(
-        '--debug', dest='debug', default=False, action='store_true')
-    parser.add_argument('-p', '--port', dest='port', default=8080, type=int)
-    parser.add_argument('-c', '--config_dir', dest='config_dir', type=str)
-    parser.add_argument('-l', '--log-level', default='INFO',
-                        dest='log_level', type=str)
+    parser = argparse.ArgumentParser(description="Spritzled")
+    parser.add_argument("--debug", dest="debug", default=False, action="store_true")
+    parser.add_argument("-p", "--port", dest="port", default=8080, type=int)
+    parser.add_argument("-c", "--config_dir", dest="config_dir", type=str)
+    parser.add_argument("-l", "--log-level", default="INFO", dest="log_level", type=str)
     args = parser.parse_args()
 
-    log = setup_logger(name='spritzle', level=args.log_level)
-    log.info(f'spritzled starting.. args: {args}')
+    log = setup_logger(name="spritzle", level=args.log_level)
+    log.info(f"spritzled starting.. args: {args}")
 
     loop = asyncio.get_event_loop()
     loop.set_debug(args.debug)
 
-    config = Config('spritzle.conf', args.config_dir)
+    config = Config("spritzle.conf", args.config_dir)
 
     # Prevent more than one process using the same config path from running.
-    f = Path(config.path, 'spritzled.lock').open(mode='w')
+    f = Path(config.path, "spritzled.lock").open(mode="w")
     try:
         fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError as e:
-        log.error(f'Another instance of Spritzle is running: {e}')
-        log.error('Exiting..')
+        log.error(f"Another instance of Spritzle is running: {e}")
+        log.error("Exiting..")
         sys.exit(0)
 
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     app.middlewares.append(auth_middleware)
-    aiohttp.web.run_app(app)
+    aiohttp.web.run_app(app, port=args.port)
