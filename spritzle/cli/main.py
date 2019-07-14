@@ -16,13 +16,13 @@ class Client(object):
         self.host = host
         self.port = port
         self.config = Path(config)
+        self.token = token
+
         if not token and Path(self.config, "tokens").exists():
             with Path(self.config, "tokens").open() as f:
                 d = yaml.safe_load(f)
                 if f"{host}:{port}" in d:
                     self.token = d[f"{host}:{port}"]
-        else:
-            self.token = token
 
         self.session = None
 
