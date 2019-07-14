@@ -26,8 +26,11 @@ import logging
 
 log = logging.getLogger('spritzle')
 
+IGNORE_KEYS = (['states', 'handle', 'torrent_file'] +
+               list(lt.torrent_status.states.names.keys()))
 
-def struct_to_dict(struct, ignore_keys=None):
+
+def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
     """
     Convert a libtorrent struct into a dictionary by finding all
     attributes that do not start with '_'.

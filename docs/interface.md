@@ -83,7 +83,27 @@ A torrent resource contains all the information you would need to know about a t
 ### /torrent
 #### GET
 
-Returns a list of all info-hashes in the session.
+Returns a list of all info-hashes in the session, filtered by the query expression.
+
+The query string format is field=expression, where expression is different dependent upon the field's type. 
+
+##### Strings
+String operations are regular expressions.
+
+**Example**
+
+```shell
+$ http GET /torrent?info_hash=^44a04.*$
+```
+
+##### Numbers
+Number expressions can use one of six operators (<, >, =, !=, >=, <=) followed by a number.
+
+**Example**
+
+```shell
+$ http GET /torrent?block_size>=0
+```
 
 **Example**
 

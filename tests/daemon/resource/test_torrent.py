@@ -25,6 +25,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import libtorrent as lt
+import pytest
 
 from spritzle.daemon.resource import torrent
 from ..common import torrent_dir
@@ -62,6 +63,72 @@ async def test_get_torrent(cli):
 
     response = await cli.get('/torrent/' + 'a0'*20)
     assert response.status == 404
+
+
+async def test_get_torrent_query(cli):
+    info_hash = await test_post_torrent(cli)
+
+    response = await cli.get('/torrent?info_hash=^44a0.*$')
+    assert response.status == 200
+
+    torrents = await response.json()
+    assert torrents == [info_hash]
+
+    response = await cli.get('/torrent?info_hash=^64a0.*$')
+    assert response.status == 200
+
+    torrents = await response.json()
+    assert len(torrents) == 0
+
+    response = await cli.get('/torrent?block_size=>0')
+    assert response.status == 200
+    torrents = await response.json()
+    assert len(torrents) == 1
+
+    response = await cli.get('/torrent?block_size=<16384')
+    assert response.status == 200
+    torrents = await response.json()
+    assert len(torrents) == 0
+
+    response = await cli.get('/torrent?block_size==16384')
+    assert response.status == 200
+    torrents = await response.json()
+    assert len(torrents) == 1
+
+
+@pytest.mark.parametrize('query,want', [
+    ({'string': '.*oo.*'}, ['t2', 't3']),
+    ({'string': '.*oo.*', 'int': '>=10'}, ['t2']),
+    ({'float': '>500.0', 'int': '<0'}, ['t3']),
+    ({'int': '>=400'}, []),
+    ({'string': '.*r.*', 'bool': 'true'}, ['t1', 't3']),
+])
+def test_get_torrent_list_by_query(query, want):
+    statuses = [
+        {
+            'info_hash': 't1',
+            'string': 'stringvalue',
+            'int': 100,
+            'float': 50.0,
+            'bool': True,
+        },
+        {
+            'info_hash': 't2',
+            'string': 'foobar',
+            'int': 10,
+            'float': 500.0,
+            'bool': False,
+        },
+        {
+            'info_hash': 't3',
+            'string': 'raboof',
+            'int': -1,
+            'float': 5000.0,
+            'bool': True,
+        },
+    ]
+    torrents = torrent.get_torrent_list_by_query(query, statuses)
+    assert torrents == want
 
 
 async def test_post_torrent(cli):
