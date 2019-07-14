@@ -29,35 +29,35 @@ from spritzle.daemon.hooks import Hooks
 def test_find_hooks():
     with tempfile.TemporaryDirectory() as tmpdir:
         h = Hooks(tmpdir)
-        hooks = h.find_hooks('foobar')
+        hooks = h.find_hooks("foobar")
         assert len(hooks) == 0
 
-        Path(tmpdir, '_foobar').touch()
-        hooks = h.find_hooks('foobar')
+        Path(tmpdir, "_foobar").touch()
+        hooks = h.find_hooks("foobar")
         assert len(hooks) == 0
-        Path(tmpdir, '_foobar').unlink()
+        Path(tmpdir, "_foobar").unlink()
 
-        Path(tmpdir, 'foobar', exist_ok=True).mkdir()
-        hooks = h.find_hooks('foobar')
+        Path(tmpdir, "foobar", exist_ok=True).mkdir()
+        hooks = h.find_hooks("foobar")
         assert len(hooks) == 0
-        Path(tmpdir, 'foobar').rmdir()
+        Path(tmpdir, "foobar").rmdir()
 
-        Path(tmpdir, 'foobar').touch()
-        hooks = h.find_hooks('foobar')
+        Path(tmpdir, "foobar").touch()
+        hooks = h.find_hooks("foobar")
         assert len(hooks) == 0
-        Path(tmpdir, 'foobar').unlink()
+        Path(tmpdir, "foobar").unlink()
 
-        Path(tmpdir, '100_foobar').touch(mode=0o777)
-        Path(tmpdir, 'foobar').touch(mode=0o777)
-        hooks = h.find_hooks('foobar')
+        Path(tmpdir, "100_foobar").touch(mode=0o777)
+        Path(tmpdir, "foobar").touch(mode=0o777)
+        hooks = h.find_hooks("foobar")
         assert len(hooks) == 2
-        assert hooks[0] == Path(tmpdir, '100_foobar')
+        assert hooks[0] == Path(tmpdir, "100_foobar")
 
 
 async def test_run_hook_success():
     with tempfile.TemporaryDirectory() as tmpdir:
-        p = Path(tmpdir, 'foobar')
-        p.write_bytes(b'#!/bin/sh\nexit 0')
+        p = Path(tmpdir, "foobar")
+        p.write_bytes(b"#!/bin/sh\nexit 0")
         p.chmod(0o777)
         h = Hooks(tmpdir)
         await h.run_hook(p)
@@ -65,8 +65,8 @@ async def test_run_hook_success():
 
 async def test_run_hook_fail():
     with tempfile.TemporaryDirectory() as tmpdir:
-        p = Path(tmpdir, 'foobar')
-        p.write_bytes(b'#!/bin/sh\nexit 1')
+        p = Path(tmpdir, "foobar")
+        p.write_bytes(b"#!/bin/sh\nexit 1")
         p.chmod(0o777)
         h = Hooks(tmpdir)
         await h.run_hook(p)

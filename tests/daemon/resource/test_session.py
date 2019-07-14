@@ -22,35 +22,34 @@
 
 
 async def test_get_session_stats(cli):
-    response = await cli.get('/session/stats')
+    response = await cli.get("/session/stats")
     s = await response.json()
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
 async def test_get_session_dht(cli):
-    response = await cli.get('/session/dht')
+    response = await cli.get("/session/dht")
     b = await response.json()
     assert isinstance(b, bool)
 
 
 async def test_get_settings(cli):
-    response = await cli.get('/session/settings')
+    response = await cli.get("/session/settings")
     s = await response.json()
     assert isinstance(s, dict)
     assert len(s) > 0
 
 
 async def test_put_settings(cli):
-    response = await cli.get('/session/settings')
+    response = await cli.get("/session/settings")
     old = await response.json()
-    test_key = 'peer_connect_timeout'
+    test_key = "peer_connect_timeout"
 
-    response = await cli.put('/session/settings',
-                             json={test_key: old[test_key] + 1})
+    response = await cli.put("/session/settings", json={test_key: old[test_key] + 1})
     assert response.status == 200
 
-    response = await cli.get('/session/settings')
+    response = await cli.get("/session/settings")
     new = await response.json()
 
     assert old[test_key] != new[test_key]
@@ -58,10 +57,10 @@ async def test_put_settings(cli):
 
 
 async def test_put_settings_bad_key(cli):
-    response = await cli.put('/session/settings', json={'bad_key': 1})
+    response = await cli.put("/session/settings", json={"bad_key": 1})
     assert response.status == 400
 
 
 async def test_put_settings_type_coercion(cli):
-    response = await cli.put('/session/settings', json={'peer_connect_timeout': '1'})
+    response = await cli.put("/session/settings", json={"peer_connect_timeout": "1"})
     assert response.status == 200

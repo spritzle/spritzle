@@ -25,7 +25,7 @@ import logging
 
 import libtorrent as lt
 
-log = logging.getLogger('spritzle')
+log = logging.getLogger("spritzle")
 
 
 class AlertException(Exception):
@@ -38,14 +38,23 @@ class Torrent(object):
         self.core = core
         self.remove_torrent_futures = {}
         self.delete_torrent_futures = {}
-        self.core.alert.register_handler('torrent_removed_alert', self._on_torrent_removed_alert)
-        self.core.alert.register_handler('torrent_deleted_alert', self._on_torrent_deleted_alert)
-        self.core.alert.register_handler('torrent_delete_failed_alert', self._on_torrent_delete_failed_alert)
+        self.core.alert.register_handler(
+            "torrent_removed_alert", self._on_torrent_removed_alert
+        )
+        self.core.alert.register_handler(
+            "torrent_deleted_alert", self._on_torrent_deleted_alert
+        )
+        self.core.alert.register_handler(
+            "torrent_delete_failed_alert", self._on_torrent_delete_failed_alert
+        )
 
     async def remove(self, torrent_handle, options=0):
         info_hash = str(torrent_handle.info_hash())
 
-        if info_hash not in self.remove_torrent_futures and info_hash not in self.delete_torrent_futures:
+        if (
+            info_hash not in self.remove_torrent_futures
+            and info_hash not in self.delete_torrent_futures
+        ):
             self.remove_torrent_futures[info_hash] = asyncio.Future()
             if options & lt.options_t.delete_files:
                 self.delete_torrent_futures[info_hash] = asyncio.Future()

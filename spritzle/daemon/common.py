@@ -24,10 +24,11 @@ import datetime
 import libtorrent as lt
 import logging
 
-log = logging.getLogger('spritzle')
+log = logging.getLogger("spritzle")
 
-IGNORE_KEYS = (['states', 'handle', 'torrent_file'] +
-               list(lt.torrent_status.states.names.keys()))
+IGNORE_KEYS = ["states", "handle", "torrent_file"] + list(
+    lt.torrent_status.states.names.keys()
+)
 
 
 def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
@@ -50,11 +51,11 @@ def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
 
     def error_code(value):
         return {
-            'value': value.value(),
-            'message': value.message(),
-            'category': {
-                'name': value.category().name(),
-                'message': value.category().message(value.value()),
+            "value": value.value(),
+            "message": value.message(),
+            "category": {
+                "name": value.category().name(),
+                "message": value.category().message(value.value()),
             },
         }
 
@@ -66,7 +67,7 @@ def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
     }
 
     d = {}
-    keys = [x for x in dir(struct) if not x.startswith('_')]
+    keys = [x for x in dir(struct) if not x.startswith("_")]
 
     for key in keys:
         if ignore_keys and key in ignore_keys:
@@ -80,10 +81,8 @@ def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
             value = type_converters[vtype](value)
 
         # Skip values that cannot be json encoded
-        if (type(value) not in (dict, list, str, int, float, bool) and
-                value is not None):
-            log.debug(
-                f'skipping key: {key} type: {type(value)} value: {value}')
+        if type(value) not in (dict, list, str, int, float, bool) and value is not None:
+            log.debug(f"skipping key: {key} type: {type(value)} value: {value}")
             continue
 
         d[key] = value

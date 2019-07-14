@@ -22,5 +22,5 @@
 
 from pathlib import Path
 
-resume_data_dir = Path(__file__).resolve().parent / 'resume_data'
-torrent_dir = Path(__file__).resolve().parent / 'torrents'
+resume_data_dir = Path(__file__).resolve().parent / "resume_data"
+torrent_dir = Path(__file__).resolve().parent / "torrents"

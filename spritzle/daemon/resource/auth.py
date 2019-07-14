@@ -29,51 +29,42 @@ from aiohttp import web
 routes = web.RouteTableDef()
 
 
-@routes.post('/auth')
+@routes.post("/auth")
 async def post_auth(request):
-    config = request.app['spritzle.config']
+    config = request.app["spritzle.config"]
     try:
         post = await request.json()
     except JSONDecodeError as ex:
-        raise web.HTTPBadRequest(
-            reason='Invalid JSON',
-            text=ex.msg
-        )
+        raise web.HTTPBadRequest(reason="Invalid JSON", text=ex.msg)
 
-    if post.get('password', None) != config['auth_password']:
-        raise web.HTTPUnauthorized(reason='Incorrect password')
+    if post.get("password", None) != config["auth_password"]:
+        raise web.HTTPUnauthorized(reason="Incorrect password")
 
-    payload = {
-       'exp': (datetime.utcnow() +
-               timedelta(seconds=config['auth_timeout']))
-    }
+    payload = {"exp": (datetime.utcnow() + timedelta(seconds=config["auth_timeout"]))}
 
-    jwt_token = jwt.encode(payload, config['auth_secret'], 'HS256')
+    jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
 
-    return web.json_response({'token': jwt_token.decode('utf8')})
+    return web.json_response({"token": jwt_token.decode("utf8")})
 
 
 @web.middleware
 async def auth_middleware(request, handler):
-    config = request.app['spritzle.config']
+    config = request.app["spritzle.config"]
 
-    peername = request.transport.get_extra_info('peername')
-    if peername and peername[0] in config['auth_allow_hosts']:
+    peername = request.transport.get_extra_info("peername")
+    if peername and peername[0] in config["auth_allow_hosts"]:
         return await handler(request)
 
-    if request.rel_url.path == '/auth':
+    if request.rel_url.path == "/auth":
         return await handler(request)
 
-    jwt_token = request.headers.get('authorization', None)
+    jwt_token = request.headers.get("authorization", None)
     if jwt_token is None:
-        raise web.HTTPUnauthorized(reason='Authorization token required')
+        raise web.HTTPUnauthorized(reason="Authorization token required")
 
     try:
-        jwt.decode(
-            jwt_token,
-            config['auth_secret'],
-            algorithms=['HS256'])
+        jwt.decode(jwt_token, config["auth_secret"], algorithms=["HS256"])
     except (jwt.DecodeError, jwt.ExpiredSignatureError):
-        raise web.HTTPUnauthorized(reason='Token is invalid')
+        raise web.HTTPUnauthorized(reason="Token is invalid")
 
     return await handler(request)

@@ -25,9 +25,10 @@ from aiohttp import web
 routes = web.RouteTableDef()
 
 
-@routes.delete('/core')
+@routes.delete("/core")
 async def delete_core(request):
     def shutdown():
         raise web.GracefulExit()
+
     request.loop.call_soon(shutdown)
     return web.Response()

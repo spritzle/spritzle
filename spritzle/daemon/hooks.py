@@ -26,7 +26,7 @@ import os
 import logging
 import subprocess
 
-log = logging.getLogger('spritzle')
+log = logging.getLogger("spritzle")
 
 
 class Hooks:
@@ -49,15 +49,23 @@ class Hooks:
         return sorted(hooks)
 
     async def run_hook(self, hook, *args):
-        log.info(f'run_hook start hook={hook} args={args}')
+        log.info(f"run_hook start hook={hook} args={args}")
         try:
-            p = subprocess.run([hook, *args], check=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.run(
+                [hook, *args],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
         except subprocess.CalledProcessError as e:
-            log.error((f'run_hook fail retcode={e.returncode} cmd={e.cmd}'
-                       f' output={e.output}'))
+            log.error(
+                (
+                    f"run_hook fail retcode={e.returncode} cmd={e.cmd}"
+                    f" output={e.output}"
+                )
+            )
         else:
-            log.info(f'run_hook success args={p.args}')
+            log.info(f"run_hook success args={p.args}")
 
     def run_hooks(self, hook_name, *args):
         for hook in self.find_hooks(hook_name):

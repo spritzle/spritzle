@@ -24,21 +24,21 @@ import libtorrent as lt
 
 
 async def test_save_session_state(core):
-    state_file = core.state_dir / 'session.state'
+    state_file = core.state_dir / "session.state"
     await core.start()
     assert not state_file.is_file()
     await core.save_session_state()
     assert state_file.is_file()
-    with state_file.open(mode='rb') as f:
+    with state_file.open(mode="rb") as f:
         data = lt.bdecode(f.read())
-        assert b'settings' in data
+        assert b"settings" in data
 
 
 async def test_torrent_data(cli, core):
-    info_hash = '44a040be6d74d8d290cd20128788864cbf770719'
-    torrent_address = str(cli.make_url('/test_torrents/random_one_file.torrent'))
+    info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
     assert not core.torrent_data
-    await cli.post('/torrent', json={'url': torrent_address})
+    await cli.post("/torrent", json={"url": torrent_address})
     assert info_hash in core.torrent_data
-    await cli.delete('/torrent/44a040be6d74d8d290cd20128788864cbf770719')
+    await cli.delete("/torrent/44a040be6d74d8d290cd20128788864cbf770719")
     assert not core.torrent_data

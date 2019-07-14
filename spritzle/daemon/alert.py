@@ -25,12 +25,12 @@ import logging
 
 import libtorrent as lt
 
-log = logging.getLogger('spritzle')
+log = logging.getLogger("spritzle")
 
 
 async def debug_handler(alert):
-    if type(alert).__name__ not in ['stats_alert']:
-        log.debug(f'{type(alert).__name__} {alert}')
+    if type(alert).__name__ not in ["stats_alert"]:
+        log.debug(f"{type(alert).__name__} {alert}")
 
 
 def build_categories():
@@ -38,7 +38,7 @@ def build_categories():
     # handlers.
     categories = {}
     for c in dir(lt.alert.category_t):
-        if not c.startswith('__'):
+        if not c.startswith("__"):
             categories[c] = getattr(lt.alert.category_t, c)
     return categories
 
@@ -61,40 +61,37 @@ def build_alert_types():
 
 
 class Alert(object):
-
     def __init__(self):
         self.session = None
         self.loop = asyncio.get_event_loop()
         self.pop_alerts_task = None
         self.run = False
         self.event = asyncio.Event()
-        self.handlers = {
-            'all_categories': [debug_handler],
-        }
+        self.handlers = {"all_categories": [debug_handler]}
         self.categories = build_categories()
         self.alert_types = build_alert_types()
 
     async def start(self, session):
-        log.debug('Alert starting..')
+        log.debug("Alert starting..")
         self.session = session
         self.run = True
         self.pop_alerts_task = self.loop.create_task(self.pop_alerts())
         self.session.set_alert_notify(self.alert_notify)
 
     async def stop(self):
-        log.debug('Alert stopping..')
+        log.debug("Alert stopping..")
         self.run = False
         self.event.set()
         await asyncio.sleep(0)
         if self.pop_alerts_task:
             await self.pop_alerts_task
-        log.debug('Alert stopped.')
+        log.debug("Alert stopped.")
 
     def register_handler(self, alert_type, handler):
         if alert_type not in self.alert_types and alert_type not in self.categories:
-            raise ValueError('Not a valid alert type or category.')
+            raise ValueError("Not a valid alert type or category.")
         if not asyncio.iscoroutinefunction(handler):
-            raise ValueError('Alert handlers must by coroutine functions.')
+            raise ValueError("Alert handlers must by coroutine functions.")
         self.handlers.setdefault(alert_type, []).append(handler)
 
     def alert_notify(self):

@@ -29,60 +29,60 @@ from spritzle.daemon.resource import auth
 @pytest.fixture
 def cli(loop, core, app, aiohttp_client):
     config = {
-        'auth_password': 'password',
-        'auth_timeout': 120,
-        'auth_secret': 'secret',
-        'auth_allow_hosts': [],
+        "auth_password": "password",
+        "auth_timeout": 120,
+        "auth_secret": "secret",
+        "auth_allow_hosts": [],
     }
     core.config.data = config
 
     async def get_nothing(request):
         return aiohttp.web.Response()
 
-    app.router.add_route('GET', '/', get_nothing)
+    app.router.add_route("GET", "/", get_nothing)
     app.middlewares.append(auth.auth_middleware)
     return loop.run_until_complete(aiohttp_client(app))
 
 
 async def test_post_auth(core, cli):
     config = {
-        'auth_password': 'password',
-        'auth_timeout': 120,
-        'auth_secret': 'secret',
-        'auth_allowed_hosts': [],
+        "auth_password": "password",
+        "auth_timeout": 120,
+        "auth_secret": "secret",
+        "auth_allowed_hosts": [],
     }
     core.config.data = config
-    response = await cli.post('/auth', json={'password': 'password'})
+    response = await cli.post("/auth", json={"password": "password"})
     assert response.status == 200
 
-    response = await cli.post('/auth', json={'password': 'badpassword'})
+    response = await cli.post("/auth", json={"password": "badpassword"})
     assert response.status == 401
 
 
 async def test_auth_middleware(cli):
-    response = await cli.get('/')
+    response = await cli.get("/")
     assert response.status == 401
-    assert response.reason == 'Authorization token required'
+    assert response.reason == "Authorization token required"
 
-    response = await cli.get('/', headers={'authorization': 'badtoken'})
+    response = await cli.get("/", headers={"authorization": "badtoken"})
     assert response.status == 401
-    assert response.reason == 'Token is invalid'
+    assert response.reason == "Token is invalid"
 
-    response = await cli.post('/auth', json={'password': 'password'})
+    response = await cli.post("/auth", json={"password": "password"})
     data = await response.json()
-    token = data['token']
+    token = data["token"]
 
-    response = await cli.get('/', headers={'authorization': token})
+    response = await cli.get("/", headers={"authorization": token})
     assert response.status == 200
 
 
 async def test_auth_allow_hosts(core, cli):
-    core.config['auth_allow_hosts'] = []
+    core.config["auth_allow_hosts"] = []
 
-    response = await cli.get('/')
+    response = await cli.get("/")
     assert response.status == 401
 
-    core.config['auth_allow_hosts'] = ['127.0.0.1']
+    core.config["auth_allow_hosts"] = ["127.0.0.1"]
 
-    response = await cli.get('/')
+    response = await cli.get("/")
     assert response.status == 200

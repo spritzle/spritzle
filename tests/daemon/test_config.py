@@ -29,12 +29,11 @@ from spritzle.daemon.config import Config
 
 
 def test_config_init_no_dir():
-    tmpdir = Path(tempfile.gettempdir(), 'spritzletmpdir')
-    with patch('pathlib.Path.home', return_value=tmpdir):
+    tmpdir = Path(tempfile.gettempdir(), "spritzletmpdir")
+    with patch("pathlib.Path.home", return_value=tmpdir):
         c = Config()
 
-    assert c.config_file == Path(
-        tmpdir, '.config', 'spritzle', 'spritzled.conf')
+    assert c.config_file == Path(tmpdir, ".config", "spritzle", "spritzled.conf")
 
     assert c.config_file.is_file()
 
@@ -49,7 +48,7 @@ def test_config_init_with_dir():
 def test_config_save():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
-        c['foo'] = 1
+        c["foo"] = 1
         c.save()
         old = c.data
         c.load()
@@ -57,9 +56,9 @@ def test_config_save():
 
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir, in_memory=True)
-        c['foo'] = 1
+        c["foo"] = 1
         c.save()
-        assert not Path(tempdir, 'spritzle.conf').exists()
+        assert not Path(tempdir, "spritzle.conf").exists()
 
 
 def test_config_load():
@@ -67,7 +66,7 @@ def test_config_load():
         c = Config(config_dir=tempdir)
         c.load()
         assert c.data == {}
-        c['foo'] = 1
+        c["foo"] = 1
         old = c.data
         c.load()
         assert c.data == old
@@ -81,54 +80,54 @@ def test_len():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         assert len(c) == 0
-        c['foo'] = 1
+        c["foo"] = 1
         assert len(c) == 1
-        c['bar'] = 1
+        c["bar"] = 1
         assert len(c) == 2
 
 
 def test_iter():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
-        c['foo'] = 1
-        assert next(iter(c)) == 'foo'
+        c["foo"] = 1
+        assert next(iter(c)) == "foo"
 
 
 def test_delitem():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
-        c['foo'] = 1
-        del c['foo']
-        assert 'foo' not in c
+        c["foo"] = 1
+        del c["foo"]
+        assert "foo" not in c
 
 
 def test_get():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
-        assert c.get('foo') is None
-        assert c.get('foo', 1) == 1
-        c['foo'] = 2
-        assert c.get('foo') == 2
+        assert c.get("foo") is None
+        assert c.get("foo", 1) == 1
+        c["foo"] = 2
+        assert c.get("foo") == 2
 
 
 def test_initial():
-    c = Config(in_memory=True, initial={'foo': 1})
-    assert c.get('foo') == 1
+    c = Config(in_memory=True, initial={"foo": 1})
+    assert c.get("foo") == 1
 
 
 def test_defaults():
-    c = Config(in_memory=True, defaults={'foo': 1})
-    assert c.get('foo') == 1
-    c['foo'] = 2
-    assert c.get('foo') == 2
-    del c['foo']
-    assert c.get('foo') == 1
+    c = Config(in_memory=True, defaults={"foo": 1})
+    assert c.get("foo") == 1
+    c["foo"] = 2
+    assert c.get("foo") == 2
+    del c["foo"]
+    assert c.get("foo") == 1
 
 
 def test_init_load():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
-        c['foo'] = 1
+        c["foo"] = 1
         c.save()
         c = Config(config_dir=tempdir)
-        assert c.get('foo') == 1
+        assert c.get("foo") == 1

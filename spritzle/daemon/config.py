@@ -25,18 +25,24 @@ import collections.abc
 from pathlib import Path
 
 DEFAULTS = {
-    'add_torrent_params.save_path': '',
-    'auth_password': 'password',
-    'auth_secret': '',
-    'auth_timeout': 120,
-    'auth_allow_hosts': ['127.0.0.1'],
-    'resume_data_save_frequency': 60,
+    "add_torrent_params.save_path": "",
+    "auth_password": "password",
+    "auth_secret": "",
+    "auth_timeout": 120,
+    "auth_allow_hosts": ["127.0.0.1"],
+    "resume_data_save_frequency": 60,
 }
 
 
 class Config(collections.abc.MutableMapping):
-    def __init__(self, filename='spritzled.conf', config_dir=None,
-                 defaults=None, in_memory=False, initial=None):
+    def __init__(
+        self,
+        filename="spritzled.conf",
+        config_dir=None,
+        defaults=None,
+        in_memory=False,
+        initial=None,
+    ):
 
         self.in_memory = in_memory
         self.defaults = defaults or DEFAULTS
@@ -45,7 +51,7 @@ class Config(collections.abc.MutableMapping):
             self.data.update(initial)
 
         if config_dir is None:
-            self.path = Path(Path.home(), '.config', 'spritzle')
+            self.path = Path(Path.home(), ".config", "spritzle")
         else:
             self.path = Path(config_dir)
 
@@ -69,18 +75,19 @@ class Config(collections.abc.MutableMapping):
         if self.in_memory:
             return
 
-        with self.config_file.open(mode='w') as f:
+        with self.config_file.open(mode="w") as f:
             f.write(
-                '''#
+                """#
 # Configuration file for Spritzle. The format is YAML.
 #
 # Default values:
 #
-''')
+"""
+            )
             for key, value in sorted(self.defaults.items()):
-                f.write(f'# {key}: {value}\n')
+                f.write(f"# {key}: {value}\n")
 
-            f.write('#\n# Overrides should be made below this line\n\n')
+            f.write("#\n# Overrides should be made below this line\n\n")
             if self.data:
                 for k, v in sorted(self.data.items()):
                     yaml.safe_dump({k: v}, f, default_flow_style=False)

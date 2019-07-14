@@ -22,9 +22,9 @@
 
 
 async def test_get_config(core, cli):
-    config_data = {'key1': 'value1'}
+    config_data = {"key1": "value1"}
     core.config.data = config_data
-    response = await cli.get('/config')
+    response = await cli.get("/config")
     data = await response.json()
 
     assert data == config_data
@@ -35,7 +35,7 @@ async def test_put_config(core, cli):
     new_config = {"key2": "value2"}
     core.config.data = orig_config
 
-    response = await cli.put('/config', json=new_config)
+    response = await cli.put("/config", json=new_config)
     assert response.status == 200
     assert core.config.data == new_config
 
@@ -46,6 +46,6 @@ async def test_patch_config(core, cli):
     new_config = {**orig_config, **patch_config}
     core.config.data = orig_config
 
-    response = await cli.patch('/config', json=patch_config)
+    response = await cli.patch("/config", json=patch_config)
     assert response.status == 200
     assert core.config.data == new_config

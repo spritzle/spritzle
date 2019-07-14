@@ -23,20 +23,20 @@
 from setuptools import setup
 
 setup(
-    name='spritzle',
-    version='0.1',
-    fullname='Spritzle Bittorrent Client',
-    description='Lightweight Bitorrent Client',
-    author='Andrew Resch',
-    author_email='andrewresch@gmail.com',
-    keywords='torrent bittorrent p2p fileshare filesharing',
-    url='http://github.com/spritzle/spritzle',
-    license='GPLv3',
-    packages=['spritzle.daemon', 'spritzle.cli'],
+    name="spritzle",
+    version="0.1",
+    fullname="Spritzle Bittorrent Client",
+    description="Lightweight Bitorrent Client",
+    author="Andrew Resch",
+    author_email="andrewresch@gmail.com",
+    keywords="torrent bittorrent p2p fileshare filesharing",
+    url="http://github.com/spritzle/spritzle",
+    license="GPLv3",
+    packages=["spritzle.daemon", "spritzle.cli"],
     entry_points={
-        'console_scripts': [
-            'spritzled = spritzle.daemon.main:main',
-            'spritzle = spritzle.cli.main:cli',
+        "console_scripts": [
+            "spritzled = spritzle.daemon.main:main",
+            "spritzle = spritzle.cli.main:cli",
         ]
     },
 )

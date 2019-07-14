@@ -25,15 +25,15 @@ from aiohttp import web
 routes = web.RouteTableDef()
 
 
-@routes.get('/session/settings')
+@routes.get("/session/settings")
 async def get_session_settings(request):
-    core = request.app['spritzle.core']
+    core = request.app["spritzle.core"]
     return web.json_response(core.session.get_settings())
 
 
-@routes.put('/session/settings')
+@routes.put("/session/settings")
 async def put_session_settings(request):
-    core = request.app['spritzle.core']
+    core = request.app["spritzle.core"]
     settings = await request.json()
     current = core.session.get_settings()
 
@@ -50,14 +50,14 @@ async def put_session_settings(request):
     return web.json_response()
 
 
-@routes.get('/session/stats')
+@routes.get("/session/stats")
 async def get_session_stats(request):
-    core = request.app['spritzle.core']
+    core = request.app["spritzle.core"]
     stats = await core.get_session_stats()
     return web.json_response(stats)
 
 
-@routes.get('/session/dht')
+@routes.get("/session/dht")
 async def get_session_dht(request):
-    core = request.app['spritzle.core']
+    core = request.app["spritzle.core"]
     return web.json_response(core.session.is_dht_running())

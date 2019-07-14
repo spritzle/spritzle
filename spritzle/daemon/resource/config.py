@@ -27,31 +27,31 @@ from aiohttp import web
 routes = web.RouteTableDef()
 
 
-@routes.get('/config')
+@routes.get("/config")
 async def get_config(request):
-    config = request.app['spritzle.config']
+    config = request.app["spritzle.config"]
     return web.json_response(dict(config))
 
 
-@routes.put('/config')
+@routes.put("/config")
 async def put_config(request):
-    config = request.app['spritzle.config']
+    config = request.app["spritzle.config"]
     try:
         new_values = await request.json()
     except JSONDecodeError as e:
-        raise web.HTTPBadRequest(text=f'Invalid JSON body: {e}')
+        raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
     config.data = new_values
     config.save()
     return web.Response()
 
 
-@routes.patch('/config')
+@routes.patch("/config")
 async def patch_config(request):
-    config = request.app['spritzle.config']
+    config = request.app["spritzle.config"]
     try:
         new_values = await request.json()
     except JSONDecodeError as e:
-        raise web.HTTPBadRequest(text=f'Invalid JSON body: {e}')
+        raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
     config.update(new_values)
     config.save()
     return web.Response()

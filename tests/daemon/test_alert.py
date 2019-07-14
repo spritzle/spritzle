@@ -36,7 +36,6 @@ class CategoryT:
 
 
 class AlertTest:
-
     def what(self):
         return self.__class__.__name__
 
@@ -49,7 +48,6 @@ class AlertTestOne(AlertTest):
 
 
 class AlertTestTwo(AlertTest):
-
     def category(self):
         return 2
 
@@ -70,25 +68,25 @@ async def test_pop_alerts(monkeypatch):
     alert_test_one = AlertTestOne()
     alert_test_two = AlertTestTwo()
 
-    session.configure_mock(**{
-        'pop_alerts.return_value': [alert_test_one, alert_test_two],
-    })
+    session.configure_mock(
+        **{"pop_alerts.return_value": [alert_test_one, alert_test_two]}
+    )
 
-    monkeypatch.setattr('libtorrent.alert.category_t', CategoryT)
+    monkeypatch.setattr("libtorrent.alert.category_t", CategoryT)
     a = spritzle.daemon.alert.Alert()
-    a.alert_types = ['AlertTestOne', 'AlertTestTwo', 'AlertTestThree']
+    a.alert_types = ["AlertTestOne", "AlertTestTwo", "AlertTestThree"]
 
     handler_one = asynctest.CoroutineMock()
-    a.register_handler('AlertTestOne', handler_one)
-    assert 'AlertTestOne' in a.handlers
+    a.register_handler("AlertTestOne", handler_one)
+    assert "AlertTestOne" in a.handlers
 
     handler_two = asynctest.CoroutineMock()
-    a.register_handler('AlertTestTwo', handler_two)
-    assert 'AlertTestTwo' in a.handlers
+    a.register_handler("AlertTestTwo", handler_two)
+    assert "AlertTestTwo" in a.handlers
 
     handler_three = asynctest.CoroutineMock()
-    a.register_handler('test_category1', handler_three)
-    assert 'test_category1' in a.handlers
+    a.register_handler("test_category1", handler_three)
+    assert "test_category1" in a.handlers
 
     await a.start(session)
     a.event.set()
@@ -109,9 +107,9 @@ async def test_handler_validation():
         pass
 
     a = spritzle.daemon.alert.Alert()
-    valid_alert_type = 'torrent_paused_alert'
-    valid_category = 'storage_notification'
-    invalid_alert_type = 'invalid_alert_type'
+    valid_alert_type = "torrent_paused_alert"
+    valid_category = "storage_notification"
+    invalid_alert_type = "invalid_alert_type"
 
     # Verify a valid handler doesn't raise anything
     a.register_handler(valid_alert_type, valid_handler)
