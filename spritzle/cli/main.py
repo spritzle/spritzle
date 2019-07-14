@@ -12,7 +12,7 @@ CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
 
 class Client(object):
-    def __init__(self, host, port, config, token):
+    def __init__(self, host: str, port: int, config: str, token: str):
         self.host = host
         self.port = port
         self.config = Path(config)
