@@ -75,6 +75,14 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
 
     for status in statuses:
         for key, value in query.items():
+            # Key's can have an operator as a '.' separated suffix. If the key is in the status dict it means it's valid
+            # and does not have an operator.
+            if key in status:
+                op = ""
+            else:
+                op = key.rsplit(".", 1)[-1]
+                key = key.rsplit(".", 1)[:-1][0]
+
             if not isinstance(key, str):
                 raise web.HTTPBadRequest(reason=f"Key {key} must be string type.")
             if not isinstance(value, str):
@@ -90,7 +98,7 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                 m = re.match(r"(?P<value>^true$|^false$)", value)
                 if m is None:
                     raise web.HTTPBadRequest(
-                        reason=f"Invalid query for boolean type: {key}={value}"
+                        reason=f"Invalid query for boolean type: {key}={value}, value must be either 'true' or 'false'."
                     )
                 if m.group("value") == "true" and not status[key]:
                     break
@@ -98,34 +106,26 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                     break
 
             elif isinstance(status[key], int) or isinstance(status[key], float):
-                m = re.match(r"(?P<op>[=<>]+)\s*(?P<value>\d+(\.\d*)?)", value)
-                if m is None:
-                    raise web.HTTPBadRequest(
-                        reason=f"Invalid query for number type: {key}={value}"
-                    )
-                op, opval = m.groups()[:2]
                 ops = {
-                    "<": operator.lt,
-                    ">": operator.gt,
-                    "=": operator.eq,
-                    "!=": operator.ne,
-                    ">=": operator.ge,
-                    "<=": operator.le,
+                    "": operator.eq,
+                    "lt": operator.lt,
+                    "gt": operator.gt,
+                    "ne": operator.ne,
+                    "ge": operator.ge,
+                    "le": operator.le,
                 }
                 if op not in ops:
                     raise web.HTTPBadRequest(
-                        reason=f"Invalid operator {op}, must provide valid operator {ops.keys()}"
+                        reason=f"Invalid operator {op}, must provide valid operator: {ops.keys()}"
                     )
-                if not ops[op](status[key], float(opval)):
+                if not ops[op](status[key], float(value)):
                     break
             elif isinstance(status[key], list):
-                m = re.match(r"(?P<op>^all|^any|^in)\((?P<value>[\w,]+)\)", value)
-                if m is None:
+                ops = ["all", "any", "in"]
+                if op not in ops:
                     raise web.HTTPBadRequest(
-                        reason=f"Invalid query for list type: {key}={value}"
+                        reason=f"Invalid operator {op}, must provide valid operator: {ops}"
                     )
-                op = m.group("op")
-                opval = m.group("value").split(",")
 
                 # TODO: Implement list operations
                 if op == "all":

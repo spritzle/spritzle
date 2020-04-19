@@ -85,7 +85,7 @@ A torrent resource contains all the information you would need to know about a t
 
 Returns a list of all info-hashes in the session, filtered by the query expression.
 
-The query string format is field=expression, where expression is different dependent upon the field's type. 
+The query string format is field.operator=expression, where expression is different dependent upon the field's type and operator is the last '.' separated field of the key.
 
 ##### Strings
 String operations are regular expressions.
@@ -96,13 +96,21 @@ String operations are regular expressions.
 $ http GET /torrent?info_hash=^44a04.*$
 ```
 
+##### Booleans
+Booleans are evaluated against two string: 'true', 'false'.
+
+**Example**
+```
+$ http GET /torrent?boolkey=true
+```
+
 ##### Numbers
-Number expressions can use one of six operators (<, >, =, !=, >=, <=) followed by a number.
+Number expressions can use one of five operators (lt, gt, ne, ge, le), when no operator is presnet in the key an equality operator will be used.
 
 **Example**
 
 ```shell
-$ http GET /torrent?block_size>=0
+$ http GET /torrent?block_size.ge=0
 ```
 
 **Example**

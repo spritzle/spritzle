@@ -80,17 +80,17 @@ async def test_get_torrent_query(cli):
     torrents = await response.json()
     assert len(torrents) == 0
 
-    response = await cli.get("/torrent?block_size=>0")
+    response = await cli.get("/torrent?block_size.gt=0")
     assert response.status == 200
     torrents = await response.json()
     assert len(torrents) == 1
 
-    response = await cli.get("/torrent?block_size=<16384")
+    response = await cli.get("/torrent?block_size.lt=16384")
     assert response.status == 200
     torrents = await response.json()
     assert len(torrents) == 0
 
-    response = await cli.get("/torrent?block_size==16384")
+    response = await cli.get("/torrent?block_size=16384")
     assert response.status == 200
     torrents = await response.json()
     assert len(torrents) == 1
@@ -100,10 +100,13 @@ async def test_get_torrent_query(cli):
     "query,want",
     [
         ({"string": ".*oo.*"}, ["t2", "t3"]),
-        ({"string": ".*oo.*", "int": ">=10"}, ["t2"]),
-        ({"float": ">500.0", "int": "<0"}, ["t3"]),
-        ({"int": ">=400"}, []),
+        ({"string": ".*oo.*", "int.ge": "10"}, ["t2"]),
+        ({"float.gt": "500.0", "int.lt": "0"}, ["t3"]),
+        ({"int.ge": "400"}, []),
         ({"string": ".*r.*", "bool": "true"}, ["t1", "t3"]),
+        ({"int": "10"}, ["t2"]),
+        ({"spritzle.int.gt": "10"}, ["t1"]),
+        ({"spritzle.int": "100"}, ["t1"]),
     ],
 )
 def test_get_torrent_list_by_query(query, want):
@@ -114,6 +117,7 @@ def test_get_torrent_list_by_query(query, want):
             "int": 100,
             "float": 50.0,
             "bool": True,
+            "spritzle.int": 100,
         },
         {
             "info_hash": "t2",
@@ -121,6 +125,7 @@ def test_get_torrent_list_by_query(query, want):
             "int": 10,
             "float": 500.0,
             "bool": False,
+            "spritzle.int": 10,
         },
         {
             "info_hash": "t3",
@@ -128,6 +133,7 @@ def test_get_torrent_list_by_query(query, want):
             "int": -1,
             "float": 5000.0,
             "bool": True,
+            "spritzle.int": -1,
         },
     ]
     torrents = torrent.get_torrent_list_by_query(query, statuses)
