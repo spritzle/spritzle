@@ -17,4 +17,4 @@ tabulate = "^0.8.3"
 pytest = "*"
 asynctest = "^0.12.2"
 coverage = "^4.5"
-black = {version = "^18.3-alpha.0",allows-prereleases = true}
+black = {version = "^18.3-alpha.0",allow-prereleases = true}
