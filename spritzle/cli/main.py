@@ -26,8 +26,8 @@ class Client(object):
 
         self.session = None
 
-    def url(self, path):
-        return f"http://{self.host}:{self.port}/{path}"
+    def url(self, path: str, query: str = "") -> str:
+        return f"http://{self.host}:{self.port}/{path}?{query}"
 
     def do_command(self, cmd, *args, **kwargs):
         async def _do_command(cmd, *args, **kwargs):
