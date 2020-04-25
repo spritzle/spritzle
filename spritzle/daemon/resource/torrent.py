@@ -79,7 +79,7 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
             # and does not have an operator.
             if key in status:
                 op = ""
-            else:
+            elif "." in key:
                 op = key.rsplit(".", 1)[-1]
                 key = key.rsplit(".", 1)[:-1][0]
 

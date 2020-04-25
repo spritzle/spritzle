@@ -95,6 +95,9 @@ async def test_get_torrent_query(cli):
     torrents = await response.json()
     assert len(torrents) == 1
 
+    response = await cli.get("/torrent?unknown_field=foo")
+    assert response.status == 400
+
 
 @pytest.mark.parametrize(
     "query,want",
