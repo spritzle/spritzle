@@ -22,8 +22,8 @@
 
 import asyncio
 import shutil
+from unittest.mock import patch
 
-from asynctest import patch
 import libtorrent as lt
 import pytest
 

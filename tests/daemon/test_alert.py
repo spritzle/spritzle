@@ -21,9 +21,8 @@
 #
 
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
-import asynctest
 import pytest
 
 import spritzle.daemon.alert
@@ -76,15 +75,15 @@ async def test_pop_alerts(monkeypatch):
     a = spritzle.daemon.alert.Alert()
     a.alert_types = ["AlertTestOne", "AlertTestTwo", "AlertTestThree"]
 
-    handler_one = asynctest.CoroutineMock()
+    handler_one = AsyncMock()
     a.register_handler("AlertTestOne", handler_one)
     assert "AlertTestOne" in a.handlers
 
-    handler_two = asynctest.CoroutineMock()
+    handler_two = AsyncMock()
     a.register_handler("AlertTestTwo", handler_two)
     assert "AlertTestTwo" in a.handlers
 
-    handler_three = asynctest.CoroutineMock()
+    handler_three = AsyncMock()
     a.register_handler("test_category1", handler_three)
     assert "test_category1" in a.handlers
 
