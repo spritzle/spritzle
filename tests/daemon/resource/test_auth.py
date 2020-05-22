@@ -34,7 +34,7 @@ def cli(loop, core, app, aiohttp_client):
         "auth_secret": "secret",
         "auth_allow_hosts": [],
     }
-    core.config.data = config
+    core.config.update(config)
 
     async def get_nothing(request):
         return aiohttp.web.Response()
@@ -51,7 +51,7 @@ async def test_post_auth(core, cli):
         "auth_secret": "secret",
         "auth_allowed_hosts": [],
     }
-    core.config.data = config
+    core.config.update(config)
     response = await cli.post("/auth", json={"password": "password"})
     assert response.status == 200
 

@@ -33,7 +33,7 @@ def test_config_init_no_dir():
     with patch("pathlib.Path.home", return_value=tmpdir):
         c = Config()
 
-    assert c.config_file == Path(tmpdir, ".config", "spritzle", "spritzled.conf")
+    assert c.config_file == Path(tmpdir, ".config", "spritzle", "config.db")
 
     assert c.config_file.is_file()
 
@@ -45,40 +45,9 @@ def test_config_init_with_dir():
         Config(config_dir=tempdir)
 
 
-def test_config_save():
-    with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
-        c["foo"] = 1
-        c.save()
-        old = c.data
-        c.load()
-        assert old == c.data
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir, in_memory=True)
-        c["foo"] = 1
-        c.save()
-        assert not Path(tempdir, "spritzle.conf").exists()
-
-
-def test_config_load():
-    with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
-        c.load()
-        assert c.data == {}
-        c["foo"] = 1
-        old = c.data
-        c.load()
-        assert c.data == old
-
-        c = Config(config_dir=tempdir, in_memory=True)
-        c.load()
-        assert c.data == {}
-
-
 def test_len():
     with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
+        c = Config(config_dir=tempdir, defaults={})
         assert len(c) == 0
         c["foo"] = 1
         assert len(c) == 1
@@ -88,7 +57,7 @@ def test_len():
 
 def test_iter():
     with tempfile.TemporaryDirectory() as tempdir:
-        c = Config(config_dir=tempdir)
+        c = Config(config_dir=tempdir, defaults={})
         c["foo"] = 1
         assert next(iter(c)) == "foo"
 
@@ -110,11 +79,6 @@ def test_get():
         assert c.get("foo") == 2
 
 
-def test_initial():
-    c = Config(in_memory=True, initial={"foo": 1})
-    assert c.get("foo") == 1
-
-
 def test_defaults():
     c = Config(in_memory=True, defaults={"foo": 1})
     assert c.get("foo") == 1
@@ -128,6 +92,13 @@ def test_init_load():
     with tempfile.TemporaryDirectory() as tempdir:
         c = Config(config_dir=tempdir)
         c["foo"] = 1
-        c.save()
         c = Config(config_dir=tempdir)
         assert c.get("foo") == 1
+
+
+def test_reset():
+    c = Config(in_memory=True)
+    c["foo"] = 1
+    assert c["foo"] == 1
+    c.reset()
+    assert c.get("foo") is None

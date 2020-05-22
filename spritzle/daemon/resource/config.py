@@ -40,8 +40,9 @@ async def put_config(request):
         new_values = await request.json()
     except JSONDecodeError as e:
         raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
-    config.data = new_values
-    config.save()
+
+    config.reset()
+    config.update(new_values)
     return web.Response()
 
 
@@ -52,6 +53,6 @@ async def patch_config(request):
         new_values = await request.json()
     except JSONDecodeError as e:
         raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
+
     config.update(new_values)
-    config.save()
     return web.Response()
