@@ -128,7 +128,7 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(args.debug)
 
-    config = Config("spritzle.conf", args.config_dir)
+    config = Config(config_dir=args.config_dir)
 
     # Prevent more than one process using the same config path from running.
     f = Path(config.path, "spritzled.lock").open(mode="w")
