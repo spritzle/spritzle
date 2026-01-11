@@ -59,10 +59,7 @@ class Hooks:
             )
         except subprocess.CalledProcessError as e:
             log.error(
-                (
-                    f"run_hook fail retcode={e.returncode} cmd={e.cmd}"
-                    f" output={e.output}"
-                )
+                (f"run_hook fail retcode={e.returncode} cmd={e.cmd} output={e.output}")
             )
         else:
             log.info(f"run_hook success args={p.args}")

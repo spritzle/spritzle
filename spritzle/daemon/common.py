@@ -38,6 +38,7 @@ def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
 
     A conversion attempt will be made for special libtorrent types.
     """
+
     # Define converter functions to coerce libtorrent types into
     # basic objects.
     def lt_sha1_hash(value):

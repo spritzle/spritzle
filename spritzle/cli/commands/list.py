@@ -11,7 +11,7 @@ from tabulate import tabulate
     "--fields",
     type=str,
     show_default=True,
-    default=("name,state,progress,download_rate,upload_rate," "spritzle.tags"),
+    default=("name,state,progress,download_rate,upload_rate,spritzle.tags"),
     help="Fields from the torrent status that will be printed.",
 )
 @click.option("--header/--no-header", default=True, help="Print header in output.")

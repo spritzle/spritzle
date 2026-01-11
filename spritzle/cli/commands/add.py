@@ -22,7 +22,7 @@ import click
     "-t",
     type=str,
     multiple=True,
-    help=("Tag to apply to the torrent. Can be specified multiple " "times."),
+    help=("Tag to apply to the torrent. Can be specified multiple times."),
 )
 @click.pass_obj
 def command(client, path, option, tag):
