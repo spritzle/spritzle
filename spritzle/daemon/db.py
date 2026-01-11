@@ -24,7 +24,7 @@ import collections.abc
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any, Dict, Optional, Iterator, TypeVar, Generic, cast
+from typing import Any, Dict, Optional, Iterator, TypeVar
 
 T = TypeVar("T")
 

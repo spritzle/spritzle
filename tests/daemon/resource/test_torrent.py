@@ -19,7 +19,7 @@
 #   51 Franklin Street, Fifth Floor
 #   Boston, MA    02110-1301, USA.
 #
-import asyncio
+
 from base64 import b64encode
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -339,17 +339,25 @@ async def test_torrent_flags(cli):
 
 async def test_force_recheck(cli):
     tid = await test_post_torrent(cli)
-    await asyncio.sleep(1)
 
     r = await cli.get(f"/torrent/{tid}")
     status = await r.json()
     assert status["state"] != "checking_resume_data"
+    await cli.post(f"/torrent/{tid}/pause")
+    r = await cli.get(f"/torrent/{tid}")
+    status = await r.json()
+    assert status["flags"] & lt.torrent_flags.paused
 
-    await cli.post(f"/torrent/{tid}/force_recheck")
+    await cli.put(f"/torrent/{tid}/flags/auto_managed", json=True)
+    r = await cli.put("/session/settings", json={"active_checking": 0})
+    assert r.status == 200
+
+    r = await cli.post(f"/torrent/{tid}/force_recheck")
+    assert r.status == 200
 
     r = await cli.get(f"/torrent/{tid}")
     status = await r.json()
-    assert status["state"] == "checking_resume_data"
+    assert status["state"] == "downloading"
 
 
 async def test_set_max_uploads(cli):
