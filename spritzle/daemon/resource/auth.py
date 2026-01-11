@@ -44,7 +44,7 @@ async def post_auth(request):
 
     jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
 
-    return web.json_response({"token": jwt_token.decode("utf8")})
+    return web.json_response({"token": jwt_token})
 
 
 @web.middleware
