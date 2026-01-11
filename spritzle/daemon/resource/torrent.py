@@ -213,12 +213,12 @@ async def post_torrent(request):
                 generate_torrent_info(await resp.read())
 
     elif "info_hash" in post:
-        atp["info_hash"] = binascii.unhexlify(post.pop("info_hash"))
+        atp["info_hashes"] = binascii.unhexlify(post.pop("info_hash"))
 
     if "ti" in atp:
         info_hash = str(atp["ti"].info_hash())
-    elif "info_hash" in atp:
-        info_hash = binascii.hexlify(atp["info_hash"]).decode()
+    elif "info_hashes" in atp:
+        info_hash = binascii.hexlify(atp["info_hashes"]).decode()
 
     if info_hash not in core.torrent_data:
         core.torrent_data[info_hash] = {}
@@ -342,7 +342,6 @@ async def delete_torrent(request):
 
 @routes.post("/torrent/{tid}/{method}")
 async def post_torrent_method(request):
-
     core = request.app["spritzle.core"]
     tid = request.match_info.get("tid")
     method_name = request.match_info.get("method")
