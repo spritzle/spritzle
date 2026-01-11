@@ -21,9 +21,7 @@
 #
 
 import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import patch
 
 from spritzle.daemon.db import DB
 
@@ -32,7 +30,7 @@ def test_db_init():
     with tempfile.TemporaryDirectory() as tempdir:
         path = Path(tempdir, "tmp.db")
 
-        db = DB(path=path)
+        DB(path=path)
 
         assert path.exists()
         assert path.is_file()
