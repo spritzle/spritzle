@@ -40,7 +40,7 @@ async def put_session_settings(request):
     # Do our best to coerce what the client sent into the proper types that
     # libtorrent expects.
     for key, value in current.items():
-        if key in settings and type(settings[key]) != type(value):
+        if key in settings and type(settings[key]) is not type(value):
             settings[key] = type(value)(settings[key])
 
     try:

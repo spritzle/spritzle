@@ -25,7 +25,7 @@ import importlib.metadata
 from pathlib import Path
 import logging
 import functools
-from typing import Any, Dict, Optional, Coroutine
+from typing import Any, Dict, Optional
 
 import libtorrent as lt
 
