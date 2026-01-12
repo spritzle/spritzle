@@ -42,3 +42,21 @@ async def test_torrent_data(cli, core):
     assert info_hash in core.torrent_data
     await cli.delete("/torrent/44a040be6d74d8d290cd20128788864cbf770719")
     assert not core.torrent_data
+
+
+def test_get_default_settings(core):
+    settings = core.get_default_settings()
+    assert isinstance(settings, dict)
+    assert "alert_mask" in settings
+    assert "user_agent" in settings
+    assert "Spritzle/" in settings["user_agent"]
+    assert "libtorrent/" in settings["user_agent"]
+
+
+async def test_start_stop(core):
+    assert core.session is None
+    await core.start()
+    assert core.session is not None
+    assert core.alert.session is not None
+    await core.stop()
+    assert core.session is None

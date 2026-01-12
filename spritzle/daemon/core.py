@@ -21,10 +21,11 @@
 #
 
 import asyncio
-import pkg_resources
+import importlib.metadata
 from pathlib import Path
 import logging
 import functools
+from typing import Any, Dict, Optional, Coroutine
 
 import libtorrent as lt
 
@@ -37,9 +38,9 @@ log = logging.getLogger("spritzle")
 
 
 class Core(object):
-    def __init__(self, config, state_dir=None):
+    def __init__(self, config: Any, state_dir: Optional[Path] = None):
         self.config = config
-        self.session = None
+        self.session: Optional[lt.session] = None
         self.hooks = Hooks(Path(self.config.path, "hooks"))
         if state_dir is None:
             self.state_dir = Path(Path.home(), ".local", "share", "spritzle", "state")
@@ -47,10 +48,10 @@ class Core(object):
             self.state_dir = state_dir
         # TODO check dir for rw, etc
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        self.session_stats_future = None
+        self.session_stats_future: Optional[asyncio.Future] = None
         # A place to keep additional data on torrents, that isn't stored in
         # libtorrent.  This is key'd on info_hash.
-        self.torrent_data = {}
+        self.torrent_data: Dict[str, Any] = {}
 
         self.alert = Alert()
         self.resume_data = ResumeData(self)
@@ -60,27 +61,30 @@ class Core(object):
             "status_notification", self.on_status_notification_alert
         )
 
-    async def start(self, settings=None):
+    def get_default_settings(self) -> Dict[str, Any]:
+        return {
+            "alert_mask": (
+                int(lt.alert.category_t.error_notification)
+                | int(lt.alert.category_t.peer_notification)
+                | int(lt.alert.category_t.port_mapping_notification)
+                | int(lt.alert.category_t.storage_notification)
+                | int(lt.alert.category_t.tracker_notification)
+                | int(lt.alert.category_t.status_notification)
+                | int(lt.alert.category_t.ip_block_notification)
+                | int(lt.alert.category_t.performance_warning)
+                | int(lt.alert.category_t.stats_notification)
+                | int(lt.alert.category_t.session_log_notification)
+                | int(lt.alert.category_t.torrent_log_notification)
+                | int(lt.alert.category_t.peer_log_notification)
+            ),
+            "user_agent": "Spritzle/%s libtorrent/%s"
+            % (importlib.metadata.version("spritzle"), lt.__version__),
+        }
+
+    async def start(self, settings: Optional[Dict[str, Any]] = None) -> None:
         log.debug("Core starting..")
         if settings is None:
-            settings = {
-                "alert_mask": (
-                    int(lt.alert.category_t.error_notification)
-                    | int(lt.alert.category_t.peer_notification)
-                    | int(lt.alert.category_t.port_mapping_notification)
-                    | int(lt.alert.category_t.storage_notification)
-                    | int(lt.alert.category_t.tracker_notification)
-                    | int(lt.alert.category_t.status_notification)
-                    | int(lt.alert.category_t.ip_block_notification)
-                    | int(lt.alert.category_t.performance_warning)
-                    | int(lt.alert.category_t.stats_notification)
-                    | int(lt.alert.category_t.session_log_notification)
-                    | int(lt.alert.category_t.torrent_log_notification)
-                    | int(lt.alert.category_t.peer_log_notification)
-                ),
-                "user_agent": "Spritzle/%s libtorrent/%s"
-                % (pkg_resources.require("spritzle")[0].version, lt.__version__),
-            }
+            settings = self.get_default_settings()
         self.session = lt.session(settings)
         await self.load_session_state()
         await self.alert.start(self.session)
