@@ -51,18 +51,24 @@ class Hooks:
     async def run_hook(self, hook, *args):
         log.info(f"run_hook start hook={hook} args={args}")
         try:
-            p = subprocess.run(
-                [hook, *args],
-                check=True,
+            p = await asyncio.create_subprocess_exec(
+                hook,
+                *args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-        except subprocess.CalledProcessError as e:
-            log.error(
-                (f"run_hook fail retcode={e.returncode} cmd={e.cmd} output={e.output}")
-            )
-        else:
-            log.info(f"run_hook success args={p.args}")
+            stdout, stderr = await p.communicate()
+            if p.returncode != 0:
+                log.error(
+                    (
+                        f"run_hook fail retcode={p.returncode} cmd={hook} "
+                        f"output={stderr or stdout}"
+                    )
+                )
+            else:
+                log.info(f"run_hook success args={args}")
+        except Exception as e:
+            log.error(f"run_hook exception: {e}")
 
     def run_hooks(self, hook_name, *args):
         for hook in self.find_hooks(hook_name):

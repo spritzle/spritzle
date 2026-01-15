@@ -93,9 +93,9 @@ class Core(object):
 
     async def stop(self):
         log.debug("Core stopping..")
+        await self.resume_data.stop()
         await self.save_session_state()
         self.session.pause()
-        await self.resume_data.stop()
         await self.alert.stop()
         del self.session
         self.session = None
@@ -117,7 +117,8 @@ class Core(object):
             )
 
     async def on_session_stats_alert(self, alert):
-        self.session_stats_future.set_result(alert.values)
+        if self.session_stats_future and not self.session_stats_future.done():
+            self.session_stats_future.set_result(alert.values)
 
     async def get_session_stats(self):
         if self.session_stats_future is None or self.session_stats_future.done():
@@ -131,12 +132,21 @@ class Core(object):
         return self.torrent_data.get(info_hash, {}).get("spritzle.tags", [])
 
     async def on_status_notification_alert(self, alert):
-        if hasattr(alert, "handle"):
-            if alert.what() == "torrent_removed_alert":
-                info_hash = str(alert.info_hash)
-            info_hash = str(alert.handle.info_hash())
-            self.hooks.run_hooks(
-                alert.what(), info_hash, ",".join(self.get_torrent_tags(info_hash))
+        try:
+            if hasattr(alert, "handle"):
+                if alert.what() == "torrent_removed_alert":
+                    info_hash = str(alert.info_hash)
+                else:
+                    info_hash = str(alert.handle.info_hash())
+
+                self.hooks.run_hooks(
+                    alert.what(), info_hash, ",".join(self.get_torrent_tags(info_hash))
+                )
+        except Exception:
+            import traceback
+
+            log.error(
+                f"Error in on_status_notification_alert: {traceback.format_exc()}"
             )
 
     async def on_state_changed_alert(self, alert):

@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
 import libtorrent as lt
 
 
@@ -60,3 +61,48 @@ async def test_start_stop(core):
     assert core.alert.session is not None
     await core.stop()
     assert core.session is None
+
+
+async def test_get_session_stats(core):
+    await core.start()
+
+    # Trigger an unsolicited stats alert to simulate a periodic update or race condition.
+    # If the bug is present, this will cause the alert loop to crash because
+    # session_stats_future will be None.
+    core.session.post_session_stats()
+    await asyncio.sleep(0.1)
+
+    stats = await core.get_session_stats()
+    assert isinstance(stats, dict)
+    assert len(stats) > 0
+    # ensure subsequent calls also work
+    stats2 = await core.get_session_stats()
+    assert isinstance(stats2, dict)
+    assert len(stats2) > 0
+    await core.stop()
+
+
+async def test_alert_loop_robustness(core):
+    await core.start()
+
+    # Register a handler that crashes
+    async def crashing_handler(alert):
+        raise RuntimeError("Oops -> Crash Handler")
+
+    # We attach it to stats_alert since we can easily trigger that
+    core.alert.register_handler("session_stats_alert", crashing_handler)
+
+    # Trigger the alert
+    core.session.post_session_stats()
+    # Allow loop to process and crash
+    await asyncio.sleep(0.1)
+
+    # Now verify the loop is still running by performing a valid operation that requires alerts
+    # If the loop crashed, this will hang (and eventually timeout via wait_for in a real scenario,
+    # or just hang if we don't wrap it. Pytest usually timeouts eventually but let's be explicit if we want).
+    # Since we fixed the "unexpected stats alert" bug in the previous step,
+    # get_session_stats() should work IF the loop is still alive.
+    stats = await core.get_session_stats()
+    assert isinstance(stats, dict)
+
+    await core.stop()

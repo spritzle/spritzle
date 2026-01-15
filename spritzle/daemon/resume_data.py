@@ -34,13 +34,14 @@ log = logging.getLogger("spritzle")
 class ResumeData(object):
     def __init__(self, core):
         self.core = core
-        self.loop = asyncio.get_event_loop()
+        self.loop = None
         self.save_loop_task = None
 
         # Store state of outstanding save resume data alerts
         self.resume_data_futures = {}
 
     async def start(self):
+        self.loop = asyncio.get_event_loop()
         log.debug("Resume data manager starting...")
         await self.load()
         self.core.alert.register_handler(
@@ -55,7 +56,10 @@ class ResumeData(object):
         log.debug("Resume data manager stopping...")
         if self.save_loop_task:
             self.save_loop_task.cancel()
-            await self.save_loop_task
+            try:
+                await self.save_loop_task
+            except asyncio.CancelledError:
+                pass
         await self.save_all()
         log.debug("Resume data manager stopped.")
 
@@ -75,7 +79,8 @@ class ResumeData(object):
         info_hash = str(alert.handle.info_hash())
         p = Path(self.core.state_dir, info_hash + ".resume")
         r = lt.write_resume_data(alert.params)
-        r.update(self.core.torrent_data[info_hash])
+        if info_hash in self.core.torrent_data:
+            r.update(self.core.torrent_data[info_hash])
         p.write_bytes(lt.bencode(r))
         if info_hash in self.resume_data_futures:
             self.resume_data_futures.pop(info_hash).set_result(True)
@@ -108,7 +113,14 @@ class ResumeData(object):
         for torrent in self.core.session.get_torrents():
             if torrent.need_save_resume_data():
                 self.save_torrent(torrent)
-        await asyncio.gather(*self.resume_data_futures.values())
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self.resume_data_futures.values()), timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            log.warning("Timed out waiting for resume data to save")
+        except Exception as e:
+            log.error(f"Error saving resume data: {e}")
 
     def delete(self, info_hash):
         p = Path(self.core.state_dir, info_hash + ".resume")

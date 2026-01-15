@@ -108,10 +108,14 @@ async def test_torrent_transfer(create_core, loop):
                 leecher_handle.connect_peer(("127.0.0.1", seeder_port))
 
                 # Wait for download
+                print("WAITING FOR DOWNLOAD")
                 for i in range(200):  # 20 seconds timeout
                     s = leecher_handle.status()
                     if s.is_seeding:
+                        print("LEECHER IS SEEDING")
                         break
+                    if i % 10 == 0:
+                        print(f"WAITING... {i} status={s.state} p={s.progress}")
                     await asyncio.sleep(0.1)
 
                 assert leecher_handle.status().is_seeding
@@ -131,8 +135,8 @@ async def test_hook_integration(create_core, loop):
 
     # Create a hook script
     hooks_dir = config_dir / "hooks"
-    # We will trigger a pause, so we expect torrent_paused_alert
-    hook_script = hooks_dir / "torrent_paused_alert"
+    # We will trigger a pause, so we expect torrent_paused
+    hook_script = hooks_dir / "torrent_paused"
 
     token_file = config_dir / "hook_triggered"
 

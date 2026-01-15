@@ -63,7 +63,7 @@ def build_alert_types():
 class Alert(object):
     def __init__(self):
         self.session = None
-        self.loop = asyncio.get_event_loop()
+        self.loop = None
         self.pop_alerts_task = None
         self.run = False
         self.event = asyncio.Event()
@@ -72,6 +72,7 @@ class Alert(object):
         self.alert_types = build_alert_types()
 
     async def start(self, session):
+        self.loop = asyncio.get_event_loop()
         log.debug("Alert starting..")
         self.session = session
         self.run = True
@@ -118,4 +119,7 @@ class Alert(object):
             # We have to make sure all alert handlers have completed before
             # calling pop_alerts() again as it will invalidate all previous
             # libtorrent alert objects.
-            await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in results:
+                if isinstance(res, Exception):
+                    log.error(f"Error in alert handler: {res}")

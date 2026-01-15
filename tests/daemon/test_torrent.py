@@ -26,6 +26,7 @@ class MockAlert(Alert):
         self.event.set()
 
     async def start(self, session):
+        self.loop = asyncio.get_event_loop()
         self.session = Mock(pop_alerts=self._pop_alerts)
         self.run = True
         self.pop_alerts_task = asyncio.ensure_future(self.pop_alerts())
