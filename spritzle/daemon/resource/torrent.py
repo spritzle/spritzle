@@ -34,6 +34,7 @@ import aiohttp
 from aiohttp import web
 
 import spritzle.daemon.common as common
+from spritzle.daemon.keys import APP_KEY_CONFIG, APP_KEY_CORE
 from spritzle.daemon.torrent import AlertException
 
 import libtorrent as lt
@@ -150,7 +151,7 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
 @routes.get("/torrent")
 @routes.get("/torrent/{tid}")
 async def get_torrent(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid", None)
 
     if tid is None:
@@ -178,8 +179,8 @@ async def post_torrent(request):
 
     http://libtorrent.org/reference-Session.html#add_torrent_params
     """
-    core = request.app["spritzle.core"]
-    config = request.app["spritzle.config"]
+    core = request.app[APP_KEY_CORE]
+    config = request.app[APP_KEY_CONFIG]
 
     atp = {"save_path": config.get("add_torrent_params.save_path", "")}
 
@@ -250,7 +251,7 @@ async def post_torrent(request):
 @routes.put("/torrent/{tid}/flags")
 @routes.put("/torrent/{tid}/flags/{flag}")
 async def put_flags(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid")
     flag = request.match_info.get("flag", None)
     handle = get_valid_handle(core, tid)
@@ -294,7 +295,7 @@ def build_flags_dict(flags: int) -> Dict[str, bool]:
 @routes.get("/torrent/{tid}/flags")
 @routes.get("/torrent/{tid}/flags/{flag}")
 async def get_flags(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid")
     flag = request.match_info.get("flag", None)
     handle = get_valid_handle(core, tid)
@@ -310,7 +311,7 @@ async def get_flags(request):
 @routes.delete("/torrent")
 @routes.delete("/torrent/{tid}")
 async def delete_torrent(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid", None)
 
     # see libtorrent.options_t for valid options
@@ -342,7 +343,7 @@ async def delete_torrent(request):
 
 @routes.post("/torrent/{tid}/{method}")
 async def post_torrent_method(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid")
     method_name = request.match_info.get("method")
     handle = get_valid_handle(core, tid)

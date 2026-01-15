@@ -26,12 +26,14 @@ from json import JSONDecodeError
 import jwt
 from aiohttp import web
 
+from spritzle.daemon.keys import APP_KEY_CONFIG
+
 routes = web.RouteTableDef()
 
 
 @routes.post("/auth")
 async def post_auth(request):
-    config = request.app["spritzle.config"]
+    config = request.app[APP_KEY_CONFIG]
     try:
         post = await request.json()
     except JSONDecodeError as ex:
@@ -49,7 +51,7 @@ async def post_auth(request):
 
 @web.middleware
 async def auth_middleware(request, handler):
-    config = request.app["spritzle.config"]
+    config = request.app[APP_KEY_CONFIG]
 
     peername = request.transport.get_extra_info("peername")
     if peername and peername[0] in config["auth_allow_hosts"]:

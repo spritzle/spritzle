@@ -24,18 +24,20 @@ from json import JSONDecodeError
 
 from aiohttp import web
 
+from spritzle.daemon.keys import APP_KEY_CONFIG
+
 routes = web.RouteTableDef()
 
 
 @routes.get("/config")
 async def get_config(request):
-    config = request.app["spritzle.config"]
+    config = request.app[APP_KEY_CONFIG]
     return web.json_response(dict(config))
 
 
 @routes.put("/config")
 async def put_config(request):
-    config = request.app["spritzle.config"]
+    config = request.app[APP_KEY_CONFIG]
     try:
         new_values = await request.json()
     except JSONDecodeError as e:
@@ -48,7 +50,7 @@ async def put_config(request):
 
 @routes.patch("/config")
 async def patch_config(request):
-    config = request.app["spritzle.config"]
+    config = request.app[APP_KEY_CONFIG]
     try:
         new_values = await request.json()
     except JSONDecodeError as e:

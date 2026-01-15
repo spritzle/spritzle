@@ -22,18 +22,20 @@
 
 from aiohttp import web
 
+from spritzle.daemon.keys import APP_KEY_CORE
+
 routes = web.RouteTableDef()
 
 
 @routes.get("/session/settings")
 async def get_session_settings(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     return web.json_response(core.session.get_settings())
 
 
 @routes.put("/session/settings")
 async def put_session_settings(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     settings = await request.json()
     current = core.session.get_settings()
 
@@ -52,12 +54,12 @@ async def put_session_settings(request):
 
 @routes.get("/session/stats")
 async def get_session_stats(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     stats = await core.get_session_stats()
     return web.json_response(stats)
 
 
 @routes.get("/session/dht")
 async def get_session_dht(request):
-    core = request.app["spritzle.core"]
+    core = request.app[APP_KEY_CORE]
     return web.json_response(core.session.is_dht_running())

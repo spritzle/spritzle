@@ -37,6 +37,7 @@ from .resource.core import routes as core_routes
 from .resource.session import routes as session_routes
 from .resource.torrent import routes as torrent_routes
 
+from .keys import APP_KEY_CONFIG, APP_KEY_CORE, APP_KEY_LOG
 from .core import Core
 from .config import Config
 from .logger import setup_logger
@@ -51,7 +52,7 @@ async def debug_middleware(request, handler):
         body = await request.post()
     else:
         body = await request.text()
-    log = request.app["spritzle.log"]
+    log = request.app[APP_KEY_LOG]
     log.debug("*" * 20 + "REQUEST" + "*" * 20)
     log.debug(f"URL: {request.rel_url}")
     log.debug(f"METHOD: {request.method}")
@@ -92,17 +93,17 @@ def setup_app(app, core, log):
     if not config["auth_secret"]:
         config["auth_secret"] = secrets.token_hex()
 
-    app["spritzle.log"] = log
-    app["spritzle.core"] = core
-    app["spritzle.config"] = config
+    app[APP_KEY_LOG] = log
+    app[APP_KEY_CORE] = core
+    app[APP_KEY_CONFIG] = config
 
     app.middlewares.extend([error_middleware, debug_middleware])
 
     async def on_startup(app):
-        await app["spritzle.core"].start()
+        await app[APP_KEY_CORE].start()
 
     async def on_shutdown(app):
-        await app["spritzle.core"].stop()
+        await app[APP_KEY_CORE].stop()
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)

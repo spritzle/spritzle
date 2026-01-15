@@ -38,7 +38,7 @@ def test_find_hooks():
         assert len(hooks) == 0
         Path(tmpdir, "_foobar").unlink()
 
-        Path(tmpdir, "foobar", exist_ok=True).mkdir()
+        Path(tmpdir, "foobar").mkdir(exist_ok=True)
         hooks = h.find_hooks("foobar")
         assert len(hooks) == 0
         Path(tmpdir, "foobar").rmdir()
