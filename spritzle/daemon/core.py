@@ -30,6 +30,7 @@ from typing import Any, Dict, Optional
 import libtorrent as lt
 
 from .alert import Alert
+from .config import Config
 from .hooks import Hooks
 from .resume_data import ResumeData
 from .torrent import Torrent
@@ -38,7 +39,7 @@ log = logging.getLogger("spritzle")
 
 
 class Core(object):
-    def __init__(self, config: Any, state_dir: Optional[Path] = None):
+    def __init__(self, config: Config, state_dir: Optional[Path] = None):
         self.config = config
         self.session: Optional[lt.session] = None
         self.hooks = Hooks(Path(self.config.path, "hooks"))
@@ -95,13 +96,16 @@ class Core(object):
         log.debug("Core stopping..")
         await self.resume_data.stop()
         await self.save_session_state()
-        self.session.pause()
+        if self.session is not None:
+            self.session.pause()
         await self.alert.stop()
         del self.session
         self.session = None
         log.debug("Core stopped..")
 
     async def save_session_state(self):
+        if self.session is None:
+            return
         state = await asyncio.get_event_loop().run_in_executor(
             None, functools.partial(self.session.save_state)
         )
@@ -112,6 +116,8 @@ class Core(object):
         f = Path(self.state_dir, "session.state")
         log.info(f"Loading session state from: {f}")
         if f.exists():
+            if self.session is None:
+                raise RuntimeError("Session not started")
             await asyncio.get_event_loop().run_in_executor(
                 None, functools.partial(self.session.load_state), f.read_bytes()
             )
@@ -121,6 +127,8 @@ class Core(object):
             self.session_stats_future.set_result(alert.values)
 
     async def get_session_stats(self):
+        if self.session is None:
+            raise RuntimeError("Session not started")
         if self.session_stats_future is None or self.session_stats_future.done():
             self.session_stats_future = asyncio.Future()
             self.session.post_session_stats()

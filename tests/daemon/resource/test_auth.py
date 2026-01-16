@@ -37,7 +37,7 @@ def cli(loop, core, app, aiohttp_client):
     core.config.update(config)
 
     async def get_nothing(request):
-        return aiohttp.web.Response()
+        return aiohttp.web.Response()  # type: ignore
 
     app.router.add_route("GET", "/", get_nothing)
     app.middlewares.append(auth.auth_middleware)

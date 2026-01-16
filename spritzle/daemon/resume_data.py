@@ -25,6 +25,7 @@ import binascii
 import functools
 import logging
 from pathlib import Path
+from typing import Optional
 
 import libtorrent as lt
 
@@ -34,7 +35,7 @@ log = logging.getLogger("spritzle")
 class ResumeData(object):
     def __init__(self, core):
         self.core = core
-        self.loop = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.save_loop_task = None
 
         # Store state of outstanding save resume data alerts
@@ -69,8 +70,9 @@ class ResumeData(object):
             while True:
                 await asyncio.sleep(self.core.config["resume_data_save_frequency"])
                 # Don't interrupt save process when loop is cancelled
-                save_all_task = self.loop.create_task(self.save_all())
-                await asyncio.shield(save_all_task)
+                if self.loop is not None:
+                    save_all_task = self.loop.create_task(self.save_all())
+                    await asyncio.shield(save_all_task)
         except asyncio.CancelledError:
             if save_all_task and not save_all_task.done():
                 await save_all_task

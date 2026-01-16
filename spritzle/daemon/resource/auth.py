@@ -20,7 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from json import JSONDecodeError
 
 import jwt
@@ -42,7 +42,9 @@ async def post_auth(request):
     if post.get("password", None) != config["auth_password"]:
         raise web.HTTPUnauthorized(reason="Incorrect password")
 
-    payload = {"exp": (datetime.utcnow() + timedelta(seconds=config["auth_timeout"]))}
+    payload = {
+        "exp": (datetime.now(timezone.utc) + timedelta(seconds=config["auth_timeout"]))
+    }
 
     jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
 

@@ -20,6 +20,7 @@ dependencies = [
     "setuptools",
     "libtorrent",
     "PyYAML",
+    "ty>=0.0.12",
 ]
 
 [project.scripts]
@@ -35,3 +36,6 @@ dev = [
     "coverage>=4.5",
     "ruff>=0.14.11",
 ]
+
+[tool.ty.environment]
+extra-paths = ["stubs"]

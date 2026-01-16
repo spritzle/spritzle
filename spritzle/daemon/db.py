@@ -181,8 +181,10 @@ class DB(collections.abc.MutableMapping[str, Any]):
         except sqlite3.Error as e:
             raise RuntimeError(f"Failed to delete item: {e}") from e
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         """Check if a key exists in the database."""
+        if not isinstance(key, str):
+            return False
         try:
             return bool(
                 self.conn.execute("SELECT 1 FROM t WHERE key=?", (key,)).fetchone()

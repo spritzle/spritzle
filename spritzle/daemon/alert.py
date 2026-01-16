@@ -22,6 +22,7 @@
 
 import asyncio
 import logging
+from typing import Optional
 
 import libtorrent as lt
 
@@ -62,8 +63,8 @@ def build_alert_types():
 
 class Alert(object):
     def __init__(self):
-        self.session = None
-        self.loop = None
+        self.session: Optional[lt.session] = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.pop_alerts_task = None
         self.run = False
         self.event = asyncio.Event()
@@ -98,6 +99,8 @@ class Alert(object):
     def alert_notify(self):
         # This function is called from libtorrent so we must not block it. Return here
         # as quickly as possible.
+        if self.loop is None:
+            return
         self.loop.call_soon_threadsafe(self.event.set)
 
     async def pop_alerts(self):
@@ -106,6 +109,8 @@ class Alert(object):
             self.event.clear()
 
             tasks = []
+            if self.session is None or self.loop is None:
+                continue
             for alert in self.session.pop_alerts():
                 handlers = set()
                 handlers.update(self.handlers.get(type(alert).__name__, []))

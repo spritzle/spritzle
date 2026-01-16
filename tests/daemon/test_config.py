@@ -35,6 +35,7 @@ def test_config_init_no_dir():
 
     assert c.config_file == Path(tmpdir, ".config", "spritzle", "config.db")
 
+    assert c.config_file is not None
     assert c.config_file.is_file()
 
     shutil.rmtree(tmpdir)
