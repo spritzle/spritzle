@@ -46,7 +46,7 @@ touch ~/.config/spritzle/hooks/200_torrent_finished_alert
 touch ~/.config/spritzle/hooks/300_torrent_finished_alert
 ```
 
-Edit these files and put in any you wish to do when the script runs. It's suggested to use the spritzle-cli program if you need to interact with spritzled.  Some examples are in the Examples section, but here is what the beginning of your script may look like if written in bash.
+Edit these files and put in any you wish to do when the script runs. It's suggested to use the spritzle program if you need to interact with spritzled.  Some examples are in the Examples section, but here is what the beginning of your script may look like if written in bash.
 
 ```bash
 #!/bin/bash
