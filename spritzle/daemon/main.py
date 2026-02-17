@@ -103,7 +103,13 @@ def setup_app(app, core, log):
         await app[APP_KEY_CORE].start()
 
     async def on_shutdown(app):
-        await app[APP_KEY_CORE].stop()
+        log.info("Shutdown sequence initiated..")
+        try:
+            await app[APP_KEY_CORE].stop()
+        except Exception:
+            # We don't want to stop the shutdown sequence if something fails
+            log.error(f"Error during shutdown: {traceback.format_exc()}")
+        log.info("Shutdown sequence completed.")
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
