@@ -1,8 +1,9 @@
+import json
+import os
 from pathlib import Path
 import sys
 
 import click
-import yaml
 
 
 @click.command("auth", short_help="Generate an authentication token.")
@@ -22,15 +23,17 @@ async def f(client, password):
         d = await resp.json()
         tf = Path(client.config, "tokens")
 
+        t = {}
         if tf.exists():
-            t = yaml.safe_load(tf.open(mode="r")) or {}
-        else:
-            t = {}
+            try:
+                with tf.open(mode="r") as f:
+                    t = json.load(f) or {}
+            except Exception:
+                t = {}
 
-        import os
         with tf.open(mode="w") as f:
             t[f"{client.host}:{client.port}"] = d["token"]
-            yaml.safe_dump(t, f, default_flow_style=False)
+            json.dump(t, f, indent=2)
         try:
             os.chmod(tf, 0o600)
         except OSError:

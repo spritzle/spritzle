@@ -4,9 +4,10 @@ from pathlib import Path
 import pkgutil
 import sys
 
+import json
+
 import aiohttp
 import click
-import yaml
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
@@ -21,7 +22,7 @@ class Client(object):
         if not token and Path(self.config, "tokens").exists():
             try:
                 with Path(self.config, "tokens").open() as f:
-                    d = yaml.safe_load(f)
+                    d = json.load(f)
                     if isinstance(d, dict) and f"{host}:{port}" in d:
                         self.token = d[f"{host}:{port}"]
             except Exception:

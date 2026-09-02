@@ -141,5 +141,36 @@ def test_client_init_with_empty_or_invalid_tokens_file(tmp_path):
     assert client.token == ""
 
 
+def test_client_init_with_valid_tokens_file(tmp_path):
+    import json
+    from spritzle.cli.main import Client
+    tokens_file = tmp_path / "tokens"
+    tokens_file.write_text(json.dumps({"127.0.0.1:8080": "my-saved-token"}))
+
+    client = Client("127.0.0.1", 8080, str(tmp_path), "")
+    assert client.token == "my-saved-token"
+
+
+def test_auth_command(cli, tmp_path):
+    import json
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--config", str(tmp_path),
+            "auth",
+            "--password", "password",
+        ],
+    )
+    assert result.exit_code == 0
+    tokens_file = tmp_path / "tokens"
+    assert tokens_file.exists()
+    data = json.loads(tokens_file.read_text())
+    assert f"127.0.0.1:{cli.server.port}" in data
+    assert len(data[f"127.0.0.1:{cli.server.port}"]) > 0
+
+
+
 
 

@@ -19,7 +19,6 @@ dependencies = [
     "pyopenssl>=23.2.0",
     "setuptools",
     "libtorrent",
-    "PyYAML",
     "ty>=0.0.12",
 ]
 
