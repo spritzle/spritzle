@@ -19,15 +19,22 @@ class Client(object):
         self.token = token
 
         if not token and Path(self.config, "tokens").exists():
-            with Path(self.config, "tokens").open() as f:
-                d = yaml.safe_load(f)
-                if f"{host}:{port}" in d:
-                    self.token = d[f"{host}:{port}"]
+            try:
+                with Path(self.config, "tokens").open() as f:
+                    d = yaml.safe_load(f)
+                    if isinstance(d, dict) and f"{host}:{port}" in d:
+                        self.token = d[f"{host}:{port}"]
+            except Exception:
+                pass
+
 
         self.session = None
 
     def url(self, path: str, query: str = "") -> str:
-        return f"http://{self.host}:{self.port}/{path}?{query}"
+        path = path.lstrip("/")
+        if query:
+            return f"http://{self.host}:{self.port}/{path}?{query}"
+        return f"http://{self.host}:{self.port}/{path}"
 
     def do_command(self, cmd, *args, **kwargs):
         async def _do_command(cmd, *args, **kwargs):

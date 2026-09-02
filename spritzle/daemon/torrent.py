@@ -68,13 +68,17 @@ class Torrent(object):
         await asyncio.gather(*futures)
 
     async def _on_torrent_removed_alert(self, alert):
-        future = self.remove_torrent_futures.pop(str(alert.info_hash))
-        future.set_result(alert)
+        future = self.remove_torrent_futures.pop(str(alert.info_hash), None)
+        if future and not future.done():
+            future.set_result(alert)
 
     async def _on_torrent_deleted_alert(self, alert):
-        future = self.delete_torrent_futures.pop(str(alert.info_hash))
-        future.set_result(alert)
+        future = self.delete_torrent_futures.pop(str(alert.info_hash), None)
+        if future and not future.done():
+            future.set_result(alert)
 
     async def _on_torrent_delete_failed_alert(self, alert):
-        future = self.delete_torrent_futures.pop(str(alert.info_hash))
-        future.set_exception(AlertException(alert))
+        future = self.delete_torrent_futures.pop(str(alert.info_hash), None)
+        if future and not future.done():
+            future.set_exception(AlertException(alert))
+

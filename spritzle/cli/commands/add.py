@@ -30,8 +30,15 @@ def command(client, path, option, tag):
 
 
 async def f(client, path, option, tag):
-    data = dict([o.split("=") for o in option])
+    data = {}
+    for o in option:
+        if "=" in o:
+            k, v = o.split("=", 1)
+            data[k] = v
+        else:
+            data[o] = True
     data["spritzle.tags"] = tag
+
 
     if not urlparse(path).scheme:
         with open(path, "rb") as f:

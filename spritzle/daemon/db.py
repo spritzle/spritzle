@@ -63,8 +63,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
         sqlite3.register_converter("JSON", convert_json)
 
         self.path = path
-        self.iter_cursor: Optional[sqlite3.Cursor] = None
         self.in_memory = in_memory
+
         self.defaults = defaults if defaults else {}
         self.conn: sqlite3.Connection
 
@@ -128,17 +128,10 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __iter__(self) -> Iterator[str]:
         """Return an iterator over the database keys."""
-        return self
-
-    def __next__(self) -> str:
-        """Get the next key from the iterator."""
-        if self.iter_cursor is None:
-            self.iter_cursor = self.conn.execute("SELECT key FROM t")
         try:
-            return next(self.iter_cursor)[0]
-        except StopIteration as e:
-            self.iter_cursor = None
-            raise e
+            cursor = self.conn.execute("SELECT key FROM t")
+            for row in cursor:
+                yield row[0]
         except sqlite3.Error as e:
             raise RuntimeError(f"Failed to iterate database: {e}") from e
 
@@ -152,8 +145,9 @@ class DB(collections.abc.MutableMapping[str, Any]):
             self.conn.commit()
         except sqlite3.Error as e:
             raise RuntimeError(f"Failed to set item: {e}") from e
-        except json.JSONDecodeError as e:
+        except (TypeError, ValueError) as e:
             raise ValueError(f"Value is not JSON serializable: {e}") from e
+
 
     def __getitem__(self, key: str) -> Any:
         """Get a value from the database by key."""

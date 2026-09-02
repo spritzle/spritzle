@@ -15,10 +15,11 @@ def command(client, info_hash, delete_files):
 
 async def f(client, info_hash, delete_files):
     url = client.url(f"torrent/{info_hash}")
+    params = {}
     if delete_files:
-        url += "?delete_files"
+        params["delete_files"] = ""
 
-    async with client.session.delete(url) as resp:
+    async with client.session.delete(url, params=params) as resp:
         if resp.status != 200:
             click.echo(
                 f"Error removing torrent: {resp.status} {resp.reason}", file=sys.stderr

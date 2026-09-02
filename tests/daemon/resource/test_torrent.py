@@ -222,6 +222,19 @@ async def test_add_torrent_url(cli):
     assert response.status == 201
 
 
+async def test_add_torrent_url_invalid_scheme(cli):
+    post_data = create_torrent_post_data(url="file:///etc/passwd")
+    response = await cli.post("/torrent", json=post_data)
+    assert response.status == 400
+
+
+async def test_add_torrent_url_metadata_blocked(cli):
+    post_data = create_torrent_post_data(url="http://169.254.169.254/latest/meta-data")
+    response = await cli.post("/torrent", json=post_data)
+    assert response.status == 400
+
+
+
 async def test_remove_torrent(cli):
     tid = await test_post_torrent(cli)
 
@@ -240,6 +253,23 @@ async def test_remove_torrent_all(cli, core):
     response = await cli.delete("/torrent", params={"delete_files": 1})
     assert response.status == 200
     assert len(torrent.get_torrent_list(core)) == 0
+
+
+async def test_remove_torrent_missing_from_torrent_data(cli, core):
+    tid = await test_post_torrent(cli)
+    # Remove from torrent_data to simulate ghost / missing metadata
+    core.torrent_data.pop(tid, None)
+
+    response = await cli.delete(f"/torrent/{tid}")
+    assert response.status == 200
+    assert tid not in core.torrent_data
+    assert len(torrent.get_torrent_list(core)) == 0
+
+
+async def test_get_torrent_invalid_hex(cli):
+    response = await cli.get("/torrent/not-a-valid-hex")
+    assert response.status in (400, 404)
+
 
 
 async def test_pause_resume_torrent(cli):
@@ -372,3 +402,11 @@ async def test_set_max_uploads(cli):
     r = await cli.get(f"/torrent/{tid}")
     status = await r.json()
     assert status["uploads_limit"] == 255
+
+
+async def test_disallowed_torrent_method(cli):
+    tid = await test_post_torrent(cli)
+    r = await cli.post(f"/torrent/{tid}/move_storage", json=["/tmp"])
+    assert r.status == 400
+
+

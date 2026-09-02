@@ -24,11 +24,18 @@ def command(client, set_value):
 
 
 async def setter(client, set_value):
-    data = json.dumps(dict(set_value))
+    d = {}
+    for k, v in set_value:
+        try:
+            d[k] = json.loads(v)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            d[k] = v
+    data = json.dumps(d)
     async with client.session.patch(client.url("config"), data=data) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)
             sys.exit(1)
+
 
 
 async def show(client):

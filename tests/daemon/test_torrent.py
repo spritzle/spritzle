@@ -68,3 +68,15 @@ async def test_torrent_remove(loop, mock_alert):
     assert not remove_task.done()
     await core.alert.push_alert("torrent_deleted_alert", info_hash=info_hash)
     await asyncio.wait_for(remove_task, 1)
+
+
+async def test_untracked_torrent_alerts(loop, mock_alert):
+    core = Mock(alert=mock_alert)
+    torrent = Torrent(core)
+    alert = Mock(info_hash="untracked_hash_123")
+    # These should handle untracked alerts gracefully without raising KeyError
+    await torrent._on_torrent_removed_alert(alert)
+    await torrent._on_torrent_deleted_alert(alert)
+    await torrent._on_torrent_delete_failed_alert(alert)
+
+

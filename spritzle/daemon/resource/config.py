@@ -20,19 +20,22 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-from json import JSONDecodeError
-
 from aiohttp import web
+
 
 from spritzle.daemon.keys import APP_KEY_CONFIG
 
 routes = web.RouteTableDef()
 
 
+SECRET_KEYS = {"auth_password", "auth_secret"}
+
+
 @routes.get("/config")
 async def get_config(request):
     config = request.app[APP_KEY_CONFIG]
-    return web.json_response(dict(config))
+    safe_config = {k: v for k, v in config.items() if k not in SECRET_KEYS}
+    return web.json_response(safe_config)
 
 
 @routes.put("/config")
@@ -40,8 +43,11 @@ async def put_config(request):
     config = request.app[APP_KEY_CONFIG]
     try:
         new_values = await request.json()
-    except JSONDecodeError as e:
+    except Exception as e:
         raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
+
+    if not isinstance(new_values, dict):
+        raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
     config.reset()
     config.update(new_values)
@@ -53,8 +59,12 @@ async def patch_config(request):
     config = request.app[APP_KEY_CONFIG]
     try:
         new_values = await request.json()
-    except JSONDecodeError as e:
+    except Exception as e:
         raise web.HTTPBadRequest(text=f"Invalid JSON body: {e}")
+
+    if not isinstance(new_values, dict):
+        raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
     config.update(new_values)
     return web.Response()
+

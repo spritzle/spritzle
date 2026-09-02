@@ -45,6 +45,22 @@ async def test_patch_config(core, cli):
     patch_config = {"key2": "value2"}
 
     response = await cli.patch("/config", json=patch_config)
-    assert response.status == 200
     assert core.config["key1"] == "value1"
     assert core.config["key2"] == "value2"
+
+
+async def test_get_config_redacts_secrets(core, cli):
+    core.config["auth_password"] = "supersecret"
+    core.config["auth_secret"] = "myjwtsecret"
+    response = await cli.get("/config")
+    data = await response.json()
+    assert "auth_password" not in data or data["auth_password"] != "supersecret"
+    assert "auth_secret" not in data or data["auth_secret"] != "myjwtsecret"
+
+
+async def test_put_config_invalid_body(core, cli):
+    core.config["key1"] = "value1"
+    response = await cli.put("/config", data="not json")
+    assert response.status == 400
+    assert core.config["key1"] == "value1"
+

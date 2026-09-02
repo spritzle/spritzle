@@ -48,7 +48,25 @@ def test_len():
 def test_iter():
     db = DB(in_memory=True)
     db["foo"] = 1
-    assert next(iter(db)) == "foo"
+    db["bar"] = 2
+    db["baz"] = 3
+    # Multiple complete iterations
+    assert sorted(list(db)) == ["bar", "baz", "foo"]
+    assert sorted(list(db)) == ["bar", "baz", "foo"]
+
+    # Early break followed by full iteration
+    for k in db:
+        if k == "bar":
+            break
+    assert sorted(list(db)) == ["bar", "baz", "foo"]
+
+    # Nested iteration
+    pairs = []
+    for k1 in db:
+        for k2 in db:
+            pairs.append((k1, k2))
+    assert len(pairs) == 9
+
 
 
 def test_delitem():
@@ -90,3 +108,11 @@ def test_reset():
     assert db["foo"] == 1
     db.reset()
     assert db.get("foo") is None
+
+
+def test_setitem_not_json_serializable():
+    import pytest
+    db = DB(in_memory=True)
+    with pytest.raises(ValueError, match="not JSON serializable"):
+        db["foo"] = object()
+

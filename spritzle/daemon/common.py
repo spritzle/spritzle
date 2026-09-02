@@ -31,7 +31,7 @@ IGNORE_KEYS = ["states", "handle", "torrent_file"] + list(
 )
 
 
-def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
+def struct_to_dict(struct, ignore_keys=IGNORE_KEYS, only_keys=None):
     """
     Convert a libtorrent struct into a dictionary by finding all
     attributes that do not start with '_'.
@@ -68,13 +68,20 @@ def struct_to_dict(struct, ignore_keys=IGNORE_KEYS):
     }
 
     d = {}
-    keys = [x for x in dir(struct) if not x.startswith("_")]
+    if only_keys:
+        keys = only_keys
+    else:
+        keys = [x for x in dir(struct) if not x.startswith("_")]
 
     for key in keys:
         if ignore_keys and key in ignore_keys:
             continue
 
-        value = getattr(struct, key)
+        try:
+            value = getattr(struct, key)
+        except AttributeError:
+            continue
+        
         vtype = type(value)
 
         # Convert the value if necessary

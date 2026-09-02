@@ -30,7 +30,13 @@ def command(client, fields, header, query):
 async def f(client, fields: str, header: bool, query: List[str]):
     type_formatters = {list: list_formatter}
 
-    params = dict([q.split("=") for q in query])
+    params = {}
+    for q in query:
+        if "=" in q:
+            k, v = q.split("=", 1)
+            params[k] = v
+        else:
+            params[q] = ""
     fields: List[str] = fields.split(",")
     async with client.session.get(client.url("torrent"), params=params) as resp:
         if resp.status != 200:
@@ -44,9 +50,10 @@ async def f(client, fields: str, header: bool, query: List[str]):
             t = await resp.json()
             values = []
             for field in fields:
-                value = t[field]
+                value = t.get(field, "")
                 values.append(type_formatters.get(type(value), str)(value))
             table.append(values)
+
 
     tablefmt = "simple"
     if not header:

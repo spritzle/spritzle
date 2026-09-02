@@ -27,8 +27,14 @@ async def f(client, password):
         else:
             t = {}
 
+        import os
         with tf.open(mode="w") as f:
             t[f"{client.host}:{client.port}"] = d["token"]
             yaml.safe_dump(t, f, default_flow_style=False)
+        try:
+            os.chmod(tf, 0o600)
+        except OSError:
+            pass
 
         click.echo(f"Token for {client.host}:{client.port} updated.")
+

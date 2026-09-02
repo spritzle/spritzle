@@ -61,6 +61,9 @@ class Core(object):
         self.alert.register_handler(
             "status_notification", self.on_status_notification_alert
         )
+        self.alert.register_handler("state_changed_alert", self.on_state_changed_alert)
+
+
 
     def get_default_settings(self) -> Dict[str, Any]:
         return {
@@ -80,6 +83,7 @@ class Core(object):
             ),
             "user_agent": "Spritzle/%s libtorrent/%s"
             % (importlib.metadata.version("spritzle"), lt.__version__),
+            "alert_queue_size": 20000,
         }
 
     async def start(self, settings: Optional[Dict[str, Any]] = None) -> None:
@@ -90,14 +94,24 @@ class Core(object):
         await self.load_session_state()
         await self.alert.start(self.session)
         await self.resume_data.start()
+
+        # Consistency check: Ensure all torrents have metadata entries
+        # This handles cases where session.state restores a torrent but resume data (metadata) is missing.
+        for handle in self.session.get_torrents():
+            info_hash = str(handle.info_hash())
+            if info_hash not in self.torrent_data:
+                log.warning(f"Restoring missing metadata for ghost torrent {info_hash}")
+                self.torrent_data[info_hash] = {}
+                
         log.debug("Core started.")
 
     async def stop(self):
         log.debug("Core stopping..")
+        if self.session is None:
+            return
         await self.resume_data.stop()
         await self.save_session_state()
-        if self.session is not None:
-            self.session.pause()
+        self.session.pause()
         await self.alert.stop()
         del self.session
         self.session = None
@@ -133,8 +147,9 @@ class Core(object):
             self.session_stats_future = asyncio.Future()
             self.session.post_session_stats()
 
-        await self.session_stats_future
+        await asyncio.wait_for(self.session_stats_future, timeout=5.0)
         return self.session_stats_future.result()
+
 
     def get_torrent_tags(self, info_hash):
         return self.torrent_data.get(info_hash, {}).get("spritzle.tags", [])

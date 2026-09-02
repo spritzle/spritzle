@@ -57,3 +57,15 @@ def test_update_struct_with_dict():
     assert s.a == 3
     assert s.b == 2
     assert not hasattr(s, "c")
+
+
+def test_setup_logger_case_insensitivity():
+    import logging
+    from spritzle.daemon.logger import setup_logger
+
+    log = setup_logger("test_case_debug", level="debug")
+    assert log.level == logging.DEBUG
+
+    log = setup_logger("test_case_info", level="Info")
+    assert log.level == logging.INFO
+

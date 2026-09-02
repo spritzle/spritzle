@@ -106,3 +106,9 @@ async def test_alert_loop_robustness(core):
     assert isinstance(stats, dict)
 
     await core.stop()
+
+
+async def test_state_changed_alert_registered(core):
+    assert "state_changed_alert" in core.alert.handlers
+    assert core.on_state_changed_alert in core.alert.handlers["state_changed_alert"]
+

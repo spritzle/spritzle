@@ -11,7 +11,8 @@ def setup_logger(name=__name__, logfile=None, level=logging.DEBUG):
     }
 
     if isinstance(level, str):
-        level = level_map[level]
+        level = level_map.get(level.upper(), logging.INFO)
+
 
     logger = logging.getLogger(name)
     logger.propagate = False

@@ -21,11 +21,11 @@
 #
 
 import asyncio
-import binascii
 import functools
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional, Set
+
 
 import libtorrent as lt
 
@@ -39,7 +39,9 @@ class ResumeData(object):
         self.save_loop_task = None
 
         # Store state of outstanding save resume data alerts
-        self.resume_data_futures = {}
+        self.resume_data_futures: Dict[str, asyncio.Future] = {}
+        self.pending_writes: Set[asyncio.Task] = set()
+        self.save_interval = 60 * 30
 
     async def start(self):
         self.loop = asyncio.get_event_loop()
@@ -62,7 +64,12 @@ class ResumeData(object):
             except asyncio.CancelledError:
                 pass
         await self.save_all()
-        log.debug("Resume data manager stopped.")
+        
+        if self.pending_writes:
+            log.debug(f"Waiting for {len(self.pending_writes)} pending resume data writes...")
+            await asyncio.gather(*self.pending_writes, return_exceptions=True)
+            
+        log.debug("ResumeData stopped.")
 
     async def save_loop(self):
         save_all_task = None
@@ -83,9 +90,22 @@ class ResumeData(object):
         r = lt.write_resume_data(alert.params)
         if info_hash in self.core.torrent_data:
             r.update(self.core.torrent_data[info_hash])
-        p.write_bytes(lt.bencode(r))
-        if info_hash in self.resume_data_futures:
-            self.resume_data_futures.pop(info_hash).set_result(True)
+        
+        data = lt.bencode(r)
+        
+        # Fire-and-forget write task to avoid blocking the alert loop
+        task = self.loop.create_task(self._write_data(p, data, info_hash))
+        self.pending_writes.add(task)
+        task.add_done_callback(self.pending_writes.discard)
+
+    async def _write_data(self, path: Path, data: bytes, info_hash: str):
+        try:
+            await self.loop.run_in_executor(None, path.write_bytes, data)
+        except Exception as e:
+            log.error(f"Failed to write resume data for {info_hash}: {e}")
+        finally:
+            if info_hash in self.resume_data_futures:
+                self.resume_data_futures.pop(info_hash).set_result(True)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
@@ -117,8 +137,9 @@ class ResumeData(object):
                 self.save_torrent(torrent)
         try:
             await asyncio.wait_for(
-                asyncio.gather(*self.resume_data_futures.values()), timeout=5.0
+                asyncio.gather(*list(self.resume_data_futures.values())), timeout=30.0
             )
+
         except asyncio.TimeoutError:
             log.warning("Timed out waiting for resume data to save")
         except Exception as e:
@@ -137,15 +158,18 @@ class ResumeData(object):
                 b = f.read_bytes()
                 atp = lt.read_resume_data(b)
                 try:
-                    await asyncio.get_event_loop().run_in_executor(
+                    handle = await asyncio.get_event_loop().run_in_executor(
                         None, functools.partial(self.core.session.add_torrent), atp
                     )
                 except RuntimeError as e:
                     log.error(f"Error loading resume data {f}: {e}")
+                    continue
 
                 d = lt.bdecode(b)
 
-                info_hash = binascii.hexlify(d[b"info-hash"]).decode()
+                # Use the verify handle info_hash as libtorrent 2.0+ might save a different
+                # hash in the resume data (e.g. v2 vs v1).
+                info_hash = str(handle.info_hash())
                 self.core.torrent_data[info_hash] = {}
                 for key, value in d.items():
                     if key.startswith(b"spritzle."):

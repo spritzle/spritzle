@@ -20,11 +20,13 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import secrets
 from datetime import datetime, timedelta, timezone
 from json import JSONDecodeError
 
 import jwt
 from aiohttp import web
+
 
 from spritzle.daemon.keys import APP_KEY_CONFIG
 
@@ -39,7 +41,9 @@ async def post_auth(request):
     except JSONDecodeError as ex:
         raise web.HTTPBadRequest(reason="Invalid JSON", text=ex.msg)
 
-    if post.get("password", None) != config["auth_password"]:
+    provided_password = str(post.get("password", ""))
+    expected_password = str(config.get("auth_password", ""))
+    if not secrets.compare_digest(provided_password, expected_password):
         raise web.HTTPUnauthorized(reason="Incorrect password")
 
     payload = {
@@ -47,8 +51,11 @@ async def post_auth(request):
     }
 
     jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
+    if isinstance(jwt_token, bytes):
+        jwt_token = jwt_token.decode("utf-8")
 
     return web.json_response({"token": jwt_token})
+
 
 
 @web.middleware

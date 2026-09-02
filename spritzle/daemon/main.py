@@ -56,8 +56,15 @@ async def debug_middleware(request, handler):
     log.debug("*" * 20 + "REQUEST" + "*" * 20)
     log.debug(f"URL: {request.rel_url}")
     log.debug(f"METHOD: {request.method}")
-    log.debug(f"HEADERS: {request.headers}")
-    log.debug(f"BODY: {body}")
+    safe_headers = {
+        k: ("***REDACTED***" if k.lower() == "authorization" else v)
+        for k, v in request.headers.items()
+    }
+    log.debug(f"HEADERS: {safe_headers}")
+    if request.rel_url.path == "/auth":
+        log.debug("BODY: ***REDACTED (auth)***")
+    else:
+        log.debug(f"BODY: {body}")
     log.debug("*" * 47)
     return await handler(request)
 
@@ -71,7 +78,16 @@ async def error_middleware(request, handler):
     except Exception:
         # Unhandled exception, this is a bug in Spritzle
         tb = "".join(traceback.format_exception(*sys.exc_info()))
-        response = aiohttp.web.Response(status=500, reason="Spritzle Bug", text=tb)
+        log = request.app.get(APP_KEY_LOG)
+        if log:
+            log.error(
+                f"Unhandled exception in {request.method} {request.rel_url}:\n{tb}"
+            )
+        response = aiohttp.web.Response(
+            status=500,
+            reason="Internal Server Error",
+            text="An internal error occurred in Spritzle.",
+        )
     if response.status < 400:
         return response
     return aiohttp.web.json_response(
@@ -83,6 +99,7 @@ async def error_middleware(request, handler):
         status=response.status,
         reason=response.reason,
     )
+
 
 
 app = aiohttp.web.Application()

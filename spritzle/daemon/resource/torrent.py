@@ -25,10 +25,13 @@ from base64 import b64decode
 import binascii
 import functools
 from json import JSONDecodeError
+import ipaddress
 import logging
 import operator
 import re
 from typing import Dict, List, Union
+from urllib.parse import urlparse
+
 
 import aiohttp
 from aiohttp import web
@@ -43,15 +46,45 @@ log = logging.getLogger("spritzle")
 routes = web.RouteTableDef()
 
 
+def validate_torrent_url(url_str: str) -> str:
+    parsed = urlparse(url_str)
+    if parsed.scheme not in ("http", "https"):
+        raise web.HTTPBadRequest(
+            reason=f"Unsupported URL scheme '{parsed.scheme}'. Only HTTP and HTTPS are allowed."
+        )
+    if not parsed.hostname:
+        raise web.HTTPBadRequest(reason="Invalid URL: missing hostname.")
+
+    try:
+        ip = ipaddress.ip_address(parsed.hostname)
+        if ip.is_link_local or ip.is_multicast:
+            raise web.HTTPBadRequest(reason=f"URL host '{parsed.hostname}' is not allowed.")
+    except ValueError:
+        pass
+
+    return url_str
+
+
+
+
 def get_valid_handle(core, tid):
     """
-    Either returns a valid torrent_handle or aborts with a client-error (400)
+    Either returns a valid torrent_handle or aborts with a client-error (400/404)
     """
-    handle = core.session.find_torrent(lt.sha1_hash(binascii.unhexlify(tid)))
+    try:
+        raw_hash = binascii.unhexlify(tid)
+        if len(raw_hash) != 20:
+            raise web.HTTPBadRequest(reason=f"Invalid info-hash length: {tid}")
+        sha = lt.sha1_hash(raw_hash)
+    except (binascii.Error, ValueError):
+        raise web.HTTPBadRequest(reason=f"Invalid info-hash format: {tid}")
+
+    handle = core.session.find_torrent(sha)
     if not handle.is_valid():
         raise web.HTTPNotFound(reason="Torrent not found: " + tid)
 
     return handle
+
 
 
 def get_torrent_list(core, query=None) -> List[str]:
@@ -60,10 +93,16 @@ def get_torrent_list(core, query=None) -> List[str]:
         # the torrents.
         return [str(th.info_hash()) for th in core.session.get_torrents()]
 
+    keys = {"info_hash"}
+    for k in query.keys():
+        if "." in k:
+            keys.add(k.rsplit(".", 1)[0])
+        else:
+            keys.add(k)
+    
     statuses: List[Dict[str, Union[str, int, float]]] = []
     for handle in core.session.get_torrents():
-        # TODO: only keep keys that are in query
-        statuses.append(common.struct_to_dict(handle.status()))
+        statuses.append(common.struct_to_dict(handle.status(), only_keys=list(keys)))
 
     return get_torrent_list_by_query(query, statuses)
 
@@ -209,9 +248,21 @@ async def post_torrent(request):
     # info-hash when we need it.
     # See: https://github.com/arvidn/libtorrent/issues/481
     elif "url" in post:
-        async with aiohttp.ClientSession() as client:
-            async with client.get(post.pop("url")) as resp:
-                generate_torrent_info(await resp.read())
+        raw_url = post.pop("url")
+        validated_url = validate_torrent_url(raw_url)
+        try:
+
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as client:
+                async with client.get(validated_url) as resp:
+                    if resp.status != 200:
+                        raise web.HTTPBadRequest(
+                            reason=f"Failed to fetch torrent URL (HTTP {resp.status})"
+                        )
+                    generate_torrent_info(await resp.read())
+        except aiohttp.ClientError as ex:
+            raise web.HTTPBadRequest(reason=f"Error fetching torrent URL: {ex}")
+
 
     elif "info_hash" in post:
         atp["info_hashes"] = binascii.unhexlify(post.pop("info_hash"))
@@ -330,15 +381,41 @@ async def delete_torrent(request):
         tids = [tid]
 
     for tid in tids:
-        handle = get_valid_handle(core, tid)
         try:
-            await core.torrent.remove(handle, options)
-        except AlertException:
-            log.error(f"Error deleting files for {handle.name()}")
-        core.resume_data.delete(tid)
-        del core.torrent_data[tid]
+            handle = get_valid_handle(core, tid)
+            try:
+                await core.torrent.remove(handle, options)
+            except AlertException:
+                log.error(f"Error deleting files for {handle.name()}")
+            core.resume_data.delete(tid)
+            core.torrent_data.pop(tid, None)
+        except Exception as e:
+
+            log.error(f"Error removing torrent {tid}: {e}")
+            # Continue deleting others? Yes.
+            continue
 
     return web.Response()
+
+
+ALLOWED_TORRENT_METHODS = {
+    "pause",
+    "resume",
+    "force_recheck",
+    "force_reannounce",
+    "force_dht_announce",
+    "queue_position_down",
+    "queue_position_up",
+    "queue_position_bottom",
+    "queue_position_top",
+    "set_max_uploads",
+    "set_upload_limit",
+    "set_download_limit",
+    "set_max_connections",
+    "set_sequential_download",
+    "clear_error",
+    "flush_cache",
+}
 
 
 @routes.post("/torrent/{tid}/{method}")
@@ -346,11 +423,15 @@ async def post_torrent_method(request):
     core = request.app[APP_KEY_CORE]
     tid = request.match_info.get("tid")
     method_name = request.match_info.get("method")
-    handle = get_valid_handle(core, tid)
 
+    if method_name not in ALLOWED_TORRENT_METHODS:
+        raise web.HTTPBadRequest(reason=f"Method '{method_name}' is not allowed.")
+
+    handle = get_valid_handle(core, tid)
     method = getattr(handle, method_name, None)
     if not method or not callable(method) or method_name.startswith("_"):
         raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
+
 
     body = await request.text()
     if body:
