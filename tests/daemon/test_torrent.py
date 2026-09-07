@@ -80,3 +80,23 @@ async def test_untracked_torrent_alerts(loop, mock_alert):
     await torrent._on_torrent_delete_failed_alert(alert)
 
 
+async def test_torrent_remove_timeout(loop, mock_alert):
+    """
+    Verifies that Torrent.remove() raises asyncio.TimeoutError when alerts are not received
+    within the specified timeout, instead of hanging indefinitely.
+    """
+    core = Mock(alert=mock_alert)
+    torrent = Torrent(core)
+    info_hash = "1234567890"
+    torrent_handle = Mock(**{"info_hash.return_value": info_hash})
+
+    # When timeout occurs, it must raise TimeoutError
+    with pytest.raises(asyncio.TimeoutError):
+        await torrent.remove(torrent_handle, timeout=0.05)
+
+    # And futures must be cleaned up from remove_torrent_futures and delete_torrent_futures
+    assert info_hash not in torrent.remove_torrent_futures
+    assert info_hash not in torrent.delete_torrent_futures
+
+
+

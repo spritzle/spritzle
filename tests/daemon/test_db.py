@@ -76,6 +76,14 @@ def test_delitem():
     assert "foo" not in db
 
 
+def test_delitem_nonexistent():
+    import pytest
+    db = DB(in_memory=True)
+    with pytest.raises(KeyError):
+        del db["nonexistent_key"]
+
+
+
 def test_get():
     db = DB(in_memory=True)
     assert db.get("foo") is None

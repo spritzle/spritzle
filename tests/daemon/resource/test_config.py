@@ -45,6 +45,7 @@ async def test_patch_config(core, cli):
     patch_config = {"key2": "value2"}
 
     response = await cli.patch("/config", json=patch_config)
+    assert response.status == 200
     assert core.config["key1"] == "value1"
     assert core.config["key2"] == "value2"
 

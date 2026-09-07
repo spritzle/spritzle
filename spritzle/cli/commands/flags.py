@@ -54,4 +54,5 @@ async def show(client, info_hash, header, **kwargs):
 
 
 def list_formatter(v):
-    return ",".join(v)
+    return ",".join(str(x) for x in v)
+

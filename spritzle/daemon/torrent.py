@@ -22,6 +22,7 @@
 
 import asyncio
 import logging
+from typing import Optional
 
 import libtorrent as lt
 
@@ -48,7 +49,7 @@ class Torrent(object):
             "torrent_delete_failed_alert", self._on_torrent_delete_failed_alert
         )
 
-    async def remove(self, torrent_handle, options=0):
+    async def remove(self, torrent_handle, options=0, timeout: Optional[float] = 30.0):
         info_hash = str(torrent_handle.info_hash())
 
         if (
@@ -65,7 +66,16 @@ class Torrent(object):
             futures.append(self.remove_torrent_futures[info_hash])
         if info_hash in self.delete_torrent_futures:
             futures.append(self.delete_torrent_futures[info_hash])
-        await asyncio.gather(*futures)
+
+        try:
+            if timeout is not None:
+                await asyncio.wait_for(asyncio.gather(*futures), timeout=timeout)
+            else:
+                await asyncio.gather(*futures)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            self.remove_torrent_futures.pop(info_hash, None)
+            self.delete_torrent_futures.pop(info_hash, None)
+            raise
 
     async def _on_torrent_removed_alert(self, alert):
         future = self.remove_torrent_futures.pop(str(alert.info_hash), None)

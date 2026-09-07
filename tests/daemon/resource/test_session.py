@@ -64,3 +64,25 @@ async def test_put_settings_bad_key(cli):
 async def test_put_settings_type_coercion(cli):
     response = await cli.put("/session/settings", json={"peer_connect_timeout": "1"})
     assert response.status == 200
+
+
+async def test_put_settings_boolean_coercion(cli):
+    # Set to True first
+    response = await cli.put("/session/settings", json={"enable_dht": True})
+    assert response.status == 200
+    response = await cli.get("/session/settings")
+    assert (await response.json())["enable_dht"] is True
+
+    # Now attempt to set to False using string "false"
+    response = await cli.put("/session/settings", json={"enable_dht": "false"})
+    assert response.status == 200
+    response = await cli.get("/session/settings")
+    assert (await response.json())["enable_dht"] is False
+
+    # Also test "0" and "no"
+    await cli.put("/session/settings", json={"enable_dht": True})
+    response = await cli.put("/session/settings", json={"enable_dht": "0"})
+    assert response.status == 200
+    response = await cli.get("/session/settings")
+    assert (await response.json())["enable_dht"] is False
+

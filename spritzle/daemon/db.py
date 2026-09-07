@@ -170,10 +170,13 @@ class DB(collections.abc.MutableMapping[str, Any]):
                     (key, json.dumps(self.defaults[key])),
                 )
             else:
-                self.conn.execute("DELETE FROM t WHERE key=?", (key,))
+                cursor = self.conn.execute("DELETE FROM t WHERE key=?", (key,))
+                if cursor.rowcount == 0:
+                    raise KeyError(f"Table key {key} not found.")
             self.conn.commit()
         except sqlite3.Error as e:
             raise RuntimeError(f"Failed to delete item: {e}") from e
+
 
     def __contains__(self, key: object) -> bool:
         """Check if a key exists in the database."""

@@ -47,7 +47,11 @@ async def f(client, fields: str, header: bool, query: List[str]):
     table = []
     for torrent in torrents:
         async with client.session.get(client.url(f"torrent/{torrent}")) as resp:
+            if resp.status != 200:
+                continue
             t = await resp.json()
+            if not isinstance(t, dict):
+                continue
             values = []
             for field in fields:
                 value = t.get(field, "")
@@ -64,4 +68,5 @@ async def f(client, fields: str, header: bool, query: List[str]):
 
 
 def list_formatter(v):
-    return ",".join(v)
+    return ",".join(str(x) for x in v)
+

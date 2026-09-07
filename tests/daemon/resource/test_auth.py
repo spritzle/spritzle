@@ -86,3 +86,30 @@ async def test_auth_allow_hosts(core, cli):
 
     response = await cli.get("/")
     assert response.status == 200
+
+
+async def test_auth_middleware_bearer_prefix(cli):
+    response = await cli.post("/auth", json={"password": "password"})
+    data = await response.json()
+    token = data["token"]
+
+    response = await cli.get("/", headers={"authorization": f"Bearer {token}"})
+    assert response.status == 200
+
+
+async def test_auth_middleware_immature_token(cli, core):
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    payload = {
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=120),
+        "nbf": datetime.now(timezone.utc) + timedelta(seconds=60),
+    }
+    immature_token = jwt.encode(payload, core.config["auth_secret"], "HS256")
+    if isinstance(immature_token, bytes):
+        immature_token = immature_token.decode("utf-8")
+
+    response = await cli.get("/", headers={"authorization": immature_token})
+    assert response.status == 401
+    assert response.reason == "Token is invalid"
+

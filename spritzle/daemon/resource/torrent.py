@@ -380,22 +380,32 @@ async def delete_torrent(request):
     else:
         tids = [tid]
 
-    for tid in tids:
+    for t in tids:
         try:
-            handle = get_valid_handle(core, tid)
+            handle = get_valid_handle(core, t)
             try:
                 await core.torrent.remove(handle, options)
             except AlertException:
                 log.error(f"Error deleting files for {handle.name()}")
-            core.resume_data.delete(tid)
-            core.torrent_data.pop(tid, None)
+            core.resume_data.delete(t)
+            core.torrent_data.pop(t, None)
+        except web.HTTPException:
+            if tid is not None:
+                raise
+            log.warning(f"Skipping missing torrent {t} during bulk removal")
+        except asyncio.TimeoutError:
+            log.error(f"Timed out removing torrent {t}")
+            if tid is not None:
+                raise web.HTTPGatewayTimeout(text=f"Timed out removing torrent {t}")
+            continue
         except Exception as e:
-
-            log.error(f"Error removing torrent {tid}: {e}")
-            # Continue deleting others? Yes.
+            log.error(f"Error removing torrent {t}: {e}")
+            if tid is not None:
+                raise
             continue
 
     return web.Response()
+
 
 
 ALLOWED_TORRENT_METHODS = {

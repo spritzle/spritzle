@@ -10,7 +10,6 @@ import libtorrent as lt
 
 
 from spritzle.daemon.core import Core
-from spritzle.daemon.config import Config
 
 # Re-using fixtures from conftest, but we might need to tweak them or just reuse them.
 # The 'core' fixture in conftest uses in-memory config and temp state dir, which is good.

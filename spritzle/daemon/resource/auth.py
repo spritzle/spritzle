@@ -73,9 +73,13 @@ async def auth_middleware(request, handler):
     if jwt_token is None:
         raise web.HTTPUnauthorized(reason="Authorization token required")
 
+    if jwt_token.lower().startswith("bearer "):
+        jwt_token = jwt_token[7:].strip()
+
     try:
         jwt.decode(jwt_token, config["auth_secret"], algorithms=["HS256"])
-    except (jwt.DecodeError, jwt.ExpiredSignatureError):
+    except jwt.InvalidTokenError:
         raise web.HTTPUnauthorized(reason="Token is invalid")
 
     return await handler(request)
+

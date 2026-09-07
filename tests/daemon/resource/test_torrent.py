@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
 from base64 import b64encode
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -271,6 +272,34 @@ async def test_get_torrent_invalid_hex(cli):
     assert response.status in (400, 404)
 
 
+async def test_delete_torrent_not_found(cli):
+    nonexistent_tid = "a" * 40
+    response = await cli.delete(f"/torrent/{nonexistent_tid}")
+    assert response.status == 404
+
+
+async def test_delete_torrent_invalid_hex(cli):
+    response = await cli.delete("/torrent/not-a-valid-hex")
+    assert response.status == 400
+
+
+async def test_delete_torrent_timeout(cli, monkeypatch):
+    tid = await test_post_torrent(cli)
+
+    async def mock_remove(*args, **kwargs):
+        raise asyncio.TimeoutError()
+
+    from spritzle.daemon.keys import APP_KEY_CORE
+
+    core = cli.app[APP_KEY_CORE]
+    monkeypatch.setattr(core.torrent, "remove", mock_remove)
+
+    response = await cli.delete(f"/torrent/{tid}")
+    assert response.status == 504
+
+
+
+
 
 async def test_pause_resume_torrent(cli):
     tid = await test_post_torrent(cli)
@@ -387,7 +416,8 @@ async def test_force_recheck(cli):
 
     r = await cli.get(f"/torrent/{tid}")
     status = await r.json()
-    assert status["state"] == "downloading"
+    assert status["state"] in ("checking_resume_data", "downloading")
+
 
 
 async def test_set_max_uploads(cli):

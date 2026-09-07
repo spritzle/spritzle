@@ -110,6 +110,38 @@ def test_list_command_missing_field_and_query_equal_sign(cli):
     assert result.exit_code == 0
 
 
+def test_list_command_non_string_list_field(cli):
+    """
+    Test that 'list' formatting does not crash with TypeError when a field
+    contains a list of non-strings (e.g. integers or non-string items).
+    """
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    # Add non-string list field to torrent_data
+    cli.app[APP_KEY_CORE].torrent_data[info_hash] = {"custom_ints": [1, 2, 3]}
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "list",
+            "-f", "name,custom_ints",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "1,2,3" in result.output
+
+
+
 def test_config_command_types(cli):
     runner = CliRunner()
     result = runner.invoke(
@@ -126,6 +158,28 @@ def test_config_command_types(cli):
     config = cli.app[APP_KEY_CONFIG]
     assert config["auth_timeout"] == 300
     assert isinstance(config["auth_timeout"], int)
+
+
+def test_settings_command_boolean_setter(cli):
+    from spritzle.daemon.keys import APP_KEY_CORE
+    core = cli.app[APP_KEY_CORE]
+    # Set to True first
+    core.session.apply_settings({"enable_dht": True})
+    assert core.session.get_settings()["enable_dht"] is True
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "settings",
+            "-s", "enable_dht", "false",
+        ]
+    )
+    assert result.exit_code == 0
+    assert core.session.get_settings()["enable_dht"] is False
+
 
 
 def test_client_init_with_empty_or_invalid_tokens_file(tmp_path):

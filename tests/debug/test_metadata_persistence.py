@@ -1,15 +1,12 @@
 
-import asyncio
-import time
 import logging
-from pathlib import Path
 import os
+from pathlib import Path
+import time
 
-import pytest
 import libtorrent as lt
 
 from spritzle.daemon.core import Core
-from spritzle.daemon.config import Config
 
 # Reuse dummy torrent creation logic
 def create_dummy_torrent(path: Path, name: str, size: int = 1024 * 1024):
@@ -69,10 +66,6 @@ async def test_metadata_persistence(cli, core, tmp_path):
 
     # Verify metadata exists in memory
     assert len(core.torrent_data) == NUM_TORRENTS
-    hash_0 = list(core.torrent_data.keys())[0]
-    # The order of keys is insertion order in py3.7+, but let's not rely on it blindly for 'tag_0' check
-    # We should check if ANY has tag_0, or just check count first.
-    # Actually, let's just check length of torrent_data first.
     
     log.info("Stopping core (saving resume data)...")
     start_stop = time.monotonic()
@@ -90,6 +83,7 @@ async def test_metadata_persistence(cli, core, tmp_path):
     # Check content of one resume file to see if custom fields are there
     with open(resume_files[0], "rb") as f:
         data = lt.bdecode(f.read())
+        assert b"spritzle.tags" in data
         # Custom fields are stored with key 'spritzle.tags' usually?
         # Let's check how resume_data.py saves it.
         # It updates the 'entry' with core.torrent_data[info_hash] items.

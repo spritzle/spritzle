@@ -23,13 +23,48 @@
 import asyncio
 import functools
 import logging
+import os
 from pathlib import Path
-from typing import Dict, Optional, Set
+import time
+from typing import Any, Callable, Dict, Optional, Set
 
 
 import libtorrent as lt
 
 log = logging.getLogger("spritzle")
+
+
+def decode_bencoded_value(val: Any) -> Any:
+    """Recursively decode bencoded byte strings into python strings."""
+    if isinstance(val, bytes):
+        try:
+            return val.decode("utf-8")
+        except UnicodeDecodeError:
+            return val.decode("latin1")
+    elif isinstance(val, list):
+        return [decode_bencoded_value(item) for item in val]
+    elif isinstance(val, dict):
+        return {
+            (k.decode("utf-8") if isinstance(k, bytes) else k): decode_bencoded_value(v)
+            for k, v in val.items()
+        }
+    return val
+
+
+def _atomic_write_file(path: Path, data: bytes, is_deleted: Callable[[], bool]) -> None:
+    """Atomically write data to path, checking if the file was marked deleted."""
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}_{time.monotonic_ns()}.tmp")
+    try:
+        tmp_path.write_bytes(data)
+        if is_deleted():
+            tmp_path.unlink(missing_ok=True)
+            return
+        tmp_path.replace(path)
+        if is_deleted():
+            path.unlink(missing_ok=True)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 class ResumeData(object):
@@ -41,6 +76,7 @@ class ResumeData(object):
         # Store state of outstanding save resume data alerts
         self.resume_data_futures: Dict[str, asyncio.Future] = {}
         self.pending_writes: Set[asyncio.Task] = set()
+        self.deleted_hashes: Set[str] = set()
         self.save_interval = 60 * 30
 
     async def start(self):
@@ -86,6 +122,10 @@ class ResumeData(object):
 
     async def on_save_resume_data_alert(self, alert):
         info_hash = str(alert.handle.info_hash())
+        if info_hash in self.deleted_hashes:
+            log.debug(f"Ignoring save resume data alert for deleted torrent {info_hash}")
+            return
+
         p = Path(self.core.state_dir, info_hash + ".resume")
         r = lt.write_resume_data(alert.params)
         if info_hash in self.core.torrent_data:
@@ -94,18 +134,32 @@ class ResumeData(object):
         data = lt.bencode(r)
         
         # Fire-and-forget write task to avoid blocking the alert loop
-        task = self.loop.create_task(self._write_data(p, data, info_hash))
+        loop = self.loop or asyncio.get_running_loop()
+        task = loop.create_task(self._write_data(p, data, info_hash))
         self.pending_writes.add(task)
         task.add_done_callback(self.pending_writes.discard)
 
     async def _write_data(self, path: Path, data: bytes, info_hash: str):
         try:
-            await self.loop.run_in_executor(None, path.write_bytes, data)
+            if info_hash in self.deleted_hashes:
+                return
+            loop = self.loop or asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None,
+                _atomic_write_file,
+                path,
+                data,
+                lambda: info_hash in self.deleted_hashes,
+            )
+            if info_hash in self.deleted_hashes:
+                path.unlink(missing_ok=True)
         except Exception as e:
             log.error(f"Failed to write resume data for {info_hash}: {e}")
         finally:
             if info_hash in self.resume_data_futures:
-                self.resume_data_futures.pop(info_hash).set_result(True)
+                fut = self.resume_data_futures.pop(info_hash)
+                if not fut.done():
+                    fut.set_result(True)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
@@ -116,10 +170,13 @@ class ResumeData(object):
         if info_hash in self.resume_data_futures:
             # We don't really care if this fails right now, maybe in the future
             # we should raise an exception.
-            self.resume_data_futures.pop(info_hash).set_result(True)
+            fut = self.resume_data_futures.pop(info_hash)
+            if not fut.done():
+                fut.set_result(True)
 
     def save_torrent(self, torrent_handle):
         info_hash = str(torrent_handle.info_hash())
+        self.deleted_hashes.discard(info_hash)
         if info_hash not in self.resume_data_futures:
             self.resume_data_futures[info_hash] = asyncio.Future()
             torrent_handle.save_resume_data(
@@ -146,31 +203,41 @@ class ResumeData(object):
             log.error(f"Error saving resume data: {e}")
 
     def delete(self, info_hash):
+        self.deleted_hashes.add(info_hash)
+        if info_hash in self.resume_data_futures:
+            fut = self.resume_data_futures.pop(info_hash)
+            if not fut.done():
+                fut.cancel()
+
         p = Path(self.core.state_dir, info_hash + ".resume")
-        if p.is_file():
-            p.unlink()
+        p.unlink(missing_ok=True)
+
+        if self.core.state_dir.is_dir():
+            for tmp in self.core.state_dir.glob(f"*.{info_hash}.*.tmp"):
+                tmp.unlink(missing_ok=True)
 
     async def load(self):
         log.info(f"Loading resume data from {self.core.state_dir}")
         for f in self.core.state_dir.iterdir():
-            if f.suffix == ".resume":
+            if f.suffix == ".resume" and not f.name.startswith("."):
                 log.info(f"Found {f.name}, attempting add..")
-                b = f.read_bytes()
-                atp = lt.read_resume_data(b)
                 try:
+                    b = f.read_bytes()
+                    atp = lt.read_resume_data(b)
                     handle = await asyncio.get_event_loop().run_in_executor(
                         None, functools.partial(self.core.session.add_torrent), atp
                     )
-                except RuntimeError as e:
+                    d = lt.bdecode(b)
+                    if isinstance(d, dict):
+                        info_hash = str(handle.info_hash())
+                        self.core.torrent_data[info_hash] = {}
+                        for key, value in d.items():
+                            if key.startswith(b"spritzle."):
+                                self.core.torrent_data[info_hash][key.decode()] = (
+                                    decode_bencoded_value(value)
+                                )
+                except Exception as e:
                     log.error(f"Error loading resume data {f}: {e}")
                     continue
 
-                d = lt.bdecode(b)
 
-                # Use the verify handle info_hash as libtorrent 2.0+ might save a different
-                # hash in the resume data (e.g. v2 vs v1).
-                info_hash = str(handle.info_hash())
-                self.core.torrent_data[info_hash] = {}
-                for key, value in d.items():
-                    if key.startswith(b"spritzle."):
-                        self.core.torrent_data[info_hash][key.decode()] = value

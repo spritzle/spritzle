@@ -1,7 +1,6 @@
 
 import libtorrent as lt
 import os
-import sys
 import time
 import shutil
 from pathlib import Path

@@ -36,20 +36,44 @@ async def get_session_settings(request):
 @routes.put("/session/settings")
 async def put_session_settings(request):
     core = request.app[APP_KEY_CORE]
-    settings = await request.json()
+    try:
+        settings = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    if not isinstance(settings, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
     current = core.session.get_settings()
 
     # Do our best to coerce what the client sent into the proper types that
     # libtorrent expects.
     for key, value in current.items():
         if key in settings and type(settings[key]) is not type(value):
-            settings[key] = type(value)(settings[key])
+            if isinstance(value, bool):
+                val_str = str(settings[key]).strip().lower()
+                if val_str in ("true", "1", "yes", "on"):
+                    settings[key] = True
+                elif val_str in ("false", "0", "no", "off", ""):
+                    settings[key] = False
+                else:
+                    raise web.HTTPBadRequest(
+                        reason=f"Cannot coerce value '{settings[key]}' to boolean for setting '{key}'."
+                    )
+            else:
+                try:
+                    settings[key] = type(value)(settings[key])
+                except (ValueError, TypeError) as e:
+                    raise web.HTTPBadRequest(
+                        reason=f"Cannot coerce value '{settings[key]}' for setting '{key}': {e}"
+                    )
 
     try:
         core.session.apply_settings(settings)
     except KeyError as e:
         raise web.HTTPBadRequest(reason=str(e))
     return web.json_response()
+
 
 
 @routes.get("/session/stats")

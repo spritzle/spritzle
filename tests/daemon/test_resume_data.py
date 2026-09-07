@@ -27,6 +27,7 @@ from unittest.mock import patch
 import libtorrent as lt
 import pytest
 
+from spritzle.daemon.core import Core
 from .common import resume_data_dir
 
 
@@ -75,3 +76,129 @@ async def test_resume_data_save_loop(core, frequency):
         # Allow a bit of slop so the test isn't so fragile
         assert expected_runs - 1 <= mock_save.call_count <= expected_runs + 1
         await core.stop()
+
+
+async def test_load_custom_metadata_types(cli, core):
+    """
+    Verifies that custom metadata (e.g. spritzle.tags) loaded from resume data
+    are deserialized as str instances rather than bytes, ensuring JSON serialization
+    and hook alerts work correctly after restart.
+    """
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+    resp = await cli.post(
+        "/torrent",
+        json={"url": torrent_address, "spritzle.tags": ["linux", "iso"]},
+    )
+    assert resp.status == 201
+    assert core.torrent_data[info_hash]["spritzle.tags"] == ["linux", "iso"]
+
+    state_dir = core.state_dir
+    config = core.config
+
+    # Save resume data and stop core
+    await core.stop()
+
+    # Restart core from the same state_dir, mimicking a new daemon process
+    settings = {
+        "enable_upnp": False,
+        "enable_natpmp": False,
+        "enable_lsd": False,
+        "enable_dht": False,
+        "anonymous_mode": True,
+        "alert_mask": 0,
+        "stop_tracker_timeout": 0,
+    }
+    new_core = Core(config, state_dir)
+    await new_core.start(settings)
+    from spritzle.daemon.keys import APP_KEY_CORE
+    cli.app[APP_KEY_CORE] = new_core
+
+    try:
+        # The metadata in torrent_data must contain python strings, not bytes
+        tags = new_core.torrent_data[info_hash].get("spritzle.tags")
+        assert tags == ["linux", "iso"]
+        assert all(isinstance(tag, str) for tag in tags)
+
+        # Calling GET /torrent/{info_hash} must return 200 JSON, not 500 TypeError
+        resp = await cli.get(f"/torrent/{info_hash}")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["spritzle.tags"] == ["linux", "iso"]
+
+        # Hooks join must not raise TypeError
+        assert new_core.get_torrent_tags(info_hash) == ["linux", "iso"]
+        assert ",".join(new_core.get_torrent_tags(info_hash)) == "linux,iso"
+    finally:
+        await new_core.stop()
+
+
+async def test_load_corrupt_resume_data_file(core):
+    """
+    Verifies that corrupt or 0-byte .resume files do not crash daemon startup,
+    and valid resume files in the same directory are still loaded.
+    """
+    # Copy a valid resume file
+    valid_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+    shutil.copy(resume_data_dir / f"{valid_hash}.resume", core.state_dir)
+
+    # Create empty and corrupted resume files
+    (core.state_dir / "empty.resume").write_bytes(b"")
+    (core.state_dir / "garbage.resume").write_bytes(b"invalid bencoded resume content")
+
+    # Starting core must not raise RuntimeError
+    await core.start()
+
+    torrents = core.session.get_torrents()
+    assert len(torrents) == 1
+    assert str(torrents[0].info_hash()) == valid_hash
+
+    await core.stop()
+
+
+async def test_delete_race_condition_pending_write(core):
+    """
+    Verifies that if a write is scheduled or in-flight when delete() is called,
+    the .resume file is not resurrected and pending writes do not recreate it.
+    """
+    await core.start()
+    info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+    resume_file = core.state_dir / f"{info_hash}.resume"
+
+    # Simulate an in-flight write task
+    dummy_data = b"d4:infod6:lengthi1024eee"
+    loop = asyncio.get_running_loop()
+    write_task = loop.create_task(
+        core.resume_data._write_data(resume_file, dummy_data, info_hash)
+    )
+    core.resume_data.pending_writes.add(write_task)
+
+    # Immediately call delete before write finishes / executor completes
+    core.resume_data.delete(info_hash)
+
+    # Wait for pending writes to finish
+    await asyncio.gather(*core.resume_data.pending_writes)
+
+    # The file must NOT exist on disk
+    assert not resume_file.is_file()
+
+    # Even if an alert arrives for the deleted hash after delete(), it should not write
+    class DummyAlert:
+        class Handle:
+            def info_hash(self):
+                return info_hash
+
+        handle = Handle()
+        params = {}
+
+    await core.resume_data.on_save_resume_data_alert(DummyAlert())
+    if core.resume_data.pending_writes:
+        await asyncio.gather(*core.resume_data.pending_writes)
+
+    assert not resume_file.is_file()
+
+    await core.stop()
+
+
+
+
