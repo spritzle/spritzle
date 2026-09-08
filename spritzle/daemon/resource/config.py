@@ -49,7 +49,9 @@ async def put_config(request):
     if not isinstance(new_values, dict):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
+    saved_secrets = {k: config[k] for k in SECRET_KEYS if k in config}
     config.reset()
+    config.update(saved_secrets)
     config.update(new_values)
     return web.Response()
 

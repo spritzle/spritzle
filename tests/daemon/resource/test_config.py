@@ -40,6 +40,17 @@ async def test_put_config(core, cli):
     assert "key1" not in core.config
 
 
+async def test_put_config_preserves_secrets(core, cli):
+    core.config["auth_password"] = "custom_password"
+    core.config["auth_secret"] = "custom_secret"
+    new_config = {"key2": "value2"}
+
+    response = await cli.put("/config", json=new_config)
+    assert response.status == 200
+    assert core.config["auth_password"] == "custom_password"
+    assert core.config["auth_secret"] == "custom_secret"
+
+
 async def test_patch_config(core, cli):
     core.config["key1"] = "value1"
     patch_config = {"key2": "value2"}
