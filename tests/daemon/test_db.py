@@ -124,3 +124,14 @@ def test_setitem_not_json_serializable():
     with pytest.raises(ValueError, match="not JSON serializable"):
         db["foo"] = object()
 
+
+def test_db_init_failure_close_del():
+    import pytest
+    db = DB.__new__(DB)
+    with pytest.raises(ValueError):
+        db.__init__(path=None, in_memory=False)
+    # Calling close() or __del__() on the failed instance must not raise AttributeError
+    db.close()
+    db.__del__()
+
+

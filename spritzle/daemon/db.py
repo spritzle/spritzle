@@ -66,7 +66,7 @@ class DB(collections.abc.MutableMapping[str, Any]):
         self.in_memory = in_memory
 
         self.defaults = defaults if defaults else {}
-        self.conn: sqlite3.Connection
+        self.conn: Optional[sqlite3.Connection] = None
 
         if self.in_memory:
             self.conn = sqlite3.connect(
@@ -114,6 +114,7 @@ class DB(collections.abc.MutableMapping[str, Any]):
         """Close the database connection."""
         if self.conn:
             self.conn.close()
+            self.conn = None
 
     def __del__(self) -> None:
         """Destructor to ensure connection is closed."""
