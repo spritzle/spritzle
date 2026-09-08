@@ -326,6 +326,31 @@ async def test_delete_torrent_timeout(cli, monkeypatch):
     assert response.status == 504
 
 
+async def test_delete_torrent_alert_exception_handling(cli, monkeypatch):
+    tid = await test_post_torrent(cli)
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from spritzle.daemon.torrent import AlertException
+    from unittest.mock import Mock
+
+    core = cli.app[APP_KEY_CORE]
+
+    async def mock_remove(handle, *args, **kwargs):
+        # In libtorrent, remove_torrent is invoked and handle becomes invalid
+        # by the time torrent_delete_failed_alert is dispatched.
+        core.session.remove_torrent(handle)
+        for _ in range(10):
+            core.session.wait_for_alert(100)
+            core.session.pop_alerts()
+        assert not handle.is_valid()
+        raise AlertException(Mock(message=lambda: "Failed to delete files"))
+
+    monkeypatch.setattr(core.torrent, "remove", mock_remove)
+
+    response = await cli.delete(f"/torrent/{tid}", params={"delete_files": 1})
+    assert response.status == 200
+    assert tid not in core.torrent_data
+
+
 
 
 

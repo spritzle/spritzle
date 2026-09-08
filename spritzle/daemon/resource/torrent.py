@@ -387,8 +387,9 @@ async def delete_torrent(request):
             handle = get_valid_handle(core, t)
             try:
                 await core.torrent.remove(handle, options)
-            except AlertException:
-                log.error(f"Error deleting files for {handle.name()}")
+            except AlertException as ex:
+                msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
+                log.error(f"Error deleting files for torrent {t}: {msg}")
             core.resume_data.delete(t)
             core.torrent_data.pop(t, None)
         except web.HTTPException:
