@@ -112,3 +112,31 @@ async def test_state_changed_alert_registered(core):
     assert "state_changed_alert" in core.alert.handlers
     assert core.on_state_changed_alert in core.alert.handlers["state_changed_alert"]
 
+
+async def test_on_status_notification_alert_removed_torrent(core, monkeypatch):
+    await core.start()
+    ti = lt.torrent_info("tests/daemon/resource/torrents/_test.torrent")
+    handle = core.session.add_torrent({"ti": ti, "save_path": "."})
+    info_hash = str(handle.info_hash())
+
+    captured_hooks = []
+
+    def mock_run_hooks(hook_name, hook_info_hash, tags):
+        captured_hooks.append((hook_name, hook_info_hash, tags))
+
+    monkeypatch.setattr(core.hooks, "run_hooks", mock_run_hooks)
+
+    # Remove the torrent and wait for alerts to be processed
+    core.session.remove_torrent(handle)
+    for _ in range(20):
+        await asyncio.sleep(0.05)
+        if any(h[0] == "torrent_removed" for h in captured_hooks):
+            break
+
+    removed_hooks = [h for h in captured_hooks if h[0] == "torrent_removed"]
+    assert len(removed_hooks) == 1
+    assert removed_hooks[0][1] == info_hash, (
+        f"Expected info_hash {info_hash}, got {removed_hooks[0][1]}"
+    )
+    await core.stop()
+

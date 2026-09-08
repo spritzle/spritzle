@@ -156,15 +156,16 @@ class Core(object):
 
     async def on_status_notification_alert(self, alert):
         try:
-            if hasattr(alert, "handle"):
-                if alert.what() == "torrent_removed_alert":
-                    info_hash = str(alert.info_hash)
-                else:
-                    info_hash = str(alert.handle.info_hash())
+            if hasattr(alert, "info_hash"):
+                info_hash = str(alert.info_hash)
+            elif hasattr(alert, "handle"):
+                info_hash = str(alert.handle.info_hash())
+            else:
+                return
 
-                self.hooks.run_hooks(
-                    alert.what(), info_hash, ",".join(self.get_torrent_tags(info_hash))
-                )
+            self.hooks.run_hooks(
+                alert.what(), info_hash, ",".join(self.get_torrent_tags(info_hash))
+            )
         except Exception:
             import traceback
 
