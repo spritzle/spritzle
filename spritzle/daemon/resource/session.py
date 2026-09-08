@@ -70,7 +70,7 @@ async def put_session_settings(request):
 
     try:
         core.session.apply_settings(settings)
-    except KeyError as e:
+    except (KeyError, RuntimeError, TypeError, ValueError) as e:
         raise web.HTTPBadRequest(reason=str(e))
     return web.json_response()
 

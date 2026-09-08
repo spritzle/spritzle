@@ -86,3 +86,11 @@ async def test_put_settings_boolean_coercion(cli):
     response = await cli.get("/session/settings")
     assert (await response.json())["enable_dht"] is False
 
+
+async def test_put_settings_incompatible_type(cli):
+    response = await cli.put(
+        "/session/settings", json={"peer_connect_timeout": "not_an_int"}
+    )
+    assert response.status == 400
+
+

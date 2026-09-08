@@ -552,4 +552,26 @@ async def test_put_flags_non_dict_body(cli):
     assert r.status == 400
 
 
+async def test_post_torrent_invalid_file_base64(cli):
+    r = await cli.post("/torrent", json={"file": "not_valid_base64!!!"})
+    assert r.status == 400
+
+
+async def test_post_torrent_invalid_info_hash_format(cli):
+    r = await cli.post("/torrent", json={"info_hash": "not_valid_hex"})
+    assert r.status == 400
+
+
+async def test_post_torrent_invalid_info_hash_length(cli):
+    r = await cli.post("/torrent", json={"info_hash": "abcd"})
+    assert r.status == 400
+
+
+async def test_get_torrent_invalid_flag(cli):
+    tid = await test_post_torrent(cli)
+    r = await cli.get(f"/torrent/{tid}/flags/not_a_valid_flag")
+    assert r.status in (400, 404)
+
+
+
 

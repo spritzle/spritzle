@@ -259,11 +259,17 @@ async def post_torrent(request):
     def generate_torrent_info(data):
         try:
             atp["ti"] = lt.torrent_info(lt.bdecode(data))
-        except RuntimeError as e:
+        except (RuntimeError, TypeError, ValueError) as e:
             raise web.HTTPBadRequest(reason=f"Not a valid torrent file: {e}")
 
     if "file" in post:
-        data = b64decode(post.pop("file"))
+        try:
+            raw_file = post.pop("file")
+            if not isinstance(raw_file, (str, bytes)):
+                raise ValueError("file must be a base64 encoded string")
+            data = b64decode(raw_file)
+        except (binascii.Error, ValueError, TypeError) as ex:
+            raise web.HTTPBadRequest(reason=f"Invalid base64 file data: {ex}")
         generate_torrent_info(data)
     # We do not use libtorrent's ability to download torrents as it will
     # probably be removed in future versions and cannot provide the
@@ -285,9 +291,19 @@ async def post_torrent(request):
         except aiohttp.ClientError as ex:
             raise web.HTTPBadRequest(reason=f"Error fetching torrent URL: {ex}")
 
-
     elif "info_hash" in post:
-        atp["info_hashes"] = binascii.unhexlify(post.pop("info_hash"))
+        raw_info_hash = post.pop("info_hash")
+        if not isinstance(raw_info_hash, str):
+            raise web.HTTPBadRequest(reason="info_hash must be a hex string")
+        try:
+            info_hash_bytes = binascii.unhexlify(raw_info_hash)
+            if len(info_hash_bytes) not in (20, 32):
+                raise web.HTTPBadRequest(
+                    reason=f"Invalid info-hash length: {raw_info_hash}"
+                )
+            atp["info_hashes"] = info_hash_bytes
+        except (binascii.Error, ValueError) as ex:
+            raise web.HTTPBadRequest(reason=f"Invalid hex info-hash: {ex}")
 
     if "ti" in atp:
         info_hash = str(atp["ti"].info_hash())
@@ -307,7 +323,7 @@ async def post_torrent(request):
         torrent_handle = await asyncio.get_event_loop().run_in_executor(
             None, functools.partial(core.session.add_torrent), atp
         )
-    except KeyError as e:
+    except (KeyError, TypeError, ValueError) as e:
         raise web.HTTPBadRequest(reason=str(e))
     except RuntimeError as e:
         raise web.HTTPInternalServerError(reason=f"Error in session.add_torrent(): {e}")
@@ -381,6 +397,8 @@ async def get_flags(request):
 
     if flag is None:
         ret = build_flags_dict(handle.flags())
+    elif flag not in get_lt_torrent_flags():
+        raise web.HTTPNotFound(reason=f"{flag} is not a valid libtorrent torrent_flag")
     else:
         ret = bool(handle.flags() & getattr(lt.torrent_flags, flag))
 
