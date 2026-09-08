@@ -225,6 +225,28 @@ def test_auth_command(cli, tmp_path):
     assert len(data[f"127.0.0.1:{cli.server.port}"]) > 0
 
 
+def test_auth_command_nonexistent_config_dir(cli, tmp_path):
+    import json
+    config_dir = tmp_path / "nonexistent" / "config"
+    assert not config_dir.exists()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--config", str(config_dir),
+            "auth",
+            "--password", "password",
+        ],
+    )
+    assert result.exit_code == 0
+    tokens_file = config_dir / "tokens"
+    assert tokens_file.exists()
+    data = json.loads(tokens_file.read_text())
+    assert f"127.0.0.1:{cli.server.port}" in data
+
+
 
 
 

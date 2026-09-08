@@ -31,6 +31,7 @@ async def f(client, password):
             except Exception:
                 t = {}
 
+        tf.parent.mkdir(parents=True, exist_ok=True)
         with tf.open(mode="w") as f:
             t[f"{client.host}:{client.port}"] = d["token"]
             json.dump(t, f, indent=2)
