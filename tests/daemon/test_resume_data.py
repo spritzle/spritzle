@@ -200,5 +200,31 @@ async def test_delete_race_condition_pending_write(core):
     await core.stop()
 
 
+async def test_save_all_handles_cancelled_futures_and_none_session(core):
+    await core.start()
+
+    fut1 = asyncio.Future()
+    fut2 = asyncio.Future()
+    core.resume_data.resume_data_futures["hash1"] = fut1
+    core.resume_data.resume_data_futures["hash2"] = fut2
+
+    async def cancel_later():
+        await asyncio.sleep(0.01)
+        core.resume_data.delete("hash1")
+        fut2.set_result(True)
+
+    asyncio.create_task(cancel_later())
+
+    # save_all() must not propagate CancelledError when fut1 is cancelled during gather
+    await core.resume_data.save_all()
+
+    # save_all() when session is None must not raise AttributeError
+    core.session = None
+    await core.resume_data.save_all()
+
+    await core.stop()
+
+
+
 
 

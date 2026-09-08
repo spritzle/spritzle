@@ -189,12 +189,17 @@ class ResumeData(object):
 
     async def save_all(self):
         log.debug("Saving resume data for all torrents")
+        if self.core.session is None:
+            return
         for torrent in self.core.session.get_torrents():
             if torrent.need_save_resume_data():
                 self.save_torrent(torrent)
         try:
             await asyncio.wait_for(
-                asyncio.gather(*list(self.resume_data_futures.values())), timeout=30.0
+                asyncio.gather(
+                    *list(self.resume_data_futures.values()), return_exceptions=True
+                ),
+                timeout=30.0,
             )
 
         except asyncio.TimeoutError:
