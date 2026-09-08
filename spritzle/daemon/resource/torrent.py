@@ -247,6 +247,9 @@ async def post_torrent(request):
     except JSONDecodeError as ex:
         raise web.HTTPBadRequest(reason="Invalid JSON", text=ex.msg)
 
+    if not isinstance(post, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
     # We require that only one of file, url or info_hash is set
     if len(set(post.keys()).intersection(("file", "url", "info_hash"))) != 1:
         raise web.HTTPBadRequest(
@@ -326,10 +329,16 @@ async def put_flags(request):
     flag = request.match_info.get("flag", None)
     handle = get_valid_handle(core, tid)
 
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as ex:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {ex}")
 
     if flag:
         body = {flag: body}
+
+    if not isinstance(body, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
 
     flags = 0
     mask = 0

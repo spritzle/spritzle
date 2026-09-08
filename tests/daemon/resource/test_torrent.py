@@ -531,3 +531,25 @@ async def test_disallowed_torrent_method(cli):
     assert r.status == 400
 
 
+async def test_post_torrent_non_dict_body(cli):
+    r = await cli.post("/torrent", json=[])
+    assert r.status == 400
+
+
+async def test_put_flags_invalid_json(cli):
+    tid = await test_post_torrent(cli)
+    r = await cli.put(
+        f"/torrent/{tid}/flags",
+        data="not a json string",
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status == 400
+
+
+async def test_put_flags_non_dict_body(cli):
+    tid = await test_post_torrent(cli)
+    r = await cli.put(f"/torrent/{tid}/flags", json=[])
+    assert r.status == 400
+
+
+

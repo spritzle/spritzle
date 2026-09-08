@@ -41,6 +41,9 @@ async def post_auth(request):
     except JSONDecodeError as ex:
         raise web.HTTPBadRequest(reason="Invalid JSON", text=ex.msg)
 
+    if not isinstance(post, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
     provided_password = str(post.get("password", ""))
     expected_password = str(config.get("auth_password", ""))
     if not secrets.compare_digest(provided_password, expected_password):

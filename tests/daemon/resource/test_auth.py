@@ -59,6 +59,12 @@ async def test_post_auth(core, cli):
     assert response.status == 401
 
 
+async def test_post_auth_non_dict_body(cli):
+    response = await cli.post("/auth", json=[])
+    assert response.status == 400
+
+
+
 async def test_auth_middleware(cli):
     response = await cli.get("/")
     assert response.status == 401
