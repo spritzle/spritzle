@@ -1,4 +1,5 @@
 from base64 import b64encode
+from pathlib import Path
 import sys
 from urllib.parse import urlparse
 
@@ -39,16 +40,26 @@ async def f(client, path, option, tag):
             data[o] = True
     data["spritzle.tags"] = tag
 
-
-    if not urlparse(path).scheme:
+    if urlparse(path).scheme:
+        data["url"] = path
+    elif len(path) in (40, 64) and not Path(path).exists():
+        try:
+            int(path, 16)
+            data["info_hash"] = path
+        except ValueError:
+            try:
+                with open(path, "rb") as f:
+                    data["file"] = b64encode(f.read()).decode("ascii")
+            except OSError as e:
+                click.echo(f"Error reading file '{path}': {e}", file=sys.stderr)
+                sys.exit(1)
+    else:
         try:
             with open(path, "rb") as f:
                 data["file"] = b64encode(f.read()).decode("ascii")
         except OSError as e:
             click.echo(f"Error reading file '{path}': {e}", file=sys.stderr)
             sys.exit(1)
-    else:
-        data["url"] = path
 
     async with client.session.post(client.url("torrent"), json=data) as resp:
         if resp.status != 201:

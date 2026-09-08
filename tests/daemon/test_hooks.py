@@ -129,3 +129,17 @@ async def test_hooks_blocking():
         # 6. We check flag. It should be True.
 
         assert flag, "Event loop was blocked by run_hook"
+
+
+async def test_run_hooks_tracks_tasks():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p = Path(tmpdir, "my_hook")
+        p.write_bytes(b"#!/bin/sh\nexit 0")
+        p.chmod(0o777)
+        h = Hooks(tmpdir)
+        h.run_hooks("my_hook")
+        assert len(h._tasks) == 1
+        # Wait for tasks to complete
+        await asyncio.gather(*list(h._tasks))
+        assert len(h._tasks) == 0
+

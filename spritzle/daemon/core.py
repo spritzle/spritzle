@@ -25,7 +25,7 @@ import importlib.metadata
 from pathlib import Path
 import logging
 import functools
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 import libtorrent as lt
 
@@ -50,6 +50,7 @@ class Core(object):
         # TODO check dir for rw, etc
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.session_stats_future: Optional[asyncio.Future] = None
+        self.session_stats_waiters: Set[asyncio.Future] = set()
         # A place to keep additional data on torrents, that isn't stored in
         # libtorrent.  This is key'd on info_hash.
         self.torrent_data: Dict[str, Any] = {}
@@ -120,7 +121,7 @@ class Core(object):
     async def save_session_state(self):
         if self.session is None:
             return
-        state = await asyncio.get_event_loop().run_in_executor(
+        state = await asyncio.get_running_loop().run_in_executor(
             None, functools.partial(self.session.save_state)
         )
         f = Path(self.state_dir, "session.state")
@@ -132,29 +133,33 @@ class Core(object):
         if f.exists():
             if self.session is None:
                 raise RuntimeError("Session not started")
-            await asyncio.get_event_loop().run_in_executor(
+            await asyncio.get_running_loop().run_in_executor(
                 None, functools.partial(self.session.load_state), f.read_bytes()
             )
 
     async def on_session_stats_alert(self, alert):
+        waiters = list(self.session_stats_waiters)
+        self.session_stats_waiters.clear()
+        for fut in waiters:
+            if not fut.done():
+                fut.set_result(alert.values)
         if self.session_stats_future and not self.session_stats_future.done():
             self.session_stats_future.set_result(alert.values)
 
     async def get_session_stats(self):
         if self.session is None:
             raise RuntimeError("Session not started")
-        if self.session_stats_future is None or self.session_stats_future.done():
-            self.session_stats_future = asyncio.Future()
+        loop = asyncio.get_running_loop()
+        first_caller = len(self.session_stats_waiters) == 0
+        fut = loop.create_future()
+        self.session_stats_waiters.add(fut)
+        if first_caller:
             self.session.post_session_stats()
 
         try:
-            await asyncio.wait_for(self.session_stats_future, timeout=5.0)
-            return self.session_stats_future.result()
-        except (asyncio.TimeoutError, asyncio.CancelledError):
-            if self.session_stats_future and not self.session_stats_future.done():
-                self.session_stats_future.cancel()
-            self.session_stats_future = None
-            raise
+            return await asyncio.wait_for(fut, timeout=5.0)
+        finally:
+            self.session_stats_waiters.discard(fut)
 
 
     def get_torrent_tags(self, info_hash):

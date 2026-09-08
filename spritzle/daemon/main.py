@@ -161,7 +161,7 @@ def main():
     except IOError as e:
         log.error(f"Another instance of Spritzle is running: {e}")
         log.error("Exiting..")
-        sys.exit(0)
+        sys.exit(1)
 
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests

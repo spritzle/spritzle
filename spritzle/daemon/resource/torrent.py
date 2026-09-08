@@ -215,6 +215,10 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                     targets = [v.strip() for v in value.split(",")]
                     if not all(target in items for target in targets):
                         break
+            else:
+                if op == "ne":
+                    continue
+                break
 
         else:
             torrents.append(status["info_hash"])
@@ -321,28 +325,24 @@ async def post_torrent(request):
         except (binascii.Error, ValueError) as ex:
             raise web.HTTPBadRequest(reason=f"Invalid hex info-hash: {ex}")
 
-    if "ti" in atp:
-        info_hash = str(atp["ti"].info_hash())
-    elif "info_hashes" in atp:
-        info_hash = binascii.hexlify(atp["info_hashes"]).decode()
-
-    if info_hash not in core.torrent_data:
-        core.torrent_data[info_hash] = {}
-
     tags = post.pop("spritzle.tags", [])
-    core.torrent_data[info_hash]["spritzle.tags"] = tags
 
     # We have already popped all spritzle specific options from post, merge it in
     atp.update(post)
 
     try:
-        torrent_handle = await asyncio.get_event_loop().run_in_executor(
+        torrent_handle = await asyncio.get_running_loop().run_in_executor(
             None, functools.partial(core.session.add_torrent), atp
         )
     except (KeyError, TypeError, ValueError) as e:
         raise web.HTTPBadRequest(reason=str(e))
     except RuntimeError as e:
         raise web.HTTPInternalServerError(reason=f"Error in session.add_torrent(): {e}")
+
+    info_hash = str(torrent_handle.info_hash())
+    if info_hash not in core.torrent_data:
+        core.torrent_data[info_hash] = {}
+    core.torrent_data[info_hash]["spritzle.tags"] = tags
 
     await core.resume_data.save_torrent(torrent_handle)
 
@@ -429,18 +429,19 @@ async def delete_torrent(request):
 
     # see libtorrent.options_t for valid options
     options = 0
+    query_params = {}
 
     for key, val in request.query.items():
-        if val.strip().lower() in ("false", "0", "no", "off"):
-            continue
-        try:
+        if hasattr(lt.options_t, key):
+            if val.strip().lower() in ("false", "0", "no", "off"):
+                continue
             options = options | getattr(lt.options_t, key)
-        except AttributeError:
-            log.warning(f"Invalid option key: {key}")
+        else:
+            query_params[key] = val
 
     if tid is None:
-        # If tid is None, we remove all the torrents
-        tids = get_torrent_list(core)
+        # If tid is None, we remove all torrents matching the query (or all if no query)
+        tids = get_torrent_list(core, query=query_params if query_params else None)
     else:
         tids = [tid]
 

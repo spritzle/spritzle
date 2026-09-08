@@ -85,3 +85,19 @@ async def test_put_config_update_error_returns_400(core, cli, monkeypatch):
     response = await cli.put("/config", json={"key": "val"})
     assert response.status == 400
 
+
+async def test_put_config_update_error_preserves_existing_config(core, cli, monkeypatch):
+    core.config["key1"] = "value1"
+    real_setitem = type(core.config).__setitem__
+
+    def failing_setitem(self, key, value):
+        if key == "bad_key":
+            raise ValueError(f"Value is not JSON serializable: {value}")
+        real_setitem(self, key, value)
+
+    monkeypatch.setattr(type(core.config), "__setitem__", failing_setitem)
+    response = await cli.put("/config", json={"bad_key": "bad_val"})
+    assert response.status == 400
+    assert core.config.get("key1") == "value1"
+
+

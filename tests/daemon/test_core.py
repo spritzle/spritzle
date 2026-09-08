@@ -178,5 +178,36 @@ async def test_get_session_stats_timeout_recovery(core, monkeypatch):
     assert isinstance(stats, dict)
     assert len(stats) > 0
     assert second_called is True, "post_session_stats should have been called on second attempt after timeout!"
+    assert len(core.session_stats_waiters) == 0
     await core.stop()
+
+
+async def test_concurrent_get_session_stats_caller_cancellation(core, monkeypatch):
+    await core.start()
+
+    real_post = core.session.post_session_stats
+
+    def delayed_post():
+        asyncio.get_running_loop().call_later(0.05, real_post)
+
+    monkeypatch.setattr(core.session, "post_session_stats", delayed_post)
+
+    task1 = asyncio.create_task(core.get_session_stats())
+    task2 = asyncio.create_task(core.get_session_stats())
+
+    await asyncio.sleep(0.01)
+    # Cancel caller 1 while waiting
+    task1.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task1
+
+    # Caller 2 must still receive results and not be cancelled
+    stats2 = await asyncio.wait_for(task2, timeout=2.0)
+    assert isinstance(stats2, dict)
+    assert len(stats2) > 0
+    assert len(core.session_stats_waiters) == 0
+
+    await core.stop()
+
+
 

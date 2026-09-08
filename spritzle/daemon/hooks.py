@@ -32,6 +32,7 @@ log = logging.getLogger("spritzle")
 class Hooks:
     def __init__(self, path):
         self.path = Path(path)
+        self._tasks = set()
 
     def find_hooks(self, hook):
         hooks = []
@@ -71,5 +72,8 @@ class Hooks:
             log.error(f"run_hook exception: {e}")
 
     def run_hooks(self, hook_name, *args):
+        loop = asyncio.get_running_loop()
         for hook in self.find_hooks(hook_name):
-            asyncio.get_event_loop().create_task(self.run_hook(hook, *args))
+            task = loop.create_task(self.run_hook(hook, *args))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)

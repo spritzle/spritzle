@@ -598,5 +598,60 @@ async def test_get_torrent_invalid_flag(cli):
     assert r.status in (400, 404)
 
 
+def test_get_torrent_list_by_query_unhandled_or_none_type():
+    from spritzle.daemon.resource.torrent import get_torrent_list_by_query
+    statuses = [
+        {"info_hash": "hash1", "error": {"code": 1, "msg": "err"}, "custom_none": None},
+        {"info_hash": "hash2", "error": None, "custom_none": None},
+    ]
+    # Querying equality for unhandled type/None must NOT match
+    res = get_torrent_list_by_query({"error": "err"}, statuses)
+    assert res == []
+
+    # Querying .ne should match
+    res_ne = get_torrent_list_by_query({"error.ne": "err"}, statuses)
+    assert res_ne == ["hash1", "hash2"]
+
+
+async def test_delete_torrent_bulk_with_query_filter(cli):
+    p1 = create_torrent_post_data(filename="testtorrent1.torrent", tags=["tag_delete"])
+    resp1 = await cli.post("/torrent", json=p1)
+    assert resp1.status == 201
+    h1 = (await resp1.json())["info_hash"]
+
+    p2 = create_torrent_post_data(filename="random_one_file.torrent", tags=["tag_keep"])
+    resp2 = await cli.post("/torrent", json=p2)
+    assert resp2.status == 201
+    h2 = (await resp2.json())["info_hash"]
+
+    # Delete with query filter
+    del_resp = await cli.delete("/torrent?spritzle.tags=tag_delete")
+    assert del_resp.status == 200
+
+    # h1 should be deleted, h2 should still exist
+    list_resp = await cli.get("/torrent")
+    remaining = await list_resp.json()
+    assert h1 not in remaining
+    assert h2 in remaining
+
+
+async def test_post_torrent_failure_does_not_leak_metadata(cli, monkeypatch):
+    from spritzle.daemon.keys import APP_KEY_CORE
+    core = cli.app[APP_KEY_CORE]
+
+    def mock_add_torrent(*args, **kwargs):
+        raise RuntimeError("Libtorrent disk error")
+
+    monkeypatch.setattr(core.session, "add_torrent", mock_add_torrent)
+    p = create_torrent_post_data(filename="testtorrent1.torrent", tags=["will_fail"])
+    resp = await cli.post("/torrent", json=p)
+    assert resp.status == 500
+
+    # Metadata must not have leaked into core.torrent_data
+    for h, data in core.torrent_data.items():
+        assert "will_fail" not in data.get("spritzle.tags", [])
+
+
+
 
 

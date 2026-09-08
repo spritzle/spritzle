@@ -50,11 +50,17 @@ async def put_config(request):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
     saved_secrets = {k: config[k] for k in SECRET_KEYS if k in config}
+    backup_items = dict(config.items())
     config.reset()
     try:
         config.update(saved_secrets)
         config.update(new_values)
     except (ValueError, TypeError, RuntimeError) as e:
+        config.reset()
+        try:
+            config.update(backup_items)
+        except Exception:
+            pass
         raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
     return web.Response()
 

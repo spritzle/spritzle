@@ -80,7 +80,7 @@ class ResumeData(object):
         self.save_interval = 60 * 30
 
     async def start(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
         log.debug("Resume data manager starting...")
         await self.load()
         self.core.alert.register_handler(
@@ -133,13 +133,16 @@ class ResumeData(object):
         
         data = lt.bencode(r)
         
+        fut = self.resume_data_futures.get(info_hash)
         # Fire-and-forget write task to avoid blocking the alert loop
         loop = self.loop or asyncio.get_running_loop()
-        task = loop.create_task(self._write_data(p, data, info_hash))
+        task = loop.create_task(self._write_data(p, data, info_hash, fut))
         self.pending_writes.add(task)
         task.add_done_callback(self.pending_writes.discard)
 
-    async def _write_data(self, path: Path, data: bytes, info_hash: str):
+    async def _write_data(
+        self, path: Path, data: bytes, info_hash: str, fut: Optional[asyncio.Future] = None
+    ):
         try:
             if info_hash in self.deleted_hashes:
                 return
@@ -156,10 +159,10 @@ class ResumeData(object):
         except Exception as e:
             log.error(f"Failed to write resume data for {info_hash}: {e}")
         finally:
-            if info_hash in self.resume_data_futures:
-                fut = self.resume_data_futures.pop(info_hash)
-                if not fut.done():
-                    fut.set_result(True)
+            if fut is not None and not fut.done():
+                fut.set_result(True)
+            if self.resume_data_futures.get(info_hash) is fut:
+                self.resume_data_futures.pop(info_hash, None)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
@@ -235,7 +238,7 @@ class ResumeData(object):
                 try:
                     b = f.read_bytes()
                     atp = lt.read_resume_data(b)
-                    handle = await asyncio.get_event_loop().run_in_executor(
+                    handle = await asyncio.get_running_loop().run_in_executor(
                         None, functools.partial(self.core.session.add_torrent), atp
                     )
                     d = lt.bdecode(b)

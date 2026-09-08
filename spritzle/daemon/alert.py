@@ -73,7 +73,7 @@ class Alert(object):
         self.alert_types = build_alert_types()
 
     async def start(self, session):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
         log.debug("Alert starting..")
         self.session = session
         self.run = True
@@ -93,7 +93,7 @@ class Alert(object):
         if alert_type not in self.alert_types and alert_type not in self.categories:
             raise ValueError("Not a valid alert type or category.")
         if not asyncio.iscoroutinefunction(handler):
-            raise ValueError("Alert handlers must by coroutine functions.")
+            raise ValueError("Alert handlers must be coroutine functions.")
         self.handlers.setdefault(alert_type, []).append(handler)
 
     def alert_notify(self):

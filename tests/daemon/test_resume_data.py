@@ -249,6 +249,36 @@ async def test_save_all_timeout_clears_futures(core, monkeypatch):
     await core.stop()
 
 
+async def test_write_data_does_not_pop_newer_future(core, tmp_path):
+    await core.start()
+
+    info_hash = "testhash123"
+    old_fut = asyncio.Future()
+    new_fut = asyncio.Future()
+
+    core.resume_data.resume_data_futures[info_hash] = old_fut
+    dummy_file = tmp_path / f"{info_hash}.resume"
+
+    # Start write task bound to old_fut
+    write_task = asyncio.create_task(
+        core.resume_data._write_data(dummy_file, b"data", info_hash, old_fut)
+    )
+
+    # In the meantime, simulate a new save_torrent registering a new future
+    core.resume_data.resume_data_futures[info_hash] = new_fut
+
+    await write_task
+
+    # Old future should be completed
+    assert old_fut.done() is True
+    # New future must NOT have been popped or completed prematurely!
+    assert core.resume_data.resume_data_futures.get(info_hash) is new_fut
+    assert new_fut.done() is False
+
+    await core.stop()
+
+
+
 
 
 

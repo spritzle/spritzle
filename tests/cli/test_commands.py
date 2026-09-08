@@ -336,6 +336,23 @@ def test_add_command_nonexistent_file(cli):
     assert "Traceback" not in result.output
 
 
+def test_add_command_info_hash(cli):
+    runner = CliRunner()
+    valid_hash = "0123456789abcdef0123456789abcdef01234567"
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "add",
+            valid_hash,
+        ],
+    )
+    assert result.exit_code == 0
+    assert "added successfully" in result.output
+
+
+
 
 
 
