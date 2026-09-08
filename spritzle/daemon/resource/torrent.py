@@ -88,6 +88,7 @@ def get_valid_handle(core, tid):
 
 
 VALID_QUERY_OPS = {"eq", "lt", "gt", "ne", "ge", "le", "all", "any", "in"}
+VALID_LT_STATUS_KEYS = {x for x in dir(lt.torrent_status) if not x.startswith("_")}
 
 
 def get_torrent_list(core, query=None) -> List[str]:
@@ -117,27 +118,42 @@ def get_torrent_list(core, query=None) -> List[str]:
 def get_torrent_list_by_query(query, statuses) -> List[str]:
     torrents: List[str] = []
 
+    all_status_keys = set()
+    for s in statuses:
+        all_status_keys.update(s.keys())
+
+    parsed_queries = []
+    for raw_key, value in query.items():
+        if not isinstance(raw_key, str):
+            raise web.HTTPBadRequest(reason=f"Key {raw_key} must be string type.")
+        if not isinstance(value, str):
+            raise web.HTTPBadRequest(reason=f"Value {value} must be string type.")
+
+        if "." in raw_key and raw_key.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
+            op = raw_key.rsplit(".", 1)[-1]
+            key = raw_key.rsplit(".", 1)[0]
+        else:
+            op = ""
+            key = raw_key
+
+        if (
+            key not in all_status_keys
+            and key not in VALID_LT_STATUS_KEYS
+            and not key.startswith("spritzle.")
+        ):
+            raise web.HTTPBadRequest(reason=f"Field {key} is not valid.")
+
+        parsed_queries.append((key, op, value))
+
     if len(statuses) == 0:
         return []
 
     for status in statuses:
-        for key, value in query.items():
-            # Key's can have an operator as a '.' separated suffix. If the key is in the status dict it means it's valid
-            # and does not have an operator.
-            if key in status:
-                op = ""
-            elif "." in key and key.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
-                op = key.rsplit(".", 1)[-1]
-                key = key.rsplit(".", 1)[0]
-            else:
-                op = ""
-
-            if not isinstance(key, str):
-                raise web.HTTPBadRequest(reason=f"Key {key} must be string type.")
-            if not isinstance(value, str):
-                raise web.HTTPBadRequest(reason=f"Value {value} must be string type.")
+        for key, op, value in parsed_queries:
             if key not in status:
-                raise web.HTTPBadRequest(reason=f"Field {key} is not valid.")
+                if op == "ne":
+                    continue
+                break
 
             if isinstance(status[key], str):
                 try:

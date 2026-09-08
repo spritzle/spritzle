@@ -21,7 +21,7 @@
 #
 
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 from spritzle.daemon.db import DB
 
@@ -37,6 +37,7 @@ DEFAULTS = {
 
 class Config(DB):
     path: Path
+    config_file: Optional[Path]
 
     def __init__(
         self,

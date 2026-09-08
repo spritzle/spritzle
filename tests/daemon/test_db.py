@@ -135,3 +135,15 @@ def test_db_init_failure_close_del():
     db.__del__()
 
 
+def test_db_context_manager_rollback_on_exception():
+    import pytest
+    db = DB(in_memory=True)
+    assert db.conn is not None
+    with pytest.raises(RuntimeError):
+        with db:
+            db.conn.execute("INSERT INTO t(key, value, is_default) VALUES('manual_key', '\"manual_val\"', 0)")
+            raise RuntimeError("Transaction aborted")
+
+    assert "manual_key" not in db
+
+

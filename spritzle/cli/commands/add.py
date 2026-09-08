@@ -41,8 +41,12 @@ async def f(client, path, option, tag):
 
 
     if not urlparse(path).scheme:
-        with open(path, "rb") as f:
-            data["file"] = b64encode(f.read()).decode("ascii")
+        try:
+            with open(path, "rb") as f:
+                data["file"] = b64encode(f.read()).decode("ascii")
+        except OSError as e:
+            click.echo(f"Error reading file '{path}': {e}", file=sys.stderr)
+            sys.exit(1)
     else:
         data["url"] = path
 

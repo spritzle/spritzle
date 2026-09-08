@@ -22,6 +22,7 @@
 
 import asyncio
 import libtorrent as lt
+import pytest
 
 
 async def test_save_session_state(core):
@@ -138,5 +139,44 @@ async def test_on_status_notification_alert_removed_torrent(core, monkeypatch):
     assert removed_hooks[0][1] == info_hash, (
         f"Expected info_hash {info_hash}, got {removed_hooks[0][1]}"
     )
+    await core.stop()
+
+
+async def test_get_session_stats_timeout_recovery(core, monkeypatch):
+    await core.start()
+
+    # First call: suppress post_session_stats so it times out
+    real_post = core.session.post_session_stats
+    post_count = 0
+
+    def mock_post_noop():
+        nonlocal post_count
+        post_count += 1
+        # do not trigger alert
+
+    monkeypatch.setattr(core.session, "post_session_stats", mock_post_noop)
+
+    # First call will timeout
+    with pytest.raises(asyncio.TimeoutError):
+        # We patch internal wait_for or use a small timeout to trigger timeout quickly
+        fut = asyncio.create_task(core.get_session_stats())
+        await asyncio.wait_for(fut, timeout=0.05)
+
+    assert post_count == 1
+
+    # Second call: record whether post_session_stats is called
+    second_called = False
+
+    def mock_post_second():
+        nonlocal second_called
+        second_called = True
+        real_post()
+
+    monkeypatch.setattr(core.session, "post_session_stats", mock_post_second)
+
+    stats = await asyncio.wait_for(core.get_session_stats(), timeout=2.0)
+    assert isinstance(stats, dict)
+    assert len(stats) > 0
+    assert second_called is True, "post_session_stats should have been called on second attempt after timeout!"
     await core.stop()
 

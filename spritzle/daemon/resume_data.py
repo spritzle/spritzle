@@ -204,6 +204,12 @@ class ResumeData(object):
 
         except asyncio.TimeoutError:
             log.warning("Timed out waiting for resume data to save")
+            for h, fut in list(self.resume_data_futures.items()):
+                if not fut.done():
+                    fut.cancel()
+                    self.resume_data_futures.pop(h, None)
+                elif fut.cancelled():
+                    self.resume_data_futures.pop(h, None)
         except Exception as e:
             log.error(f"Error saving resume data: {e}")
 

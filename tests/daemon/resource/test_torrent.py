@@ -138,6 +138,31 @@ async def test_get_torrent_query_by_tags(cli):
     assert (await resp.json()) == []
 
 
+async def test_get_torrent_query_with_heterogeneous_tags(cli):
+    from spritzle.daemon.keys import APP_KEY_CORE
+    core = cli.app[APP_KEY_CORE]
+
+    # Add torrent 1 and simulate it lacking spritzle.tags (e.g. ghost torrent / external resume)
+    p1 = create_torrent_post_data(filename="testtorrent1.torrent")
+    resp1 = await cli.post("/torrent", json=p1)
+    assert resp1.status == 201
+    info_hash1 = (await resp1.json())["info_hash"]
+    core.torrent_data[info_hash1] = {}  # No spritzle.tags
+
+    # Add torrent 2 WITH tags
+    p2 = create_torrent_post_data(
+        filename="random_one_file.torrent", tags=["linux", "iso"]
+    )
+    resp2 = await cli.post("/torrent", json=p2)
+    assert resp2.status == 201
+    info_hash2 = (await resp2.json())["info_hash"]
+
+    # Querying should succeed and only return torrent 2, NOT raise 400
+    resp = await cli.get("/torrent?spritzle.tags=linux")
+    assert resp.status == 200
+    assert (await resp.json()) == [info_hash2]
+
+
 @pytest.mark.parametrize(
     "query,want",
     [

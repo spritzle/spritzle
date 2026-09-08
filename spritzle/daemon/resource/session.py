@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
 from aiohttp import web
 
 from spritzle.daemon.keys import APP_KEY_CORE
@@ -79,7 +80,10 @@ async def put_session_settings(request):
 @routes.get("/session/stats")
 async def get_session_stats(request):
     core = request.app[APP_KEY_CORE]
-    stats = await core.get_session_stats()
+    try:
+        stats = await core.get_session_stats()
+    except asyncio.TimeoutError:
+        raise web.HTTPGatewayTimeout(reason="Timed out waiting for session stats")
     return web.json_response(stats)
 
 

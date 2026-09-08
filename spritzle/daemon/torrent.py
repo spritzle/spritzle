@@ -51,44 +51,58 @@ class Torrent(object):
 
     async def remove(self, torrent_handle, options=0, timeout: Optional[float] = 30.0):
         info_hash = str(torrent_handle.info_hash())
+        loop = asyncio.get_running_loop()
 
-        if (
+        first_caller = (
             info_hash not in self.remove_torrent_futures
             and info_hash not in self.delete_torrent_futures
-        ):
-            self.remove_torrent_futures[info_hash] = asyncio.Future()
-            if options & lt.options_t.delete_files:
-                self.delete_torrent_futures[info_hash] = asyncio.Future()
+        )
+
+        remove_fut = loop.create_future()
+        self.remove_torrent_futures.setdefault(info_hash, set()).add(remove_fut)
+
+        delete_fut = None
+        if options & lt.options_t.delete_files:
+            delete_fut = loop.create_future()
+            self.delete_torrent_futures.setdefault(info_hash, set()).add(delete_fut)
+
+        if first_caller:
             self.core.session.remove_torrent(torrent_handle, options)
 
-        futures = []
-        if info_hash in self.remove_torrent_futures:
-            futures.append(self.remove_torrent_futures[info_hash])
-        if info_hash in self.delete_torrent_futures:
-            futures.append(self.delete_torrent_futures[info_hash])
+        wait_futs = [remove_fut]
+        if delete_fut is not None:
+            wait_futs.append(delete_fut)
 
         try:
             if timeout is not None:
-                await asyncio.wait_for(asyncio.gather(*futures), timeout=timeout)
+                await asyncio.wait_for(asyncio.gather(*wait_futs), timeout=timeout)
             else:
-                await asyncio.gather(*futures)
-        except (asyncio.TimeoutError, asyncio.CancelledError):
-            self.remove_torrent_futures.pop(info_hash, None)
-            self.delete_torrent_futures.pop(info_hash, None)
-            raise
+                await asyncio.gather(*wait_futs)
+        finally:
+            if info_hash in self.remove_torrent_futures:
+                self.remove_torrent_futures[info_hash].discard(remove_fut)
+                if not self.remove_torrent_futures[info_hash]:
+                    self.remove_torrent_futures.pop(info_hash, None)
+            if delete_fut is not None and info_hash in self.delete_torrent_futures:
+                self.delete_torrent_futures[info_hash].discard(delete_fut)
+                if not self.delete_torrent_futures[info_hash]:
+                    self.delete_torrent_futures.pop(info_hash, None)
 
     async def _on_torrent_removed_alert(self, alert):
-        future = self.remove_torrent_futures.pop(str(alert.info_hash), None)
-        if future and not future.done():
-            future.set_result(alert)
+        waiters = self.remove_torrent_futures.pop(str(alert.info_hash), set())
+        for future in list(waiters):
+            if not future.done():
+                future.set_result(alert)
 
     async def _on_torrent_deleted_alert(self, alert):
-        future = self.delete_torrent_futures.pop(str(alert.info_hash), None)
-        if future and not future.done():
-            future.set_result(alert)
+        waiters = self.delete_torrent_futures.pop(str(alert.info_hash), set())
+        for future in list(waiters):
+            if not future.done():
+                future.set_result(alert)
 
     async def _on_torrent_delete_failed_alert(self, alert):
-        future = self.delete_torrent_futures.pop(str(alert.info_hash), None)
-        if future and not future.done():
-            future.set_exception(AlertException(alert))
+        waiters = self.delete_torrent_futures.pop(str(alert.info_hash), set())
+        for future in list(waiters):
+            if not future.done():
+                future.set_exception(AlertException(alert))
 

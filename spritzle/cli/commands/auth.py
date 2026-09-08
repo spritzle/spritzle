@@ -27,7 +27,9 @@ async def f(client, password):
         if tf.exists():
             try:
                 with tf.open(mode="r") as f:
-                    t = json.load(f) or {}
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        t = loaded
             except Exception:
                 t = {}
 

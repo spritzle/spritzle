@@ -1,3 +1,4 @@
+import json
 from click.testing import CliRunner
 from spritzle.cli.main import cli as spritzle_cli
 
@@ -247,6 +248,26 @@ def test_auth_command_nonexistent_config_dir(cli, tmp_path):
     assert f"127.0.0.1:{cli.server.port}" in data
 
 
+def test_auth_command_corrupted_non_dict_tokens_file(cli, tmp_path):
+    tokens_file = tmp_path / "tokens"
+    tokens_file.write_text("[1, 2, 3]")  # Non-empty list, truthy but not a dict
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--config", str(tmp_path),
+            "auth",
+            "--password", "password",
+        ],
+    )
+    assert result.exit_code == 0
+    data = json.loads(tokens_file.read_text())
+    assert isinstance(data, dict)
+    assert f"127.0.0.1:{cli.server.port}" in data
+
+
 def test_flags_command(cli):
     import libtorrent as lt
     from tests.daemon.common import torrent_dir
@@ -297,6 +318,22 @@ def test_flags_command(cli):
     )
     assert result.exit_code == 0
     assert bool(handle.flags() & lt.torrent_flags.auto_managed) is False
+
+
+def test_add_command_nonexistent_file(cli):
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "add",
+            "/path/to/nonexistent/file.torrent",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Error reading file" in result.output
+    assert "Traceback" not in result.output
 
 
 

@@ -51,8 +51,11 @@ async def put_config(request):
 
     saved_secrets = {k: config[k] for k in SECRET_KEYS if k in config}
     config.reset()
-    config.update(saved_secrets)
-    config.update(new_values)
+    try:
+        config.update(saved_secrets)
+        config.update(new_values)
+    except (ValueError, TypeError, RuntimeError) as e:
+        raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
     return web.Response()
 
 
@@ -67,6 +70,9 @@ async def patch_config(request):
     if not isinstance(new_values, dict):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
-    config.update(new_values)
+    try:
+        config.update(new_values)
+    except (ValueError, TypeError, RuntimeError) as e:
+        raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
     return web.Response()
 

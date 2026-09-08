@@ -91,8 +91,25 @@ class save_resume_data_alert(alert):
     params: Dict[str, Any]
 
 class torrent_flags:
-    seed_mode: int
+    apply_ip_filter: int
+    auto_managed: int
+    default_dont_download: int
+    default_flags: int
+    disable_dht: int
+    disable_lsd: int
+    disable_pex: int
+    duplicate_is_error: int
+    no_verify_files: int
+    override_trackers: int
+    override_web_seeds: int
     paused: int
+    seed_mode: int
+    sequential_download: int
+    share_mode: int
+    stop_when_ready: int
+    super_seeding: int
+    update_subscribe: int
+    upload_mode: int
 
 class options_t:
     delete_files: int

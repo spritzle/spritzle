@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import asyncio
 from aiohttp import web
 
 routes = web.RouteTableDef()
@@ -30,5 +31,5 @@ async def delete_core(request):
     def shutdown():
         raise web.GracefulExit()
 
-    request.loop.call_soon(shutdown)
+    asyncio.get_running_loop().call_soon(shutdown)
     return web.Response()

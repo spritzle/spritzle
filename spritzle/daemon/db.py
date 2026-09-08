@@ -113,7 +113,10 @@ class DB(collections.abc.MutableMapping[str, Any]):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         if self.conn is not None:
-            self.conn.commit()
+            if exc_type is None:
+                self.conn.commit()
+            else:
+                self.conn.rollback()
 
     def close(self) -> None:
         """Close the database connection."""

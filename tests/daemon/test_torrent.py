@@ -99,4 +99,29 @@ async def test_torrent_remove_timeout(loop, mock_alert):
     assert info_hash not in torrent.delete_torrent_futures
 
 
+async def test_concurrent_remove_timeout_does_not_break_other_callers(loop, mock_alert):
+    core = Mock(alert=mock_alert)
+    torrent = Torrent(core)
+    info_hash = "1234567890"
+    torrent_handle = Mock(**{"info_hash.return_value": info_hash})
+
+    # Caller 1 has a long timeout
+    task1 = loop.create_task(torrent.remove(torrent_handle, timeout=1.0))
+    # Caller 2 has a short timeout
+    task2 = loop.create_task(torrent.remove(torrent_handle, timeout=0.02))
+
+    await asyncio.sleep(0.05)
+    # Caller 2 should have timed out
+    assert task2.done()
+    with pytest.raises(asyncio.TimeoutError):
+        await task2
+
+    # Now the alert arrives
+    await core.alert.push_alert("torrent_removed_alert", info_hash=info_hash)
+
+    # Caller 1 must finish successfully and NOT hang or time out
+    await asyncio.wait_for(task1, timeout=0.5)
+    assert task1.done()
+
+
 

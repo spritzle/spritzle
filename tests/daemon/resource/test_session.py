@@ -94,3 +94,17 @@ async def test_put_settings_incompatible_type(cli):
     assert response.status == 400
 
 
+async def test_get_session_stats_timeout(cli, monkeypatch):
+    import asyncio
+    from spritzle.daemon.keys import APP_KEY_CORE
+
+    core = cli.app[APP_KEY_CORE]
+
+    async def mock_timeout_stats():
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(core, "get_session_stats", mock_timeout_stats)
+    response = await cli.get("/session/stats")
+    assert response.status == 504
+
+

@@ -147,8 +147,14 @@ class Core(object):
             self.session_stats_future = asyncio.Future()
             self.session.post_session_stats()
 
-        await asyncio.wait_for(self.session_stats_future, timeout=5.0)
-        return self.session_stats_future.result()
+        try:
+            await asyncio.wait_for(self.session_stats_future, timeout=5.0)
+            return self.session_stats_future.result()
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if self.session_stats_future and not self.session_stats_future.done():
+                self.session_stats_future.cancel()
+            self.session_stats_future = None
+            raise
 
 
     def get_torrent_tags(self, info_hash):

@@ -225,6 +225,30 @@ async def test_save_all_handles_cancelled_futures_and_none_session(core):
     await core.stop()
 
 
+async def test_save_all_timeout_clears_futures(core, monkeypatch):
+    await core.start()
+
+    # Create an unresolved future simulating a torrent whose alert never arrives
+    unresolved_fut = asyncio.Future()
+    core.resume_data.resume_data_futures["stuck_hash"] = unresolved_fut
+
+    # Patch wait_for timeout to be tiny for the test
+    real_wait_for = asyncio.wait_for
+
+    async def mock_wait_for(fut, timeout=None):
+        return await real_wait_for(fut, timeout=0.02)
+
+    monkeypatch.setattr(asyncio, "wait_for", mock_wait_for)
+
+    await core.resume_data.save_all()
+
+    # Stuck future must be pruned so it doesn't block future saves
+    assert "stuck_hash" not in core.resume_data.resume_data_futures
+    assert unresolved_fut.cancelled() or unresolved_fut.done()
+
+    await core.stop()
+
+
 
 
 

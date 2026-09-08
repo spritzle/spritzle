@@ -37,7 +37,7 @@ async def f(client, fields: str, header: bool, query: List[str]):
             params[k] = v
         else:
             params[q] = ""
-    fields: List[str] = fields.split(",")
+    field_list: List[str] = fields.split(",")
     async with client.session.get(client.url("torrent"), params=params) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)
@@ -53,18 +53,15 @@ async def f(client, fields: str, header: bool, query: List[str]):
             if not isinstance(t, dict):
                 continue
             values = []
-            for field in fields:
+            for field in field_list:
                 value = t.get(field, "")
                 values.append(type_formatters.get(type(value), str)(value))
             table.append(values)
 
+    tablefmt = "simple" if header else "plain"
+    headers = field_list if header else []
 
-    tablefmt = "simple"
-    if not header:
-        fields = []
-        tablefmt = "plain"
-
-    print(tabulate(table, headers=fields, tablefmt=tablefmt))
+    print(tabulate(table, headers=headers, tablefmt=tablefmt))
 
 
 def list_formatter(v):

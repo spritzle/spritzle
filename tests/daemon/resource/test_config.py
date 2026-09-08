@@ -76,3 +76,12 @@ async def test_put_config_invalid_body(core, cli):
     assert response.status == 400
     assert core.config["key1"] == "value1"
 
+
+async def test_put_config_update_error_returns_400(core, cli, monkeypatch):
+    def mock_setitem(self, key, value):
+        raise ValueError(f"Value is not JSON serializable: {value}")
+
+    monkeypatch.setattr("spritzle.daemon.db.DB.__setitem__", mock_setitem)
+    response = await cli.put("/config", json={"key": "val"})
+    assert response.status == 400
+
