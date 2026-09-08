@@ -29,7 +29,7 @@ import ipaddress
 import logging
 import operator
 import re
-from typing import Dict, List, Union
+from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 
@@ -87,6 +87,9 @@ def get_valid_handle(core, tid):
 
 
 
+VALID_QUERY_OPS = {"eq", "lt", "gt", "ne", "ge", "le", "all", "any", "in"}
+
+
 def get_torrent_list(core, query=None) -> List[str]:
     if not query:
         # No query string was provided, so just return a list of all
@@ -95,14 +98,18 @@ def get_torrent_list(core, query=None) -> List[str]:
 
     keys = {"info_hash"}
     for k in query.keys():
-        if "." in k:
+        if "." in k and k.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
             keys.add(k.rsplit(".", 1)[0])
         else:
             keys.add(k)
     
-    statuses: List[Dict[str, Union[str, int, float]]] = []
+    statuses: List[Dict[str, Any]] = []
     for handle in core.session.get_torrents():
-        statuses.append(common.struct_to_dict(handle.status(), only_keys=list(keys)))
+        info_hash = str(handle.info_hash())
+        st = common.struct_to_dict(handle.status(), only_keys=list(keys))
+        if info_hash in core.torrent_data:
+            st.update(core.torrent_data[info_hash])
+        statuses.append(st)
 
     return get_torrent_list_by_query(query, statuses)
 
@@ -119,9 +126,11 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
             # and does not have an operator.
             if key in status:
                 op = ""
-            elif "." in key:
+            elif "." in key and key.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
                 op = key.rsplit(".", 1)[-1]
-                key = key.rsplit(".", 1)[:-1][0]
+                key = key.rsplit(".", 1)[0]
+            else:
+                op = ""
 
             if not isinstance(key, str):
                 raise web.HTTPBadRequest(reason=f"Key {key} must be string type.")
@@ -131,8 +140,11 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                 raise web.HTTPBadRequest(reason=f"Field {key} is not valid.")
 
             if isinstance(status[key], str):
-                if not re.match(value, status[key]):
-                    break
+                try:
+                    if not re.match(value, status[key]):
+                        break
+                except re.error as ex:
+                    raise web.HTTPBadRequest(reason=f"Invalid regular expression '{value}': {ex}")
 
             elif isinstance(status[key], bool):
                 m = re.match(r"(?P<value>^true$|^false$)", value)
@@ -148,6 +160,7 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
             elif isinstance(status[key], int) or isinstance(status[key], float):
                 ops = {
                     "": operator.eq,
+                    "eq": operator.eq,
                     "lt": operator.lt,
                     "gt": operator.gt,
                     "ne": operator.ne,
@@ -156,30 +169,36 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                 }
                 if op not in ops:
                     raise web.HTTPBadRequest(
-                        reason=f"Invalid operator {op}, must provide valid operator: {ops.keys()}"
+                        reason=f"Invalid operator {op}, must provide valid operator: {list(ops.keys())}"
                     )
-                if not ops[op](status[key], float(value)):
+                try:
+                    num_val = float(value)
+                except ValueError:
+                    raise web.HTTPBadRequest(reason=f"Invalid numeric value '{value}' for field '{key}'.")
+                if not ops[op](status[key], num_val):
                     break
             elif isinstance(status[key], list):
-                ops = ["all", "any", "in"]
+                ops = {"", "all", "any", "in"}
                 if op not in ops:
                     raise web.HTTPBadRequest(
-                        reason=f"Invalid operator {op}, must provide valid operator: {ops}"
+                        reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
                     )
 
-                # TODO: Implement list operations
-                if op == "all":
-                    raise web.HTTPBadRequest(
-                        reason=f"List operation {op} not implemented."
-                    )
-                elif op == "any":
-                    raise web.HTTPBadRequest(
-                        reason=f"List operation {op} not implemented."
-                    )
+                items = [str(x) for x in status[key]]
+                if op in ("", "any"):
+                    try:
+                        if not any(re.match(value, item) for item in items):
+                            break
+                    except re.error as ex:
+                        raise web.HTTPBadRequest(reason=f"Invalid regular expression '{value}': {ex}")
                 elif op == "in":
-                    raise web.HTTPBadRequest(
-                        reason=f"List operation {op} not implemented."
-                    )
+                    targets = [v.strip() for v in value.split(",")]
+                    if not any(item in targets for item in items):
+                        break
+                elif op == "all":
+                    targets = [v.strip() for v in value.split(",")]
+                    if not all(target in items for target in targets):
+                        break
 
         else:
             torrents.append(status["info_hash"])

@@ -100,6 +100,44 @@ async def test_get_torrent_query(cli):
     assert response.status == 400
 
 
+async def test_get_torrent_query_by_tags(cli):
+    post_data = create_torrent_post_data(
+        filename="random_one_file.torrent", tags=["linux", "iso"]
+    )
+    resp = await cli.post("/torrent", json=post_data)
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # Query with exact tag
+    resp = await cli.get("/torrent?spritzle.tags=linux")
+    assert resp.status == 200
+    assert (await resp.json()) == [info_hash]
+
+    # Query with non-matching tag
+    resp = await cli.get("/torrent?spritzle.tags=windows")
+    assert resp.status == 200
+    assert (await resp.json()) == []
+
+    # Query with any
+    resp = await cli.get("/torrent?spritzle.tags.any=lin.*")
+    assert resp.status == 200
+    assert (await resp.json()) == [info_hash]
+
+    # Query with in
+    resp = await cli.get("/torrent?spritzle.tags.in=linux,ubuntu")
+    assert resp.status == 200
+    assert (await resp.json()) == [info_hash]
+
+    # Query with all
+    resp = await cli.get("/torrent?spritzle.tags.all=linux,iso")
+    assert resp.status == 200
+    assert (await resp.json()) == [info_hash]
+
+    resp = await cli.get("/torrent?spritzle.tags.all=linux,windows")
+    assert resp.status == 200
+    assert (await resp.json()) == []
+
+
 @pytest.mark.parametrize(
     "query,want",
     [
