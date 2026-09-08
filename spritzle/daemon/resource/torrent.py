@@ -368,7 +368,9 @@ async def delete_torrent(request):
     # see libtorrent.options_t for valid options
     options = 0
 
-    for key in request.query:
+    for key, val in request.query.items():
+        if val.strip().lower() in ("false", "0", "no", "off"):
+            continue
         try:
             options = options | getattr(lt.options_t, key)
         except AttributeError:

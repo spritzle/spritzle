@@ -248,6 +248,34 @@ async def test_remove_torrent(cli):
     assert len(torrents) == 0
 
 
+async def test_delete_torrent_delete_files_boolean_handling(cli, core):
+    from unittest.mock import patch
+
+    for false_val in ("false", "0", "no", "off", "FALSE"):
+        tid = await test_post_torrent(cli)
+        with patch.object(core.torrent, "remove", wraps=core.torrent.remove) as mock_remove:
+            response = await cli.delete(f"/torrent/{tid}", params={"delete_files": false_val})
+            assert response.status == 200
+            assert mock_remove.called
+            args, _ = mock_remove.call_args
+            options = args[1]
+            assert not bool(options & lt.options_t.delete_files), (
+                f"Expected delete_files to be False for {false_val}, got options={options}"
+            )
+
+    for true_val in ("true", "1", "yes", "on", ""):
+        tid = await test_post_torrent(cli)
+        with patch.object(core.torrent, "remove", wraps=core.torrent.remove) as mock_remove:
+            response = await cli.delete(f"/torrent/{tid}", params={"delete_files": true_val})
+            assert response.status == 200
+            assert mock_remove.called
+            args, _ = mock_remove.call_args
+            options = args[1]
+            assert bool(options & lt.options_t.delete_files), (
+                f"Expected delete_files to be True for {true_val}, got options={options}"
+            )
+
+
 async def test_remove_torrent_all(cli, core):
     await test_post_torrent(cli)
 
