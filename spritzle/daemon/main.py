@@ -51,7 +51,10 @@ async def debug_middleware(request, handler):
     ):
         body = await request.post()
     else:
-        body = await request.text()
+        try:
+            body = await request.text()
+        except UnicodeDecodeError:
+            body = "<non-utf8 binary data>"
     log = request.app[APP_KEY_LOG]
     log.debug("*" * 20 + "REQUEST" + "*" * 20)
     log.debug(f"URL: {request.rel_url}")
@@ -149,7 +152,11 @@ def main():
     log = setup_logger(name="spritzle", level=args.log_level)
     log.info(f"spritzled starting.. args: {args}")
 
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     loop.set_debug(args.debug)
 
     config = Config(config_dir=args.config_dir)
@@ -166,4 +173,5 @@ def main():
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     app.middlewares.append(auth_middleware)
-    aiohttp.web.run_app(app, port=args.port)
+    aiohttp.web.run_app(app, port=args.port, loop=loop)
+

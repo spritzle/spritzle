@@ -278,6 +278,26 @@ async def test_write_data_does_not_pop_newer_future(core, tmp_path):
     await core.stop()
 
 
+async def test_resume_data_save_loop_string_frequency(core):
+    """
+    Verifies that save_loop does not crash with TypeError when resume_data_save_frequency
+    is set as a string (e.g. "0.1").
+    """
+    core.config["resume_data_save_frequency"] = "0.1"
+    save_called = asyncio.Event()
+
+    async def mock_save_all():
+        save_called.set()
+
+    with patch.object(core.resume_data, "save_all", side_effect=mock_save_all):
+        await core.start()
+        try:
+            await asyncio.wait_for(save_called.wait(), timeout=0.5)
+        finally:
+            await core.stop()
+
+
+
 
 
 

@@ -33,9 +33,12 @@ class Client(object):
 
     def url(self, path: str, query: str = "") -> str:
         path = path.lstrip("/")
+        host = self.host
+        if ":" in host and not (host.startswith("[") and host.endswith("]")):
+            host = f"[{host}]"
         if query:
-            return f"http://{self.host}:{self.port}/{path}?{query}"
-        return f"http://{self.host}:{self.port}/{path}"
+            return f"http://{host}:{self.port}/{path}?{query}"
+        return f"http://{host}:{self.port}/{path}"
 
     def do_command(self, cmd, *args, **kwargs):
         async def _do_command(cmd, *args, **kwargs):
@@ -44,8 +47,14 @@ class Client(object):
                 self.session = session
                 await cmd(self, *args, **kwargs)
 
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         loop.run_until_complete(_do_command(cmd, *args, **kwargs))
+
+
 
 
 cmd_dir = Path(__file__).parent / "commands"

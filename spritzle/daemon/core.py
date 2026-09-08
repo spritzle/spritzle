@@ -49,7 +49,6 @@ class Core(object):
             self.state_dir = state_dir
         # TODO check dir for rw, etc
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        self.session_stats_future: Optional[asyncio.Future] = None
         self.session_stats_waiters: Set[asyncio.Future] = set()
         # A place to keep additional data on torrents, that isn't stored in
         # libtorrent.  This is key'd on info_hash.
@@ -143,8 +142,6 @@ class Core(object):
         for fut in waiters:
             if not fut.done():
                 fut.set_result(alert.values)
-        if self.session_stats_future and not self.session_stats_future.done():
-            self.session_stats_future.set_result(alert.values)
 
     async def get_session_stats(self):
         if self.session is None:
@@ -163,7 +160,11 @@ class Core(object):
 
 
     def get_torrent_tags(self, info_hash):
-        return self.torrent_data.get(info_hash, {}).get("spritzle.tags", [])
+        tags = self.torrent_data.get(info_hash, {}).get("spritzle.tags")
+        if not tags:
+            return []
+        return [str(t) for t in tags]
+
 
     async def on_status_notification_alert(self, alert):
         try:

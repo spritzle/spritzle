@@ -51,6 +51,24 @@ def test_client_url_formatting():
     assert client.url("torrent", "foo=bar") == "http://127.0.0.1:8080/torrent?foo=bar"
 
 
+def test_client_url_formatting_ipv6():
+    from spritzle.cli.main import Client
+    from yarl import URL
+
+    client = Client("::1", 8080, "/tmp", "token")
+    assert client.url("torrent") == "http://[::1]:8080/torrent"
+    assert client.url("torrent", "foo=bar") == "http://[::1]:8080/torrent?foo=bar"
+    # Must parse successfully with yarl without ValueError
+    u = URL(client.url("torrent"))
+    assert u.host == "::1"
+    assert u.port == 8080
+
+    # Already bracketed
+    client_bracketed = Client("[::1]", 8080, "/tmp", "token")
+    assert client_bracketed.url("torrent") == "http://[::1]:8080/torrent"
+
+
+
 def test_remove_delete_files_command(cli, loop):
     import libtorrent as lt
     from unittest.mock import patch

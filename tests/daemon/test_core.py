@@ -210,4 +210,19 @@ async def test_concurrent_get_session_stats_caller_cancellation(core, monkeypatc
     await core.stop()
 
 
+def test_get_torrent_tags_robustness(core):
+    # None value for spritzle.tags
+    core.torrent_data["hash_none"] = {"spritzle.tags": None}
+    tags = core.get_torrent_tags("hash_none")
+    assert tags == []
+    assert ",".join(tags) == ""
+
+    # Non-string elements
+    core.torrent_data["hash_ints"] = {"spritzle.tags": [1, 2, "three"]}
+    tags = core.get_torrent_tags("hash_ints")
+    assert tags == ["1", "2", "three"]
+    assert ",".join(tags) == "1,2,three"
+
+
+
 

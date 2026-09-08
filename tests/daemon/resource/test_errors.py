@@ -78,3 +78,14 @@ async def test_no_error(cli):
     response = await cli.get("/no_error")
     assert response.content_type == "text/plain"
     assert (await response.text()) == "No Error"
+
+
+async def test_debug_middleware_non_utf8_binary_body(cli):
+    resp = await cli.put(
+        "/config",
+        data=b"\x80\xff\xfe\xaa",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status == 400
+
+

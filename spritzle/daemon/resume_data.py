@@ -111,7 +111,14 @@ class ResumeData(object):
         save_all_task = None
         try:
             while True:
-                await asyncio.sleep(self.core.config["resume_data_save_frequency"])
+                freq_val = self.core.config.get("resume_data_save_frequency", 60)
+                try:
+                    freq = float(freq_val)
+                    if freq <= 0:
+                        freq = 60.0
+                except (TypeError, ValueError):
+                    freq = 60.0
+                await asyncio.sleep(freq)
                 # Don't interrupt save process when loop is cancelled
                 if self.loop is not None:
                     save_all_task = self.loop.create_task(self.save_all())
@@ -119,6 +126,7 @@ class ResumeData(object):
         except asyncio.CancelledError:
             if save_all_task and not save_all_task.done():
                 await save_all_task
+
 
     async def on_save_resume_data_alert(self, alert):
         info_hash = str(alert.handle.info_hash())

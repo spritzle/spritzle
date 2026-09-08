@@ -174,6 +174,11 @@ async def test_get_torrent_query_with_heterogeneous_tags(cli):
         ({"int": "10"}, ["t2"]),
         ({"spritzle.int.gt": "10"}, ["t1"]),
         ({"spritzle.int": "100"}, ["t1"]),
+        ({"string.ne": ".*oo.*"}, ["t1"]),
+        ({"string.eq": "foobar"}, ["t2"]),
+        ({"bool.ne": "true"}, ["t2"]),
+        ({"bool.eq": "true"}, ["t1", "t3"]),
+        ({"bool.ne": "false"}, ["t1", "t3"]),
     ],
 )
 def test_get_torrent_list_by_query(query, want):
@@ -650,6 +655,43 @@ async def test_post_torrent_failure_does_not_leak_metadata(cli, monkeypatch):
     # Metadata must not have leaked into core.torrent_data
     for h, data in core.torrent_data.items():
         assert "will_fail" not in data.get("spritzle.tags", [])
+
+
+def test_get_torrent_list_by_query_invalid_operators():
+    from aiohttp import web
+    statuses = [{"info_hash": "t1", "string": "foo", "bool": True}]
+
+    with pytest.raises(web.HTTPBadRequest, match="Invalid operator gt"):
+        torrent.get_torrent_list_by_query({"string.gt": "bar"}, statuses)
+
+    with pytest.raises(web.HTTPBadRequest, match="Invalid operator lt"):
+        torrent.get_torrent_list_by_query({"bool.lt": "true"}, statuses)
+
+
+async def test_post_torrent_tags_validation(cli):
+    # String instead of list
+    p1 = create_torrent_post_data(filename="testtorrent1.torrent")
+    p1["spritzle.tags"] = "invalid_string_tag"
+    r1 = await cli.post("/torrent", json=p1)
+    assert r1.status == 400
+
+    # Non-string elements in list
+    p2 = create_torrent_post_data(filename="testtorrent1.torrent")
+    p2["spritzle.tags"] = [1, 2]
+    r2 = await cli.post("/torrent", json=p2)
+    assert r2.status == 400
+
+    # null tags should be normalized to []
+    p3 = create_torrent_post_data(filename="testtorrent1.torrent")
+    p3["spritzle.tags"] = None
+    r3 = await cli.post("/torrent", json=p3)
+    assert r3.status == 201
+    h3 = (await r3.json())["info_hash"]
+    from spritzle.daemon.keys import APP_KEY_CORE
+    core = cli.app[APP_KEY_CORE]
+    assert core.torrent_data[h3]["spritzle.tags"] == []
+
+
 
 
 

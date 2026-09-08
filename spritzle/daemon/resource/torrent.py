@@ -156,22 +156,37 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                 break
 
             if isinstance(status[key], str):
+                ops = {"", "eq", "ne"}
+                if op not in ops:
+                    raise web.HTTPBadRequest(
+                        reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
+                    )
                 try:
-                    if not re.match(value, status[key]):
-                        break
+                    matched = bool(re.match(value, status[key]))
                 except re.error as ex:
                     raise web.HTTPBadRequest(reason=f"Invalid regular expression '{value}': {ex}")
+                if op == "ne" and matched:
+                    break
+                elif op in ("", "eq") and not matched:
+                    break
 
             elif isinstance(status[key], bool):
+                ops = {"", "eq", "ne"}
+                if op not in ops:
+                    raise web.HTTPBadRequest(
+                        reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
+                    )
                 m = re.match(r"(?P<value>^true$|^false$)", value)
                 if m is None:
                     raise web.HTTPBadRequest(
                         reason=f"Invalid query for boolean type: {key}={value}, value must be either 'true' or 'false'."
                     )
-                if m.group("value") == "true" and not status[key]:
+                target = (m.group("value") == "true")
+                if op in ("", "eq") and status[key] != target:
                     break
-                if m.group("value") == "false" and status[key]:
+                elif op == "ne" and status[key] == target:
                     break
+
 
             elif isinstance(status[key], int) or isinstance(status[key], float):
                 ops = {
@@ -326,6 +341,11 @@ async def post_torrent(request):
             raise web.HTTPBadRequest(reason=f"Invalid hex info-hash: {ex}")
 
     tags = post.pop("spritzle.tags", [])
+    if tags is None:
+        tags = []
+    elif not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+        raise web.HTTPBadRequest(reason="'spritzle.tags' must be a list of strings.")
+
 
     # We have already popped all spritzle specific options from post, merge it in
     atp.update(post)

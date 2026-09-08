@@ -101,3 +101,28 @@ async def test_put_config_update_error_preserves_existing_config(core, cli, monk
     assert core.config.get("key1") == "value1"
 
 
+async def test_patch_config_update_error_preserves_existing_config(core, cli, monkeypatch):
+    core.config["key1"] = "orig_value1"
+    core.config["key2"] = "orig_value2"
+    real_setitem = type(core.config).__setitem__
+
+    def failing_setitem(self, key, value):
+        if key == "bad_key":
+            raise ValueError(f"Value is not JSON serializable: {value}")
+        real_setitem(self, key, value)
+
+    monkeypatch.setattr(type(core.config), "__setitem__", failing_setitem)
+    response = await cli.patch(
+        "/config",
+        json={"key1": "new_val1", "key3": "new_val3", "bad_key": "bad_val"},
+    )
+    assert response.status == 400
+    # key1 must not have been mutated; must be rolled back to "orig_value1"
+    assert core.config.get("key1") == "orig_value1"
+    # key3 must not have been added
+    assert "key3" not in core.config
+    # key2 untouched
+    assert core.config.get("key2") == "orig_value2"
+
+
+

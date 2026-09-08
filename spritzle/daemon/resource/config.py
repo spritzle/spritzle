@@ -76,9 +76,22 @@ async def patch_config(request):
     if not isinstance(new_values, dict):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
+    backup_items = {k: config[k] for k in new_values if k in config}
+    new_keys = [k for k in new_values if k not in config]
     try:
         config.update(new_values)
     except (ValueError, TypeError, RuntimeError) as e:
+        for k in new_keys:
+            if k in config:
+                try:
+                    del config[k]
+                except Exception:
+                    pass
+        try:
+            config.update(backup_items)
+        except Exception:
+            pass
         raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
     return web.Response()
+
 
