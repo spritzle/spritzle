@@ -55,7 +55,7 @@ async def put_config(request):
     try:
         config.update(saved_secrets)
         config.update(new_values)
-    except (ValueError, TypeError, RuntimeError) as e:
+    except Exception as e:
         config.reset()
         try:
             config.update(backup_items)
@@ -80,7 +80,7 @@ async def patch_config(request):
     new_keys = [k for k in new_values if k not in config]
     try:
         config.update(new_values)
-    except (ValueError, TypeError, RuntimeError) as e:
+    except Exception as e:
         for k in new_keys:
             if k in config:
                 try:

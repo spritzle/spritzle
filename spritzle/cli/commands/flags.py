@@ -1,4 +1,3 @@
-import json
 import sys
 
 import click
@@ -24,9 +23,8 @@ async def setter(client, info_hash, header, sets, unsets):
         d[k] = True
     for k in unsets:
         d[k] = False
-    data = json.dumps(d)
     async with client.session.put(
-        client.url(f"torrent/{info_hash}/flags"), data=data
+        client.url(f"torrent/{info_hash}/flags"), json=d
     ) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)

@@ -692,6 +692,55 @@ async def test_post_torrent_tags_validation(cli):
     assert core.torrent_data[h3]["spritzle.tags"] == []
 
 
+async def test_get_and_delete_torrent_uppercase_hash(cli, core):
+    post_data = create_torrent_post_data(
+        filename="random_one_file.torrent", tags=["my_tag"]
+    )
+    resp = await cli.post("/torrent", json=post_data)
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+    assert info_hash == "44a040be6d74d8d290cd20128788864cbf770719"
+
+    # GET with uppercase hash
+    resp = await cli.get(f"/torrent/{info_hash.upper()}")
+    assert resp.status == 200
+    data = await resp.json()
+    assert data.get("spritzle.tags") == ["my_tag"]
+
+    # DELETE with uppercase hash
+    resume_file = core.state_dir / f"{info_hash}.resume"
+    assert resume_file.is_file()
+    assert info_hash in core.torrent_data
+
+    resp = await cli.delete(f"/torrent/{info_hash.upper()}")
+    assert resp.status == 200
+
+    # Must be deleted from disk and from memory
+    assert not resume_file.is_file()
+    assert info_hash not in core.torrent_data
+
+
+async def test_put_flags_string_boolean(cli, core):
+    post_data = create_torrent_post_data(filename="random_one_file.torrent")
+    resp = await cli.post("/torrent", json=post_data)
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # First ensure auto_managed is set
+    resp = await cli.put(f"/torrent/{info_hash}/flags/auto_managed", json=True)
+    assert resp.status == 200
+
+    handle = core.session.get_torrents()[0]
+    assert bool(handle.flags() & lt.torrent_flags.auto_managed) is True
+
+    # Now unset it with string "false"
+    resp = await cli.put(f"/torrent/{info_hash}/flags", json={"auto_managed": "false"})
+    assert resp.status == 200
+    assert bool(handle.flags() & lt.torrent_flags.auto_managed) is False
+
+
+
+
 
 
 

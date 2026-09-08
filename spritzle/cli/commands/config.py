@@ -30,8 +30,7 @@ async def setter(client, set_value):
             d[k] = json.loads(v)
         except (json.JSONDecodeError, TypeError, ValueError):
             d[k] = v
-    data = json.dumps(d)
-    async with client.session.patch(client.url("config"), data=data) as resp:
+    async with client.session.patch(client.url("config"), json=d) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)
             sys.exit(1)

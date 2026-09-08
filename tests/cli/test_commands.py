@@ -370,6 +370,108 @@ def test_add_command_info_hash(cli):
     assert "added successfully" in result.output
 
 
+def test_cli_config_and_flags_send_json_content_type(cli):
+    from unittest.mock import patch
+    runner = CliRunner()
+
+    with patch.object(cli.app.middlewares[1], "__call__", wraps=cli.app.middlewares[1]) as _:
+        pass
+
+    # We can inspect the Content-Type received at the server by patching the route handler or checking ClientSession.patch
+    captured_content_types = []
+
+    from aiohttp import ClientSession
+    orig_patch = ClientSession.patch
+    orig_put = ClientSession.put
+
+    def mock_patch(self, url, **kwargs):
+        if "json" in kwargs:
+            captured_content_types.append("application/json")
+        elif "data" in kwargs:
+            captured_content_types.append("data")
+        return orig_patch(self, url, **kwargs)
+
+    def mock_put(self, url, **kwargs):
+        if "json" in kwargs:
+            captured_content_types.append("application/json")
+        elif "data" in kwargs:
+            captured_content_types.append("data")
+        return orig_put(self, url, **kwargs)
+
+    with patch.object(ClientSession, "patch", mock_patch), patch.object(ClientSession, "put", mock_put):
+        res1 = runner.invoke(
+            spritzle_cli,
+            ["--port", str(cli.server.port), "--token", "test-token", "config", "-s", "auth_timeout", "120"],
+        )
+        assert res1.exit_code == 0
+        assert "application/json" in captured_content_types
+
+        captured_content_types.clear()
+        import libtorrent as lt
+        from tests.daemon.common import torrent_dir
+        from spritzle.daemon.keys import APP_KEY_CORE
+
+        t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+        ti = lt.torrent_info(lt.bdecode(t_file))
+        handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+        valid_hash = str(handle.info_hash())
+
+        res2 = runner.invoke(
+            spritzle_cli,
+            ["--port", str(cli.server.port), "--token", "test-token", "flags", valid_hash, "-s", "auto_managed"],
+        )
+        assert res2.exit_code == 0
+        assert "application/json" in captured_content_types
+
+
+def test_add_command_missing_location_header(cli, monkeypatch):
+    import aiohttp
+    runner = CliRunner()
+    valid_hash = "0123456789abcdef0123456789abcdef01234567"
+
+    orig_post = aiohttp.ClientSession.post
+
+    class MockResponse:
+        def __init__(self, real_resp):
+            self.real_resp = real_resp
+            self.status = real_resp.status
+            self.reason = real_resp.reason
+            self.headers = {}  # Location header stripped!
+
+        async def json(self):
+            return await self.real_resp.json()
+
+    class MockContextManager:
+        def __init__(self, real_cm):
+            self.real_cm = real_cm
+
+        async def __aenter__(self):
+            real_resp = await self.real_cm.__aenter__()
+            return MockResponse(real_resp)
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return await self.real_cm.__aexit__(exc_type, exc, tb)
+
+    def mock_post(self, url, **kwargs):
+        real_cm = orig_post(self, url, **kwargs)
+        return MockContextManager(real_cm)
+
+    monkeypatch.setattr(aiohttp.ClientSession, "post", mock_post)
+
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "add",
+            valid_hash,
+        ],
+    )
+    assert result.exit_code == 0
+    assert "added successfully" in result.output
+
+
+
 
 
 

@@ -125,4 +125,39 @@ async def test_patch_config_update_error_preserves_existing_config(core, cli, mo
     assert core.config.get("key2") == "orig_value2"
 
 
+async def test_put_config_unexpected_exception_preserves_existing_config(core, cli, monkeypatch):
+    core.config["key1"] = "value1"
+    real_setitem = type(core.config).__setitem__
+
+    def failing_setitem(self, key, value):
+        if key == "bad_key":
+            raise Exception("Unexpected SQLite error")
+        real_setitem(self, key, value)
+
+    monkeypatch.setattr(type(core.config), "__setitem__", failing_setitem)
+    response = await cli.put("/config", json={"bad_key": "bad_val"})
+    assert response.status == 400
+    assert core.config.get("key1") == "value1"
+
+
+async def test_patch_config_unexpected_exception_preserves_existing_config(core, cli, monkeypatch):
+    core.config["key1"] = "orig_value1"
+    real_setitem = type(core.config).__setitem__
+
+    def failing_setitem(self, key, value):
+        if key == "bad_key":
+            raise Exception("Unexpected SQLite error")
+        real_setitem(self, key, value)
+
+    monkeypatch.setattr(type(core.config), "__setitem__", failing_setitem)
+    response = await cli.patch(
+        "/config",
+        json={"key1": "new_val1", "key3": "new_val3", "bad_key": "bad_val"},
+    )
+    assert response.status == 400
+    assert core.config.get("key1") == "orig_value1"
+    assert "key3" not in core.config
+
+
+
 

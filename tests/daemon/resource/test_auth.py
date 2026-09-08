@@ -119,3 +119,28 @@ async def test_auth_middleware_immature_token(cli, core):
     assert response.status == 401
     assert response.reason == "Token is invalid"
 
+
+async def test_post_auth_string_timeout(core, cli):
+    core.config["auth_timeout"] = "300"
+    response = await cli.post("/auth", json={"password": "password"})
+    assert response.status == 200
+    data = await response.json()
+    assert "token" in data
+
+
+async def test_auth_allow_hosts_ipv4_mapped_ipv6(core):
+    from unittest.mock import Mock
+    core.config["auth_allow_hosts"] = ["127.0.0.1"]
+
+    mock_request = Mock()
+    mock_request.transport.get_extra_info.return_value = ("::ffff:127.0.0.1", 12345)
+    mock_request.rel_url.path = "/"
+    mock_request.app = {auth.APP_KEY_CONFIG: core.config}
+
+    async def dummy_handler(req):
+        return "ok"
+
+    result = await auth.auth_middleware(mock_request, dummy_handler)
+    assert result == "ok"
+
+

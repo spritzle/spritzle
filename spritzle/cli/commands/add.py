@@ -67,5 +67,10 @@ async def f(client, path, option, tag):
                 f"Error adding torrent: {resp.status} {resp.reason}", file=sys.stderr
             )
             sys.exit(1)
-        hash = resp.headers["Location"].split("/")[-1]
+        location = resp.headers.get("Location")
+        if location:
+            hash = location.split("/")[-1]
+        else:
+            resp_data = await resp.json()
+            hash = resp_data.get("info_hash", "")
         click.echo(f"{hash} added successfully.")

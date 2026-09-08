@@ -297,6 +297,47 @@ async def test_resume_data_save_loop_string_frequency(core):
             await core.stop()
 
 
+async def test_save_torrent_multi_waiter_cancellation_isolation(core):
+    await core.start()
+    info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+
+    class DummyHandle:
+        def info_hash(self):
+            return info_hash
+
+        def save_resume_data(self, flags=0):
+            pass
+
+    handle = DummyHandle()
+    fut1 = core.resume_data.save_torrent(handle)
+    fut2 = core.resume_data.save_torrent(handle)
+
+    # In a multi-waiter system, each caller must get its own future
+    assert fut1 is not fut2
+
+    # If caller 1 cancels its wait, caller 2 must not be cancelled
+    fut1.cancel()
+    assert fut1.cancelled()
+    assert not fut2.cancelled()
+
+    class DummyAlert:
+        class Handle:
+            def info_hash(self):
+                return info_hash
+
+        handle = Handle()
+        params = {}
+
+    await core.resume_data.on_save_resume_data_alert(DummyAlert())
+    if core.resume_data.pending_writes:
+        await asyncio.gather(*core.resume_data.pending_writes)
+
+    assert fut2.done()
+    assert fut2.result() is True
+    await core.stop()
+
+
+
 
 
 

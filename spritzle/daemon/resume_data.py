@@ -26,7 +26,7 @@ import logging
 import os
 from pathlib import Path
 import time
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set, Union
 
 
 import libtorrent as lt
@@ -74,7 +74,9 @@ class ResumeData(object):
         self.save_loop_task = None
 
         # Store state of outstanding save resume data alerts
-        self.resume_data_futures: Dict[str, asyncio.Future] = {}
+        self.resume_data_futures: Dict[
+            str, Union[Set[asyncio.Future], asyncio.Future]
+        ] = {}
         self.pending_writes: Set[asyncio.Task] = set()
         self.deleted_hashes: Set[str] = set()
         self.save_interval = 60 * 30
@@ -128,6 +130,23 @@ class ResumeData(object):
                 await save_all_task
 
 
+    def _pop_waiters(self, info_hash: str) -> Set[asyncio.Future]:
+        val = self.resume_data_futures.pop(info_hash, None)
+        if val is None:
+            return set()
+        if isinstance(val, set):
+            return val
+        if isinstance(val, asyncio.Future):
+            return {val}
+        return set(val)
+
+    def _discard_waiter(self, info_hash: str, fut: asyncio.Future) -> None:
+        waiters = self.resume_data_futures.get(info_hash)
+        if isinstance(waiters, set):
+            waiters.discard(fut)
+            if not waiters:
+                self.resume_data_futures.pop(info_hash, None)
+
     async def on_save_resume_data_alert(self, alert):
         info_hash = str(alert.handle.info_hash())
         if info_hash in self.deleted_hashes:
@@ -135,21 +154,28 @@ class ResumeData(object):
             return
 
         p = Path(self.core.state_dir, info_hash + ".resume")
-        r = lt.write_resume_data(alert.params)
+        if isinstance(alert.params, dict):
+            r = dict(alert.params)
+        else:
+            r = lt.write_resume_data(alert.params)
         if info_hash in self.core.torrent_data:
             r.update(self.core.torrent_data[info_hash])
-        
+
         data = lt.bencode(r)
-        
-        fut = self.resume_data_futures.get(info_hash)
+
+        waiters = self._pop_waiters(info_hash)
         # Fire-and-forget write task to avoid blocking the alert loop
         loop = self.loop or asyncio.get_running_loop()
-        task = loop.create_task(self._write_data(p, data, info_hash, fut))
+        task = loop.create_task(self._write_data(p, data, info_hash, waiters))
         self.pending_writes.add(task)
         task.add_done_callback(self.pending_writes.discard)
 
     async def _write_data(
-        self, path: Path, data: bytes, info_hash: str, fut: Optional[asyncio.Future] = None
+        self,
+        path: Path,
+        data: bytes,
+        info_hash: str,
+        waiters: Optional[Union[Set[asyncio.Future], asyncio.Future]] = None,
     ):
         try:
             if info_hash in self.deleted_hashes:
@@ -167,10 +193,14 @@ class ResumeData(object):
         except Exception as e:
             log.error(f"Failed to write resume data for {info_hash}: {e}")
         finally:
-            if fut is not None and not fut.done():
-                fut.set_result(True)
-            if self.resume_data_futures.get(info_hash) is fut:
-                self.resume_data_futures.pop(info_hash, None)
+            futs: Set[asyncio.Future] = set()
+            if isinstance(waiters, set):
+                futs = waiters
+            elif isinstance(waiters, asyncio.Future):
+                futs = {waiters}
+            for fut in futs:
+                if not fut.done():
+                    fut.set_result(True)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
@@ -178,56 +208,69 @@ class ResumeData(object):
             f"error: {alert.error.message()}"
         )
         info_hash = str(alert.handle.info_hash())
-        if info_hash in self.resume_data_futures:
-            # We don't really care if this fails right now, maybe in the future
-            # we should raise an exception.
-            fut = self.resume_data_futures.pop(info_hash)
+        waiters = self._pop_waiters(info_hash)
+        for fut in waiters:
             if not fut.done():
                 fut.set_result(True)
 
     def save_torrent(self, torrent_handle):
         info_hash = str(torrent_handle.info_hash())
         self.deleted_hashes.discard(info_hash)
-        if info_hash not in self.resume_data_futures:
-            self.resume_data_futures[info_hash] = asyncio.Future()
+        loop = self.loop or asyncio.get_running_loop()
+        caller_fut = loop.create_future()
+        caller_fut.add_done_callback(lambda f: self._discard_waiter(info_hash, f))
+
+        val = self.resume_data_futures.get(info_hash)
+        first_caller = val is None or (isinstance(val, set) and len(val) == 0)
+
+        if isinstance(val, set):
+            val.add(caller_fut)
+        else:
+            self.resume_data_futures[info_hash] = {caller_fut}
+
+        if first_caller:
             torrent_handle.save_resume_data(
                 flags=(
                     int(lt.save_resume_flags_t.flush_disk_cache)
                     | int(lt.save_resume_flags_t.save_info_dict)
                 )
             )
-        return self.resume_data_futures[info_hash]
+        return caller_fut
 
     async def save_all(self):
         log.debug("Saving resume data for all torrents")
         if self.core.session is None:
             return
+        futs = []
         for torrent in self.core.session.get_torrents():
             if torrent.need_save_resume_data():
-                self.save_torrent(torrent)
+                futs.append(self.save_torrent(torrent))
+
+        for val in list(self.resume_data_futures.values()):
+            if isinstance(val, set):
+                futs.extend(list(val))
+            elif isinstance(val, asyncio.Future):
+                futs.append(val)
+
         try:
             await asyncio.wait_for(
-                asyncio.gather(
-                    *list(self.resume_data_futures.values()), return_exceptions=True
-                ),
+                asyncio.gather(*futs, return_exceptions=True),
                 timeout=30.0,
             )
-
         except asyncio.TimeoutError:
             log.warning("Timed out waiting for resume data to save")
-            for h, fut in list(self.resume_data_futures.items()):
-                if not fut.done():
-                    fut.cancel()
-                    self.resume_data_futures.pop(h, None)
-                elif fut.cancelled():
-                    self.resume_data_futures.pop(h, None)
+            for h in list(self.resume_data_futures.keys()):
+                waiters = self._pop_waiters(h)
+                for fut in waiters:
+                    if not fut.done():
+                        fut.cancel()
         except Exception as e:
             log.error(f"Error saving resume data: {e}")
 
     def delete(self, info_hash):
         self.deleted_hashes.add(info_hash)
-        if info_hash in self.resume_data_futures:
-            fut = self.resume_data_futures.pop(info_hash)
+        waiters = self._pop_waiters(info_hash)
+        for fut in waiters:
             if not fut.done():
                 fut.cancel()
 
@@ -237,6 +280,7 @@ class ResumeData(object):
         if self.core.state_dir.is_dir():
             for tmp in self.core.state_dir.glob(f"*.{info_hash}.*.tmp"):
                 tmp.unlink(missing_ok=True)
+
 
     async def load(self):
         log.info(f"Loading resume data from {self.core.state_dir}")

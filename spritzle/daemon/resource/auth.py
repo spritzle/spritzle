@@ -20,6 +20,7 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import ipaddress
 import secrets
 from datetime import datetime, timedelta, timezone
 from json import JSONDecodeError
@@ -49,8 +50,13 @@ async def post_auth(request):
     if not secrets.compare_digest(provided_password, expected_password):
         raise web.HTTPUnauthorized(reason="Incorrect password")
 
+    try:
+        timeout_val = float(config.get("auth_timeout", 120))
+    except (TypeError, ValueError):
+        timeout_val = 120.0
+
     payload = {
-        "exp": (datetime.now(timezone.utc) + timedelta(seconds=config["auth_timeout"]))
+        "exp": (datetime.now(timezone.utc) + timedelta(seconds=timeout_val))
     }
 
     jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
@@ -65,9 +71,19 @@ async def post_auth(request):
 async def auth_middleware(request, handler):
     config = request.app[APP_KEY_CONFIG]
 
-    peername = request.transport.get_extra_info("peername")
-    if peername and peername[0] in config["auth_allow_hosts"]:
-        return await handler(request)
+    peername = request.transport.get_extra_info("peername") if request.transport else None
+    if peername:
+        peer_host = peername[0]
+        allow_hosts = set(config.get("auth_allow_hosts", []))
+        if peer_host in allow_hosts:
+            return await handler(request)
+        try:
+            ip = ipaddress.ip_address(peer_host)
+            mapped = getattr(ip, "ipv4_mapped", None)
+            if mapped and str(mapped) in allow_hosts:
+                return await handler(request)
+        except ValueError:
+            pass
 
     if request.rel_url.path == "/auth":
         return await handler(request)

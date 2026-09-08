@@ -254,8 +254,9 @@ async def get_torrent(request):
 
         status = common.struct_to_dict(handle.status())
 
-        if tid in core.torrent_data:
-            status.update(core.torrent_data[tid])
+        info_hash = str(handle.info_hash())
+        if info_hash in core.torrent_data:
+            status.update(core.torrent_data[info_hash])
 
         return web.json_response(status)
 
@@ -400,7 +401,10 @@ async def put_flags(request):
                 reason=f"{k} is not a valid libtorrent torrent_flag"
             )
         fvalue = getattr(lt.torrent_flags, k)
-        if v:
+        val_bool = bool(v)
+        if isinstance(v, str):
+            val_bool = v.strip().lower() in ("true", "1", "yes", "on")
+        if val_bool:
             flags |= fvalue
         mask |= fvalue
     handle.set_flags(flags, mask)
@@ -468,13 +472,14 @@ async def delete_torrent(request):
     for t in tids:
         try:
             handle = get_valid_handle(core, t)
+            info_hash = str(handle.info_hash())
             try:
                 await core.torrent.remove(handle, options)
             except AlertException as ex:
                 msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
-                log.error(f"Error deleting files for torrent {t}: {msg}")
-            core.resume_data.delete(t)
-            core.torrent_data.pop(t, None)
+                log.error(f"Error deleting files for torrent {info_hash}: {msg}")
+            core.resume_data.delete(info_hash)
+            core.torrent_data.pop(info_hash, None)
         except web.HTTPException:
             if tid is not None:
                 raise
