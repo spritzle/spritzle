@@ -184,6 +184,7 @@ async def test_performance_many_torrents(cli, core, tmp_path):
     duration_load = time.monotonic() - start_load
     log.info(f"Loaded {NUM_TORRENTS} torrents in {duration_load:.4f}s")
     
+    assert new_core.session is not None
     assert len(new_core.session.get_torrents()) == NUM_TORRENTS
     
     # Update app to use new core
@@ -220,6 +221,7 @@ async def test_performance_many_torrents(cli, core, tmp_path):
     log.info(f"Removed {NUM_TORRENTS} torrents in {duration_remove:.2f}s")
     
     # Verify empty
+    assert new_core.session is not None
     assert len(new_core.session.get_torrents()) == 0
     
     # Report

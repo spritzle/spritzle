@@ -102,6 +102,7 @@ async def test_metadata_persistence(cli, core, tmp_path):
     }
     await new_core.start(settings)
     
+    assert new_core.session is not None
     log.info(f"Loaded {len(new_core.session.get_torrents())} torrents.")
     log.info(f"Loaded metadata for {len(new_core.torrent_data)} torrents.")
     

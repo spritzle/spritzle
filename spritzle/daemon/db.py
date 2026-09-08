@@ -83,6 +83,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def create_table(self) -> None:
         """Create the database table and insert default values."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             self.conn.execute(TABLE)
             for key, value in self.defaults.items():
@@ -96,6 +98,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def reset(self) -> None:
         """Reset the database by dropping and recreating the table."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             self.conn.execute("DROP TABLE t")
             self.create_table()
@@ -108,7 +112,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
-        self.conn.commit()
+        if self.conn is not None:
+            self.conn.commit()
 
     def close(self) -> None:
         """Close the database connection."""
@@ -122,6 +127,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __len__(self) -> int:
         """Return the number of items in the database."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             return self.conn.execute("SELECT COUNT(*) FROM t").fetchone()[0]
         except sqlite3.Error as e:
@@ -129,6 +136,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __iter__(self) -> Iterator[str]:
         """Return an iterator over the database keys."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             cursor = self.conn.execute("SELECT key FROM t")
             for row in cursor:
@@ -138,6 +147,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set a key-value pair in the database."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             self.conn.execute(
                 "REPLACE INTO t(key, value, is_default) values(?, ?, 0)",
@@ -152,6 +163,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __getitem__(self, key: str) -> Any:
         """Get a value from the database by key."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             value = self.conn.execute(
                 "SELECT value FROM t WHERE key=?", (key,)
@@ -164,6 +177,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
 
     def __delitem__(self, key: str) -> None:
         """Delete a key from the database or reset to default value."""
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             if key in self.defaults:
                 self.conn.execute(
@@ -183,6 +198,8 @@ class DB(collections.abc.MutableMapping[str, Any]):
         """Check if a key exists in the database."""
         if not isinstance(key, str):
             return False
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open.")
         try:
             return bool(
                 self.conn.execute("SELECT 1 FROM t WHERE key=?", (key,)).fetchone()

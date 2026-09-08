@@ -77,6 +77,7 @@ async def test_ghost_torrents(core, tmp_path):
     # This calls load_session_state AND resume_data.load
     await new_core.start(settings)
     
+    assert new_core.session is not None
     torrents = new_core.session.get_torrents()
     log.info(f"Torrents in session: {len(torrents)}")
     

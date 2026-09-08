@@ -247,6 +247,59 @@ def test_auth_command_nonexistent_config_dir(cli, tmp_path):
     assert f"127.0.0.1:{cli.server.port}" in data
 
 
+def test_flags_command(cli):
+    import libtorrent as lt
+    from tests.daemon.common import torrent_dir
+    from spritzle.daemon.keys import APP_KEY_CORE
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "flags",
+            info_hash,
+        ],
+    )
+    assert result.exit_code == 0
+    assert "auto_managed" in result.output
+
+    # Test setting a flag
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "flags",
+            info_hash,
+            "-s", "auto_managed",
+        ],
+    )
+    assert result.exit_code == 0
+    assert bool(handle.flags() & lt.torrent_flags.auto_managed) is True
+
+    # Test unsetting a flag
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port", str(cli.server.port),
+            "--token", "test-token",
+            "flags",
+            info_hash,
+            "-u", "auto_managed",
+        ],
+    )
+    assert result.exit_code == 0
+    assert bool(handle.flags() & lt.torrent_flags.auto_managed) is False
+
+
+
 
 
 
