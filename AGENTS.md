@@ -32,4 +32,10 @@
 - **CLI payload serialization**: Always pass `json=payload` to `aiohttp.ClientSession` HTTP methods (`post`, `put`, `patch`) rather than manually stringifying with `data=json.dumps(...)`. Passing raw strings sets `Content-Type: text/plain; charset=utf-8` instead of `application/json`, causing MIME-type rejection on strict proxies or endpoints.
 - **Resilient response parsing**: CLI commands must never assume optional HTTP response headers (such as `Location`) are always present or unmodified by reverse proxies. Always provide a fallback to extracting canonical identifiers directly from the JSON response body (e.g. `(await resp.json()).get("info_hash")`).
 
+## 5. Continuous Learning & AGENTS.md Maintenance
+- **Autonomous knowledge capture**: Whenever you discover non-obvious codebase behavior, resolve subtle concurrency or libtorrent edge cases, establish new project patterns, or receive explicit user corrections and design decisions, automatically update `AGENTS.md` to document the learning for future agents.
+- **Categorization & concise style**: Place new entries into the most relevant section (or create a new section if necessary). Keep guidelines actionable, specific, and formatted consistently with existing entries (`- **Rule Name**: Explanation and rationale.`).
+- **High-signal invariants**: Only record durable project rules, architectural constraints, and hard-won pitfalls. Do not record transient task state, temporary notes, or generic programming advice.
+
+
 
