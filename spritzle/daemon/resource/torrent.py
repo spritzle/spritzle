@@ -516,6 +516,7 @@ ALLOWED_TORRENT_METHODS = {
     "set_sequential_download",
     "clear_error",
     "flush_cache",
+    "move_storage",
 }
 
 

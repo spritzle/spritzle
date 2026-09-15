@@ -557,8 +557,14 @@ async def test_set_max_uploads(cli):
 
 async def test_disallowed_torrent_method(cli):
     tid = await test_post_torrent(cli)
-    r = await cli.post(f"/torrent/{tid}/move_storage", json=["/tmp"])
+    r = await cli.post(f"/torrent/{tid}/invalid_method", json=["/tmp"])
     assert r.status == 400
+
+
+async def test_move_storage(cli):
+    tid = await test_post_torrent(cli)
+    r = await cli.post(f"/torrent/{tid}/move_storage", json=["/tmp"])
+    assert r.status == 200
 
 
 async def test_post_torrent_non_dict_body(cli):

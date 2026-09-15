@@ -20,18 +20,19 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import argparse
 import asyncio
 import fcntl
 from pathlib import Path
 import secrets
 import sys
 import traceback
+from typing import Optional
 
 import aiohttp.web
+import click
 
 from .resource.auth import routes as auth_routes
-from .resource.auth import auth_middleware
+from .resource.auth import auth_middleware, create_jwt_token
 from .resource.config import routes as config_routes
 from .resource.core import routes as core_routes
 from .resource.session import routes as session_routes
@@ -141,25 +142,25 @@ def setup_app(app, core, log):
     app.router.add_routes(torrent_routes)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Spritzled")
-    parser.add_argument("--debug", dest="debug", default=False, action="store_true")
-    parser.add_argument("-p", "--port", dest="port", default=8080, type=int)
-    parser.add_argument("-c", "--config_dir", dest="config_dir", type=str)
-    parser.add_argument("-l", "--log-level", default="INFO", dest="log_level", type=str)
-    args = parser.parse_args()
-
-    log = setup_logger(name="spritzle", level=args.log_level)
-    log.info(f"spritzled starting.. args: {args}")
+def run_daemon(
+    debug: bool = False,
+    port: int = 8080,
+    config_dir: Optional[str] = None,
+    log_level: str = "INFO",
+):
+    log = setup_logger(name="spritzle", level=log_level)
+    log.info(
+        f"spritzled starting.. port={port}, config_dir={config_dir}, log_level={log_level}, debug={debug}"
+    )
 
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    loop.set_debug(args.debug)
+    loop.set_debug(debug)
 
-    config = Config(config_dir=args.config_dir)
+    config = Config(config_dir=config_dir)
 
     # Prevent more than one process using the same config path from running.
     f = Path(config.path, "spritzled.lock").open(mode="w")
@@ -173,5 +174,74 @@ def main():
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     app.middlewares.append(auth_middleware)
-    aiohttp.web.run_app(app, port=args.port, loop=loop)
+    aiohttp.web.run_app(app, port=port, loop=loop)
+
+
+@click.group(invoke_without_command=True)
+@click.option("--debug", default=False, is_flag=True, help="Enable debug mode.")
+@click.option("-p", "--port", default=8080, type=int, show_default=True, help="Port to listen on.")
+@click.option(
+    "-c",
+    "--config-dir",
+    "--config_dir",
+    "config_dir",
+    default=None,
+    type=str,
+    help="Configuration directory.",
+)
+@click.option(
+    "-l",
+    "--log-level",
+    default="INFO",
+    show_default=True,
+    help="Log level.",
+)
+@click.pass_context
+def main(ctx, debug, port, config_dir, log_level):
+    """Spritzle daemon."""
+    if ctx.invoked_subcommand is None:
+        run_daemon(
+            debug=debug,
+            port=port,
+            config_dir=config_dir,
+            log_level=log_level,
+        )
+
+
+@main.command("token", short_help="Generate an authentication token.")
+@click.option(
+    "-c",
+    "--config-dir",
+    "--config_dir",
+    "config_dir",
+    default=None,
+    type=str,
+    help="Configuration directory.",
+)
+@click.option(
+    "-e",
+    "--expires-in",
+    default=None,
+    type=float,
+    help="Token expiration time in seconds (0 for no expiration).",
+)
+@click.pass_context
+def generate_token(ctx, config_dir, expires_in):
+    """Generate an authentication JWT token for the daemon."""
+    cfg_dir = config_dir or (ctx.parent.params.get("config_dir") if ctx.parent else None)
+    config = Config(config_dir=cfg_dir)
+    if not config["auth_secret"]:
+        config["auth_secret"] = secrets.token_hex()
+
+    if expires_in is not None:
+        timeout_val = float(expires_in)
+    else:
+        try:
+            timeout_val = float(config.get("auth_timeout", 120))
+        except (TypeError, ValueError):
+            timeout_val = 120.0
+
+    token = create_jwt_token(config["auth_secret"], timeout_val)
+    click.echo(token)
+
 

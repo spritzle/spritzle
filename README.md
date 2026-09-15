@@ -40,12 +40,17 @@ To run the tests:
 uv run pytest
 ```
 
-Interface
----------
+Documentation
+-------------
 
-A command-line client is included as the `spritzle` command.
+* [spritzled Daemon Guide](docs/spritzled.md): Daemon CLI options, configuration keys, systemd service setup, and token generation.
+* [spritzle CLI Guide](docs/spritzle.md): Command-line client usage, subcommands reference, authentication, and bash completion.
+* [REST API Interface](docs/interface.md): Full HTTP REST API reference and examples.
+* [Hooks System](docs/hooks.md): Custom scripting with libtorrent status alerts.
+* [Architecture Design](docs/design.md): System architecture and request lifecycle.
 
 Authors
 -------
 
 * Andrew Resch <andrewresch@gmail.com>
+

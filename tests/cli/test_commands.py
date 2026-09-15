@@ -471,6 +471,88 @@ def test_add_command_missing_location_header(cli, monkeypatch):
     assert "added successfully" in result.output
 
 
+def test_pause_command(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", info_hash],
+    )
+    assert result.exit_code == 0
+    assert "paused successfully" in result.output
+
+
+def test_resume_command(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "resume", info_hash],
+    )
+    assert result.exit_code == 0
+    assert "resumed successfully" in result.output
+
+
+def test_move_storage_command(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        [
+            "--port",
+            str(cli.server.port),
+            "--token",
+            "test-token",
+            "move_storage",
+            info_hash,
+            "/tmp/new_storage",
+        ],
+    )
+    assert result.exit_code == 0
+    assert f"Moved storage for {info_hash} to /tmp/new_storage" in result.output
+
+
+def test_spritzled_token_command(tmp_path):
+    import jwt
+    from spritzle.daemon.config import Config
+    from spritzle.daemon.main import main as daemon_cli
+
+    runner = CliRunner()
+    result = runner.invoke(daemon_cli, ["token", "-c", str(tmp_path), "-e", "3600"])
+    assert result.exit_code == 0
+    token = result.output.strip()
+    assert token
+
+    config = Config(config_dir=str(tmp_path))
+    decoded = jwt.decode(token, config["auth_secret"], algorithms=["HS256"])
+    assert "exp" in decoded
+
+
+
 
 
 

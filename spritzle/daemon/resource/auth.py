@@ -34,6 +34,16 @@ from spritzle.daemon.keys import APP_KEY_CONFIG
 routes = web.RouteTableDef()
 
 
+def create_jwt_token(secret: str, timeout_seconds: float = 120.0) -> str:
+    payload = {}
+    if timeout_seconds is not None and timeout_seconds > 0:
+        payload["exp"] = datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
+    jwt_token = jwt.encode(payload, secret, "HS256")
+    if isinstance(jwt_token, bytes):
+        jwt_token = jwt_token.decode("utf-8")
+    return jwt_token
+
+
 @routes.post("/auth")
 async def post_auth(request):
     config = request.app[APP_KEY_CONFIG]
@@ -55,14 +65,7 @@ async def post_auth(request):
     except (TypeError, ValueError):
         timeout_val = 120.0
 
-    payload = {
-        "exp": (datetime.now(timezone.utc) + timedelta(seconds=timeout_val))
-    }
-
-    jwt_token = jwt.encode(payload, config["auth_secret"], "HS256")
-    if isinstance(jwt_token, bytes):
-        jwt_token = jwt_token.decode("utf-8")
-
+    jwt_token = create_jwt_token(config["auth_secret"], timeout_val)
     return web.json_response({"token": jwt_token})
 
 
