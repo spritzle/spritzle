@@ -60,10 +60,10 @@ Options:
 
 ```shell
 # Add from a local file with tags
-spritzle add -t linux -t iso ubuntu-24.04-desktop-amd64.iso.torrent
+spritzle add -t linux -t iso archlinux-x86_64.iso.torrent
 
 # Add from a URL
-spritzle add https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso.torrent
+spritzle add https://archlinux.org/releng/releases/latest/torrent/
 
 # Add by info-hash
 spritzle add 44a040be6d74d8d290cd20128788864cbf770719
