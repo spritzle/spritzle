@@ -2,6 +2,7 @@ import sys
 
 import click
 
+from spritzle.cli.display import print_error, print_success
 from spritzle.cli.lookup import resolve_single_torrent
 
 
@@ -18,8 +19,13 @@ async def f(client, torrent, path):
     url = client.url(f"torrent/{info_hash}/move_storage")
     async with client.session.post(url, json=[path]) as resp:
         if resp.status != 200:
-            click.echo(
-                f"Error moving storage: {resp.status} {resp.reason}", file=sys.stderr
+            print_error(
+                f"Error moving storage: {resp.status} {resp.reason}",
+                color_opt=getattr(client, "color", None),
             )
             sys.exit(1)
-        click.echo(f"Moved storage for {info_hash} to {path}.")
+        print_success(
+            f"Moved storage for {info_hash} to {path}.",
+            color_opt=getattr(client, "color", None),
+        )
+

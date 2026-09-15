@@ -1,10 +1,10 @@
 import asyncio
 import importlib
+import json
 from pathlib import Path
 import pkgutil
 import sys
-
-import json
+from typing import Optional
 
 import aiohttp
 import click
@@ -13,11 +13,14 @@ CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
 
 class Client(object):
-    def __init__(self, host: str, port: int, config: str, token: str):
+    def __init__(
+        self, host: str, port: int, config: str, token: str, color: Optional[bool] = None
+    ):
         self.host = host
         self.port = port
         self.config = Path(config)
         self.token = token
+        self.color = color
 
         if not token and Path(self.config, "tokens").exists():
             try:
@@ -70,10 +73,11 @@ cmd_dir = Path(__file__).parent / "commands"
 @click.option("-h", "--host", default="127.0.0.1", show_default=True)
 @click.option("-p", "--port", default=8080, type=int, show_default=True)
 @click.option("-t", "--token", default="")
+@click.option("--color/--no-color", default=None, help="Enable or disable color output.")
 @click.pass_context
-def cli(ctx, config, host, port, token):
+def cli(ctx, config, host, port, token, color):
     """Command-line interface for Spritzle."""
-    ctx.obj = Client(host, port, config, token)
+    ctx.obj = Client(host, port, config, token, color=color)
 
 
 def load_commands():

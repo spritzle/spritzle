@@ -755,6 +755,191 @@ def test_move_storage_by_name(cli):
     assert f"Moved storage for {info_hash} to /tmp/moved_storage" in res.output
 
 
+def test_display_formatters():
+    from spritzle.cli.display import (
+        format_bool,
+        format_bytes,
+        format_progress,
+        format_speed,
+        format_state,
+        should_use_color,
+    )
+
+    # State colors requested by user
+    assert format_state("downloading", use_color=True) == "[green]downloading[/green]"
+    assert format_state("seeding", use_color=True) == "[blue]seeding[/blue]"
+    assert format_state("checking", use_color=True) == "[magenta]checking[/magenta]"
+    assert format_state("checking_files", use_color=True) == "[magenta]checking_files[/magenta]"
+    assert format_state("queued", use_color=True) == "[yellow]queued[/yellow]"
+    assert format_state("paused", use_color=True) == "[dim]paused[/dim]"
+    assert format_state("error", use_color=True) == "[red]error[/red]"
+    # No color mode
+    assert format_state("downloading", use_color=False) == "downloading"
+
+    # Speeds
+    assert format_speed(0, human=True) == "0 B/s"
+    assert format_speed(1024, human=True) == "1.0 KB/s"
+    assert format_speed(1048576, human=True) == "1.0 MB/s"
+    assert format_speed(1048576, human=False) == "1048576"
+
+    # Bytes
+    assert format_bytes(500, human=True) == "500 B"
+    assert format_bytes(1048576, human=True) == "1.0 MB"
+    assert format_bytes(1073741824, human=True) == "1.0 GB"
+    assert format_bytes(1073741824, human=False) == "1073741824"
+
+    # Progress
+    assert format_progress(0.5, human=True) == "[█████░░░░░] 50.0%"
+    assert format_progress(1.0, human=True) == "[██████████] 100.0%"
+    assert format_progress(0.5, human=False) == "0.5"
+
+    # Booleans
+    assert "on" in format_bool(True, human=True, use_color=True)
+    assert "off" in format_bool(False, human=True, use_color=True)
+    assert format_bool(True, human=False) == "True"
+
+    # Color overrides
+    assert should_use_color(color_opt=True) is True
+    assert should_use_color(color_opt=False) is False
+
+
+def test_list_json_output(cli):
+    import json
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    res = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "list", "--json"],
+    )
+    assert res.exit_code == 0
+    data = json.loads(res.output)
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["name"] == "file1.txt"
+    assert "state" in data[0]
+    assert "progress" in data[0]
+
+
+def test_list_plain_and_color_flags(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # Plain mode
+    res_plain = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "list", "--plain"],
+    )
+    assert res_plain.exit_code == 0
+    assert "file1.txt" in res_plain.output
+
+    # Color enabled mode
+    res_color = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "--color", "list"],
+    )
+    assert res_color.exit_code == 0
+    assert "file1.txt" in res_color.output
+
+
+def test_flags_json_and_plain(cli):
+    import json
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # JSON mode
+    res_json = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "--json"],
+    )
+    assert res_json.exit_code == 0
+    flags_dict = json.loads(res_json.output)
+    assert isinstance(flags_dict, dict)
+    assert "auto_managed" in flags_dict
+
+    # Plain mode
+    res_plain = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "--plain"],
+    )
+    assert res_plain.exit_code == 0
+    assert "auto_managed" in res_plain.output
+
+
+def test_stats_and_settings_json(cli):
+    import json
+    runner = CliRunner()
+
+    # Stats JSON
+    res_stats = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "stats", "--json"],
+    )
+    assert res_stats.exit_code == 0
+    stats_data = json.loads(res_stats.output)
+    assert isinstance(stats_data, dict)
+
+    # Settings JSON
+    res_settings = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--json"],
+    )
+    assert res_settings.exit_code == 0
+    settings_data = json.loads(res_settings.output)
+    assert isinstance(settings_data, dict)
+
+
+def test_quiet_action_commands(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    # Pause with --quiet
+    res_pause = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "-Q", "file1.txt"],
+    )
+    assert res_pause.exit_code == 0
+    assert res_pause.output.strip() == info_hash
+
+    # Resume with --quiet
+    res_resume = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "resume", "--quiet", "file1.txt"],
+    )
+    assert res_resume.exit_code == 0
+    assert res_resume.output.strip() == info_hash
+
+    # Remove with --quiet
+    res_remove = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "remove", "-Q", "file1.txt"],
+    )
+    assert res_remove.exit_code == 0
+    assert res_remove.output.strip() == info_hash
+
+
+
 
 
 

@@ -4,6 +4,13 @@ import sys
 import click
 from tabulate import tabulate
 
+from spritzle.cli.display import (
+    format_bool,
+    get_console,
+    print_json,
+    render_rich_table,
+    should_use_color,
+)
 from spritzle.cli.lookup import resolve_single_torrent, resolve_target_torrents
 
 
@@ -14,6 +21,8 @@ from spritzle.cli.lookup import resolve_single_torrent, resolve_target_torrents
 @click.option("-u", "--unsets", help="Unset flags.", type=str, multiple=True)
 @click.option("-q", "--query", multiple=True, help="Query string to filter torrents.")
 @click.option("--all", "all_torrents", is_flag=True, help="Apply to all torrents.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
+@click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
 def command(client, *args, **kwargs):
     if kwargs["sets"] or kwargs["unsets"]:
@@ -22,7 +31,7 @@ def command(client, *args, **kwargs):
         client.do_command(show, *args, **kwargs)
 
 
-async def setter(client, torrent, header, sets, unsets, query, all_torrents):
+async def setter(client, torrent, header, sets, unsets, query, all_torrents, **kwargs):
     targets = await resolve_target_torrents(
         client, torrent=torrent, query=query, all_torrents=all_torrents
     )
@@ -50,28 +59,40 @@ async def setter(client, torrent, header, sets, unsets, query, all_torrents):
         sys.exit(1)
 
 
-async def show(client, torrent, header, **kwargs):
+async def show(client, torrent, header, json_output=False, plain=False, **kwargs):
     if not torrent:
         click.echo("Error: Specify a torrent to show flags.", file=sys.stderr)
         sys.exit(1)
 
     info_hash = await resolve_single_torrent(client, torrent)
 
-    table = []
     async with client.session.get(client.url(f"torrent/{info_hash}/flags")) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)
             sys.exit(1)
 
         t = await resp.json()
-        for key, value in t.items():
+
+    if json_output:
+        print_json(t)
+        return
+
+    is_interactive = should_use_color(getattr(client, "color", None)) and not plain
+
+    table = []
+    for key, value in t.items():
+        if is_interactive:
+            table.append((key, format_bool(bool(value), human=True, use_color=True)))
+        else:
             table.append((key, value))
 
-    tablefmt = "simple"
-    headers = ["flag", "value"]
-    if not header:
-        headers = []
-        tablefmt = "plain"
+    if is_interactive:
+        console = get_console(getattr(client, "color", None))
+        headers = ["Flag", "Value"] if header else []
+        render_rich_table(console, headers, table)
+    else:
+        tablefmt = "simple" if header else "plain"
+        headers = ["flag", "value"] if header else []
+        print(tabulate(table, headers=headers, tablefmt=tablefmt))
 
-    print(tabulate(table, headers=headers, tablefmt=tablefmt))
 
