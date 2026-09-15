@@ -1016,6 +1016,35 @@ def test_add_quiet(cli):
     int(added_hash, 16)  # Valid hex
 
 
+def test_help_command():
+    runner = CliRunner()
+
+    # General help
+    res_general = runner.invoke(spritzle_cli, ["help"])
+    assert res_general.exit_code == 0
+    assert "Usage:" in res_general.output
+    assert "Tip: Run 'spritzle help <command>'" in res_general.output
+
+    # Command-specific help with examples
+    res_cmd = runner.invoke(spritzle_cli, ["help", "pause"])
+    assert res_cmd.exit_code == 0
+    assert "Usage:" in res_cmd.output
+    assert "--query" in res_cmd.output
+    assert "Examples:" in res_cmd.output
+    assert "spritzle pause" in res_cmd.output
+
+    # Nonexistent command
+    res_err = runner.invoke(spritzle_cli, ["help", "nonexistent"])
+    assert res_err.exit_code == 1
+    assert "No such command 'nonexistent'" in res_err.output
+
+    # Color mode
+    res_color = runner.invoke(spritzle_cli, ["--color", "help", "list"])
+    assert res_color.exit_code == 0
+    assert "Examples:" in res_color.output
+
+
+
 
 
 
