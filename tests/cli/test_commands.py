@@ -552,6 +552,210 @@ def test_spritzled_token_command(tmp_path):
     assert "exp" in decoded
 
 
+def test_pause_by_name(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    ti = lt.torrent_info(lt.bdecode(t_file))
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "file1.txt"],
+    )
+    assert result.exit_code == 0
+    assert "paused successfully" in result.output
+    assert info_hash in result.output
+
+
+def test_pause_ambiguous_name(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "file"],
+    )
+    assert result.exit_code == 1
+    assert "Multiple torrents match 'file'" in result.output
+
+
+def test_pause_nonexistent_name(cli):
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "nonexistent_torrent"],
+    )
+    assert result.exit_code == 1
+    assert "No torrent found matching 'nonexistent_torrent'" in result.output
+
+
+def test_pause_query_and_all(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # Pause by query
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "-q", "name=file1.*"],
+    )
+    assert result.exit_code == 0
+    assert "Paused 1 torrents successfully" in result.output
+
+    # Pause by --all
+    result_all = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "pause", "--all"],
+    )
+    assert result_all.exit_code == 0
+    assert "Paused 2 torrents successfully" in result_all.output
+
+
+def test_resume_by_name_and_query(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # Resume single by name
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "resume", "file1.txt"],
+    )
+    assert result.exit_code == 0
+    assert "resumed successfully" in result.output
+
+    # Resume by query
+    result_q = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "resume", "-q", "name=file.*"],
+    )
+    assert result_q.exit_code == 0
+    assert "Resumed 2 torrents successfully" in result_q.output
+
+    # Resume by --all
+    result_all = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "resume", "--all"],
+    )
+    assert result_all.exit_code == 0
+    assert "Resumed 2 torrents successfully" in result_all.output
+
+
+def test_remove_by_name_and_query(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # Remove single by name
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "remove", "file1.txt"],
+    )
+    assert result.exit_code == 0
+    assert "removed successfully" in result.output
+
+    # 1 torrent should remain
+    assert len(cli.app[APP_KEY_CORE].session.get_torrents()) == 1
+
+    # Remove remaining by --all
+    result_all = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "remove", "--all"],
+    )
+    assert result_all.exit_code == 0
+    assert "Removed 1 torrents successfully" in result_all.output
+    assert len(cli.app[APP_KEY_CORE].session.get_torrents()) == 0
+
+
+def test_flags_by_name_and_query(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+
+    runner = CliRunner()
+    # Show flags by name
+    res_show = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt"],
+    )
+    assert res_show.exit_code == 0
+    assert "auto_managed" in res_show.output
+
+    # Set flags by name
+    res_set = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "-s", "auto_managed"],
+    )
+    assert res_set.exit_code == 0
+
+    # Set flags by query
+    res_query = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "flags", "-q", "name=file1.*", "-u", "auto_managed"],
+    )
+    assert res_query.exit_code == 0
+
+
+def test_move_storage_by_name(cli):
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    info_hash = str(handle.info_hash())
+
+    runner = CliRunner()
+    res = runner.invoke(
+        spritzle_cli,
+        [
+            "--port",
+            str(cli.server.port),
+            "--token",
+            "test-token",
+            "move_storage",
+            "file1.txt",
+            "/tmp/moved_storage",
+        ],
+    )
+    assert res.exit_code == 0
+    assert f"Moved storage for {info_hash} to /tmp/moved_storage" in res.output
+
+
+
 
 
 
