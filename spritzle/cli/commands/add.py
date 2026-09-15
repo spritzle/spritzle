@@ -6,6 +6,9 @@ from urllib.parse import urlparse
 import click
 
 
+from spritzle.cli.display import print_error, print_success
+
+
 @click.command("add", short_help="Add a torrent to the session.")
 @click.argument("path", required=True)
 @click.option(
@@ -25,12 +28,13 @@ import click
     multiple=True,
     help=("Tag to apply to the torrent. Can be specified multiple times."),
 )
+@click.option("--quiet", "-Q", is_flag=True, default=False, help="Print only added info-hash.")
 @click.pass_obj
-def command(client, path, option, tag):
-    client.do_command(f, path, option, tag)
+def command(client, path, option, tag, quiet):
+    client.do_command(f, path, option, tag, quiet)
 
 
-async def f(client, path, option, tag):
+async def f(client, path, option, tag, quiet=False):
     data = {}
     for o in option:
         if "=" in o:
@@ -51,20 +55,21 @@ async def f(client, path, option, tag):
                 with open(path, "rb") as f:
                     data["file"] = b64encode(f.read()).decode("ascii")
             except OSError as e:
-                click.echo(f"Error reading file '{path}': {e}", file=sys.stderr)
+                print_error(f"Error reading file '{path}': {e}", color_opt=getattr(client, "color", None))
                 sys.exit(1)
     else:
         try:
             with open(path, "rb") as f:
                 data["file"] = b64encode(f.read()).decode("ascii")
         except OSError as e:
-            click.echo(f"Error reading file '{path}': {e}", file=sys.stderr)
+            print_error(f"Error reading file '{path}': {e}", color_opt=getattr(client, "color", None))
             sys.exit(1)
 
     async with client.session.post(client.url("torrent"), json=data) as resp:
         if resp.status != 201:
-            click.echo(
-                f"Error adding torrent: {resp.status} {resp.reason}", file=sys.stderr
+            print_error(
+                f"Error adding torrent: {resp.status} {resp.reason}",
+                color_opt=getattr(client, "color", None),
             )
             sys.exit(1)
         location = resp.headers.get("Location")
@@ -73,4 +78,8 @@ async def f(client, path, option, tag):
         else:
             resp_data = await resp.json()
             hash = resp_data.get("info_hash", "")
-        click.echo(f"{hash} added successfully.")
+
+        if quiet:
+            click.echo(hash)
+        else:
+            print_success(f"{hash} added successfully.", color_opt=getattr(client, "color", None))

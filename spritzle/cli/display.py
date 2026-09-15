@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from rich import box
 from rich.console import Console
@@ -116,6 +116,65 @@ def render_rich_table(
     for r in rows:
         table.add_row(*[str(cell) for cell in r])
     console.print(table)
+
+
+def render_kv_table(
+    console: Console,
+    items: Sequence[Tuple[str, Any]],
+    title: Optional[str] = None,
+    num_columns: Optional[int] = None,
+    key_header: str = "Key",
+    value_header: str = "Value",
+    box_style: box.Box = box.ROUNDED,
+) -> None:
+    """
+    Render key-value items in a multi-column grid across terminal width
+    to reduce vertical scrolling.
+    """
+    if not items:
+        return
+
+    num_items = len(items)
+    if num_columns is None:
+        width = console.width
+        if width >= 140:
+            num_columns = 3
+        elif width >= 80:
+            num_columns = 2
+        else:
+            num_columns = 1
+
+    num_columns = max(1, min(num_columns, num_items))
+    rows_per_col = (num_items + num_columns - 1) // num_columns
+
+    table = Table(
+        title=title,
+        box=box_style,
+        header_style="bold cyan",
+        show_header=True,
+    )
+
+    for _ in range(num_columns):
+        table.add_column(key_header, style="cyan")
+        table.add_column(value_header)
+
+    for r in range(rows_per_col):
+        row_cells: List[str] = []
+        for c in range(num_columns):
+            idx = c * rows_per_col + r
+            if idx < num_items:
+                k, v = items[idx]
+                if isinstance(v, bool):
+                    v_str = format_bool(v, human=True, use_color=True)
+                else:
+                    v_str = str(v)
+                row_cells.extend([str(k), v_str])
+            else:
+                row_cells.extend(["", ""])
+        table.add_row(*row_cells)
+
+    console.print(table)
+
 
 
 def render_plain_table(

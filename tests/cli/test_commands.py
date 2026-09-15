@@ -939,6 +939,84 @@ def test_quiet_action_commands(cli):
     assert res_remove.output.strip() == info_hash
 
 
+def test_render_kv_table_multi_column():
+    import io
+    from rich.console import Console
+    from spritzle.cli.display import render_kv_table
+
+    items = [("item_0", "val_0"), ("item_1", "val_1"), ("item_2", "val_2"), ("item_3", "val_3")]
+
+    # Wide console (>= 140) -> 3 column pairs
+    buf_wide = io.StringIO()
+    c_wide = Console(file=buf_wide, width=150, force_terminal=True)
+    render_kv_table(c_wide, items, title="Wide Table")
+    output_wide = buf_wide.getvalue()
+    assert "Wide Table" in output_wide
+    assert "item_0" in output_wide
+    assert "item_3" in output_wide
+
+    # Medium console (80-139) -> 2 column pairs
+    buf_med = io.StringIO()
+    c_med = Console(file=buf_med, width=90, force_terminal=True)
+    render_kv_table(c_med, items, title="Medium Table")
+    output_med = buf_med.getvalue()
+    assert "Medium Table" in output_med
+
+    # Narrow console (< 80) -> 1 column pair
+    buf_narrow = io.StringIO()
+    c_narrow = Console(file=buf_narrow, width=60, force_terminal=True)
+    render_kv_table(c_narrow, items, title="Narrow Table")
+    output_narrow = buf_narrow.getvalue()
+    assert "Narrow Table" in output_narrow
+
+
+def test_config_json_and_plain(cli):
+    import json
+    runner = CliRunner()
+
+    # JSON mode
+    res_json = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "config", "--json"],
+    )
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert isinstance(data, dict)
+    assert "auth_timeout" in data
+
+    # Plain mode
+    res_plain = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "config", "--plain"],
+    )
+    assert res_plain.exit_code == 0
+    assert "auth_timeout" in res_plain.output
+
+    # Color mode
+    res_color = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "--color", "config"],
+    )
+    assert res_color.exit_code == 0
+    assert "Spritzle Configuration" in res_color.output
+
+
+def test_add_quiet(cli):
+    from tests.daemon.common import torrent_dir
+
+    t_file = str(torrent_dir / "testtorrent1.torrent")
+    runner = CliRunner()
+    result = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "add", "-Q", t_file],
+    )
+    assert result.exit_code == 0
+    added_hash = result.output.strip()
+    assert len(added_hash) == 40
+    int(added_hash, 16)  # Valid hex
+
+
+
 
 
 

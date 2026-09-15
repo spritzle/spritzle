@@ -6,6 +6,9 @@ import sys
 import click
 
 
+from spritzle.cli.display import print_error, print_success
+
+
 @click.command("auth", short_help="Generate an authentication token.")
 @click.option("--password", required=True, prompt=True, hide_input=True)
 @click.pass_obj
@@ -17,7 +20,7 @@ async def f(client, password):
     data = {"password": password}
     async with client.session.post(client.url("auth"), json=data) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            print_error(f"Error: {resp}", color_opt=getattr(client, "color", None))
             sys.exit(1)
 
         d = await resp.json()
@@ -42,5 +45,8 @@ async def f(client, password):
         except OSError:
             pass
 
-        click.echo(f"Token for {client.host}:{client.port} updated.")
+        print_success(
+            f"Token for {client.host}:{client.port} updated.",
+            color_opt=getattr(client, "color", None),
+        )
 

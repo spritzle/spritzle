@@ -7,7 +7,7 @@ from tabulate import tabulate
 from spritzle.cli.display import (
     get_console,
     print_json,
-    render_rich_table,
+    render_kv_table,
     should_use_color,
 )
 
@@ -66,7 +66,13 @@ async def show(client, json_output=False, plain=False):
 
     if should_use_color(getattr(client, "color", None)) and not plain:
         console = get_console(getattr(client, "color", None))
-        render_rich_table(console, ["Setting", "Value"], table, title="Session Settings")
+        render_kv_table(
+            console,
+            table,
+            title="Session Settings",
+            key_header="Setting",
+            value_header="Value",
+        )
     else:
         print(tabulate(table, tablefmt="plain"))
 

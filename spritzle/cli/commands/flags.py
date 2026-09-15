@@ -5,10 +5,9 @@ import click
 from tabulate import tabulate
 
 from spritzle.cli.display import (
-    format_bool,
     get_console,
     print_json,
-    render_rich_table,
+    render_kv_table,
     should_use_color,
 )
 from spritzle.cli.lookup import resolve_single_torrent, resolve_target_torrents
@@ -79,18 +78,19 @@ async def show(client, torrent, header, json_output=False, plain=False, **kwargs
 
     is_interactive = should_use_color(getattr(client, "color", None)) and not plain
 
-    table = []
-    for key, value in t.items():
-        if is_interactive:
-            table.append((key, format_bool(bool(value), human=True, use_color=True)))
-        else:
-            table.append((key, value))
-
     if is_interactive:
         console = get_console(getattr(client, "color", None))
-        headers = ["Flag", "Value"] if header else []
-        render_rich_table(console, headers, table)
+        render_kv_table(
+            console,
+            list(t.items()),
+            title=f"Torrent Flags ({info_hash})",
+            key_header="Flag",
+            value_header="Value",
+        )
     else:
+        table = []
+        for key, value in t.items():
+            table.append((key, value))
         tablefmt = "simple" if header else "plain"
         headers = ["flag", "value"] if header else []
         print(tabulate(table, headers=headers, tablefmt=tablefmt))
