@@ -909,6 +909,125 @@ def test_stats_and_settings_json(cli):
     assert isinstance(settings_data, dict)
 
 
+def test_settings_defaults_and_modified_flags(cli):
+    import json
+    runner = CliRunner()
+
+    # Reset all first to ensure clean state
+    runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+    )
+
+    # Defaults flag
+    res_def = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--defaults", "--json"],
+    )
+    assert res_def.exit_code == 0
+    defaults = json.loads(res_def.output)
+    assert "download_rate_limit" in defaults
+
+    # Modified flag when nothing modified
+    res_mod_none = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+    )
+    assert res_mod_none.exit_code == 0
+    assert "No settings have been modified" in res_mod_none.output
+
+    # Modify a setting
+    res_set = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "500000"],
+    )
+    assert res_set.exit_code == 0
+
+    # Modified flag should now show only the modified setting
+    res_mod = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified", "--json"],
+    )
+    assert res_mod.exit_code == 0
+    mod_data = json.loads(res_mod.output)
+    assert list(mod_data.keys()) == ["download_rate_limit"]
+    assert mod_data["download_rate_limit"] == 500000
+
+    # Clean up
+    runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset", "download_rate_limit"],
+    )
+
+
+def test_settings_reset_commands(cli):
+    runner = CliRunner()
+
+    # Reset specific key
+    runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "999999"],
+    )
+    res_reset = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset", "download_rate_limit"],
+    )
+    assert res_reset.exit_code == 0
+    assert "download_rate_limit" in res_reset.output
+
+    # Verify download_rate_limit was reset
+    res_check = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+    )
+    assert "download_rate_limit" not in res_check.output
+
+    # Reset all
+    runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "1111", "-s", "upload_rate_limit", "2222"],
+    )
+    res_reset_all = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+    )
+    assert res_reset_all.exit_code == 0
+    assert "Reset all" in res_reset_all.output
+
+    # After reset all, nothing is modified from baseline
+    res_after_all = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+    )
+    assert "No settings have been modified" in res_after_all.output
+
+
+def test_settings_visual_modified_indicator(cli):
+    runner = CliRunner()
+
+    # Modify download_rate_limit
+    res_set = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "777777"],
+    )
+    assert res_set.exit_code == 0, res_set.output
+
+    # Invoke with color
+    res = runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "--color", "settings"],
+    )
+    assert res.exit_code == 0
+    assert "* download_rate_limit" in res.output or "* download_rate_" in res.output
+    assert "modified from default" in res.output
+
+    # Clean up
+    runner.invoke(
+        spritzle_cli,
+        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+    )
+
+
 def test_quiet_action_commands(cli):
     import libtorrent as lt
     from spritzle.daemon.keys import APP_KEY_CORE

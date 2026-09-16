@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 from rich import box
 from rich.console import Console
@@ -127,6 +127,8 @@ def render_kv_table(
     key_header: str = "Key",
     value_header: str = "Value",
     box_style: box.Box = box.ROUNDED,
+    modified_keys: Optional[Set[str]] = None,
+    caption: Optional[str] = None,
 ) -> None:
     """
     Render key-value items in a multi-column grid across terminal width
@@ -134,6 +136,10 @@ def render_kv_table(
     """
     if not items:
         return
+
+    mod_set = set(modified_keys) if modified_keys else set()
+    if caption is None and mod_set:
+        caption = "* modified from default"
 
     num_items = len(items)
     if num_columns is None:
@@ -150,14 +156,16 @@ def render_kv_table(
 
     table = Table(
         title=title,
+        caption=caption,
+        caption_style="dim italic",
         box=box_style,
         header_style="bold cyan",
         show_header=True,
     )
 
     for _ in range(num_columns):
-        table.add_column(key_header, style="cyan")
-        table.add_column(value_header)
+        table.add_column(key_header, style="cyan", no_wrap=True)
+        table.add_column(value_header, no_wrap=True)
 
     for r in range(rows_per_col):
         row_cells: List[str] = []
@@ -165,15 +173,27 @@ def render_kv_table(
             idx = c * rows_per_col + r
             if idx < num_items:
                 k, v = items[idx]
+                is_modified = k in mod_set
+                if is_modified:
+                    k_str = f"[bold yellow]* {escape(str(k))}[/bold yellow]"
+                else:
+                    k_str = escape(str(k))
+
                 if isinstance(v, bool):
                     v_str = format_bool(v, human=True, use_color=True)
+                    if is_modified:
+                        v_str = f"[bold yellow]{v_str}[/bold yellow]"
                 elif v == "":
-                    v_str = '[dim]""[/dim]'
+                    v_str = '[bold yellow]""[/bold yellow]' if is_modified else '[dim]""[/dim]'
                 elif v is None:
-                    v_str = "[dim]None[/dim]"
+                    v_str = "[bold yellow]None[/bold yellow]" if is_modified else "[dim]None[/dim]"
                 else:
-                    v_str = escape(str(v))
-                row_cells.extend([escape(str(k)), v_str])
+                    v_str = (
+                        f"[bold yellow]{escape(str(v))}[/bold yellow]"
+                        if is_modified
+                        else escape(str(v))
+                    )
+                row_cells.extend([k_str, v_str])
             else:
                 row_cells.extend(["", ""])
         table.add_row(*row_cells)

@@ -31,7 +31,46 @@ routes = web.RouteTableDef()
 @routes.get("/session/settings")
 async def get_session_settings(request):
     core = request.app[APP_KEY_CORE]
-    return web.json_response(core.session.get_settings())
+    settings = core.session.get_settings()
+    modified = request.query.get("modified", "").strip().lower() in ("true", "1", "yes", "on")
+    if modified:
+        baseline = core.get_baseline_settings()
+        settings = {k: v for k, v in settings.items() if k in baseline and v != baseline[k]}
+    return web.json_response(settings)
+
+
+@routes.get("/session/settings/defaults")
+async def get_session_settings_defaults(request):
+    core = request.app[APP_KEY_CORE]
+    return web.json_response(core.get_baseline_settings())
+
+
+@routes.post("/session/settings/reset")
+async def post_session_settings_reset(request):
+    core = request.app[APP_KEY_CORE]
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    if not isinstance(data, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
+    reset_all = bool(data.get("all", False))
+    keys = data.get("keys")
+
+    if not reset_all and not keys:
+        raise web.HTTPBadRequest(reason="Must specify 'keys' list or 'all: true'.")
+
+    if keys is not None and not isinstance(keys, list):
+        raise web.HTTPBadRequest(reason="'keys' must be a list of setting names.")
+
+    try:
+        reset_keys = core.reset_settings(keys=keys, reset_all=reset_all)
+    except (KeyError, ValueError) as e:
+        raise web.HTTPBadRequest(reason=str(e))
+
+    return web.json_response({"reset": reset_keys})
 
 
 @routes.put("/session/settings")

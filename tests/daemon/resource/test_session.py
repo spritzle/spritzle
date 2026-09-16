@@ -108,3 +108,92 @@ async def test_get_session_stats_timeout(cli, monkeypatch):
     assert response.status == 504
 
 
+async def test_get_settings_defaults(cli):
+    response = await cli.get("/session/settings/defaults")
+    assert response.status == 200
+    defaults = await response.json()
+    assert isinstance(defaults, dict)
+    assert len(defaults) > 200
+    assert "user_agent" in defaults
+    assert "download_rate_limit" in defaults
+
+
+async def test_get_settings_modified_filter(cli):
+    # First reset all
+    await cli.post("/session/settings/reset", json={"all": True})
+
+    # None modified initially
+    resp = await cli.get("/session/settings?modified=true")
+    assert resp.status == 200
+    assert await resp.json() == {}
+
+    # Modify one setting
+    await cli.put("/session/settings", json={"download_rate_limit": 500000})
+
+    resp = await cli.get("/session/settings?modified=true")
+    assert resp.status == 200
+    modified = await resp.json()
+    assert "download_rate_limit" in modified
+    assert modified["download_rate_limit"] == 500000
+    assert len(modified) == 1
+
+    # Reset
+    await cli.post("/session/settings/reset", json={"keys": ["download_rate_limit"]})
+    resp = await cli.get("/session/settings?modified=true")
+    assert await resp.json() == {}
+
+
+async def test_post_settings_reset_keys(cli):
+    defaults_resp = await cli.get("/session/settings/defaults")
+    defaults = await defaults_resp.json()
+    default_limit = defaults["download_rate_limit"]
+
+    # Change download_rate_limit
+    await cli.put("/session/settings", json={"download_rate_limit": default_limit + 1000})
+    curr = await (await cli.get("/session/settings")).json()
+    assert curr["download_rate_limit"] == default_limit + 1000
+
+    # Reset it
+    resp = await cli.post("/session/settings/reset", json={"keys": ["download_rate_limit"]})
+    assert resp.status == 200
+    assert (await resp.json())["reset"] == ["download_rate_limit"]
+
+    # Verify restored to default
+    after = await (await cli.get("/session/settings")).json()
+    assert after["download_rate_limit"] == default_limit
+
+
+async def test_post_settings_reset_all(cli):
+    defaults_resp = await cli.get("/session/settings/defaults")
+    defaults = await defaults_resp.json()
+
+    # Change two settings
+    await cli.put("/session/settings", json={"download_rate_limit": 12345, "upload_rate_limit": 54321})
+
+    # Reset all
+    resp = await cli.post("/session/settings/reset", json={"all": True})
+    assert resp.status == 200
+    reset_list = (await resp.json())["reset"]
+    assert len(reset_list) > 200
+
+    # Verify both restored
+    curr = await (await cli.get("/session/settings")).json()
+    assert curr["download_rate_limit"] == defaults["download_rate_limit"]
+    assert curr["upload_rate_limit"] == defaults["upload_rate_limit"]
+
+
+async def test_post_settings_reset_invalid_key(cli):
+    resp = await cli.post("/session/settings/reset", json={"keys": ["nonexistent_setting_xyz"]})
+    assert resp.status == 400
+    err = await resp.text()
+    assert "nonexistent_setting_xyz" in err
+
+
+async def test_post_settings_reset_bad_payload(cli):
+    resp = await cli.post("/session/settings/reset", json={})
+    assert resp.status == 400
+
+    resp = await cli.post("/session/settings/reset", data="invalid json")
+    assert resp.status == 400
+
+

@@ -25,7 +25,7 @@ import importlib.metadata
 from pathlib import Path
 import logging
 import functools
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
 import libtorrent as lt
 
@@ -53,6 +53,7 @@ class Core(object):
         # A place to keep additional data on torrents, that isn't stored in
         # libtorrent.  This is key'd on info_hash.
         self.torrent_data: Dict[str, Any] = {}
+        self._baseline_settings: Optional[Dict[str, Any]] = None
 
         self.alert = Alert()
         self.resume_data = ResumeData(self)
@@ -62,8 +63,6 @@ class Core(object):
             "status_notification", self.on_status_notification_alert
         )
         self.alert.register_handler("state_changed_alert", self.on_state_changed_alert)
-
-
 
     def get_default_settings(self) -> Dict[str, Any]:
         return {
@@ -85,6 +84,33 @@ class Core(object):
             % (importlib.metadata.version("spritzle"), lt.__version__),
             "alert_queue_size": 20000,
         }
+
+    def get_baseline_settings(self) -> Dict[str, Any]:
+        if self._baseline_settings is None:
+            temp_session = cast(Any, lt.session(self.get_default_settings()))
+            self._baseline_settings = temp_session.get_settings()
+        return dict(self._baseline_settings)
+
+    def reset_settings(
+        self, keys: Optional[Sequence[str]] = None, reset_all: bool = False
+    ) -> List[str]:
+        if self.session is None:
+            raise RuntimeError("Session not started")
+        baseline = self.get_baseline_settings()
+        if reset_all:
+            target_keys = list(baseline.keys())
+        elif keys:
+            target_keys = list(keys)
+        else:
+            raise ValueError("Either keys or reset_all must be specified.")
+
+        for k in target_keys:
+            if k not in baseline:
+                raise KeyError(f"Unknown setting '{k}'")
+
+        reset_dict = {k: baseline[k] for k in target_keys}
+        cast(Any, self.session).apply_settings(reset_dict)
+        return target_keys
 
     async def start(self, settings: Optional[Dict[str, Any]] = None) -> None:
         log.debug("Core starting..")

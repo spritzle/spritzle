@@ -6,7 +6,9 @@ from tabulate import tabulate
 
 from spritzle.cli.display import (
     get_console,
+    print_error,
     print_json,
+    print_success,
     render_kv_table,
     should_use_color,
 )
@@ -22,14 +24,44 @@ from spritzle.cli.display import (
     multiple=True,
     help="Set a property value as: key value",
 )
+@click.option(
+    "--reset",
+    "-r",
+    "reset_keys",
+    type=str,
+    multiple=True,
+    help="Reset specified setting(s) to default value.",
+)
+@click.option(
+    "--reset-all",
+    is_flag=True,
+    default=False,
+    help="Reset all settings to default values.",
+)
+@click.option(
+    "--modified",
+    "-m",
+    is_flag=True,
+    default=False,
+    help="Show only settings that differ from their default values.",
+)
+@click.option(
+    "--defaults",
+    "-d",
+    is_flag=True,
+    default=False,
+    help="Show default values for settings.",
+)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
-def command(client, set_value, json_output, plain):
+def command(client, set_value, reset_keys, reset_all, modified, defaults, json_output, plain):
     if set_value:
         client.do_command(setter, set_value)
+    elif reset_keys or reset_all:
+        client.do_command(resetter, reset_keys, reset_all)
     else:
-        client.do_command(show, json_output, plain)
+        client.do_command(show, modified, defaults, json_output, plain)
 
 
 async def setter(client, set_value):
@@ -48,20 +80,82 @@ async def setter(client, set_value):
             sys.exit(1)
 
 
-async def show(client, json_output=False, plain=False):
+async def resetter(client, reset_keys, reset_all):
+    payload = {}
+    if reset_all:
+        payload["all"] = True
+    else:
+        payload["keys"] = list(reset_keys)
+
+    headers = {"Content-Type": "application/json"}
+    async with client.session.post(
+        client.url("session/settings/reset"), json=payload, headers=headers
+    ) as resp:
+        if resp.status != 200:
+            try:
+                err_data = await resp.json()
+                err = err_data.get("reason", await resp.text())
+            except Exception:
+                err = await resp.text()
+            print_error(f"Error resetting settings: {err}", getattr(client, "color", None))
+            sys.exit(1)
+
+        result = await resp.json()
+        reset_list = result.get("reset", [])
+        if reset_all:
+            print_success(
+                f"Reset all {len(reset_list)} settings to default values.",
+                getattr(client, "color", None),
+            )
+        else:
+            print_success(
+                f"Reset {len(reset_list)} setting(s) to default values: {', '.join(reset_list)}",
+                getattr(client, "color", None),
+            )
+
+
+async def show(client, modified=False, defaults=False, json_output=False, plain=False):
     async with client.session.get(client.url("session/settings")) as resp:
         if resp.status != 200:
             click.echo(f"Error: {resp}", file=sys.stderr)
             sys.exit(1)
-
         settings = await resp.json()
 
+    async with client.session.get(client.url("session/settings/defaults")) as resp:
+        if resp.status != 200:
+            click.echo(f"Error: {resp}", file=sys.stderr)
+            sys.exit(1)
+        default_settings = await resp.json()
+
+    modified_keys = {
+        k
+        for k, v in settings.items()
+        if k in default_settings and v != default_settings[k]
+    }
+
+    if defaults:
+        display_data = default_settings
+        title = "Session Settings (Defaults)"
+        mod_keys = set()
+    elif modified:
+        display_data = {k: settings[k] for k in sorted(modified_keys)}
+        title = "Session Settings (Modified)"
+        mod_keys = modified_keys
+    else:
+        display_data = settings
+        title = "Session Settings"
+        mod_keys = modified_keys
+
     if json_output:
-        print_json(settings)
+        print_json(display_data)
+        return
+
+    if modified and not display_data:
+        click.echo("No settings have been modified from their default values.")
         return
 
     table = []
-    for k, v in sorted(settings.items()):
+    for k, v in sorted(display_data.items()):
         table.append([k, v])
 
     if should_use_color(getattr(client, "color", None)) and not plain:
@@ -69,10 +163,12 @@ async def show(client, json_output=False, plain=False):
         render_kv_table(
             console,
             table,
-            title="Session Settings",
+            title=title,
             key_header="Setting",
             value_header="Value",
+            modified_keys=mod_keys,
         )
     else:
         print(tabulate(table, tablefmt="plain"))
+
 

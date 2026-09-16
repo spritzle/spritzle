@@ -59,7 +59,10 @@ EXAMPLES: Dict[str, List[str]] = {
     "settings": [
         "spritzle settings",
         "spritzle settings -s download_rate_limit 1048576",
-        "spritzle settings -s enable_dht false",
+        "spritzle settings --modified",
+        "spritzle settings --defaults",
+        "spritzle settings --reset download_rate_limit",
+        "spritzle settings --reset-all",
         "spritzle settings --json",
     ],
     "config": [
