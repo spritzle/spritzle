@@ -10,6 +10,7 @@ spritzled [OPTIONS] [COMMAND] [ARGS]...
 
 ### Options
 
+* `-H, --host TEXT`: Hostname or IP to listen on (default: `127.0.0.1`).
 * `-p, --port INTEGER`: Port for the HTTP REST server to listen on (default: `8080`).
 * `-c, --config-dir, --config_dir PATH`: Path to the configuration directory (default: `~/.config/spritzle`).
 * `-l, --log-level [DEBUG|INFO|WARNING|ERROR]`: Daemon log verbosity (default: `INFO`).

@@ -143,14 +143,15 @@ def setup_app(app, core, log):
 
 
 def run_daemon(
-    debug: bool = False,
+    host: str = "127.0.0.1",
     port: int = 8080,
+    debug: bool = False,
     config_dir: Optional[str] = None,
     log_level: str = "INFO",
 ):
     log = setup_logger(name="spritzle", level=log_level)
     log.info(
-        f"spritzled starting.. port={port}, config_dir={config_dir}, log_level={log_level}, debug={debug}"
+        f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, log_level={log_level}, debug={debug}"
     )
 
     try:
@@ -174,10 +175,22 @@ def run_daemon(
     setup_app(app, Core(config), log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     app.middlewares.append(auth_middleware)
-    aiohttp.web.run_app(app, port=port, loop=loop)
+    try:
+        aiohttp.web.run_app(app, host=host, port=port, loop=loop)
+    except OSError as e:
+        log.error(f"Failed to bind to {host}:{port}: {e}")
+        log.error(f"Specify another port with -p / --port (e.g. spritzled -p {port + 1}).")
+        sys.exit(1)
 
 
 @click.group(invoke_without_command=True)
+@click.option(
+    "-H",
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Host to listen on.",
+)
 @click.option("--debug", default=False, is_flag=True, help="Enable debug mode.")
 @click.option("-p", "--port", default=8080, type=int, show_default=True, help="Port to listen on.")
 @click.option(
@@ -197,12 +210,13 @@ def run_daemon(
     help="Log level.",
 )
 @click.pass_context
-def main(ctx, debug, port, config_dir, log_level):
+def main(ctx, host, port, debug, config_dir, log_level):
     """Spritzle daemon."""
     if ctx.invoked_subcommand is None:
         run_daemon(
-            debug=debug,
+            host=host,
             port=port,
+            debug=debug,
             config_dir=config_dir,
             log_level=log_level,
         )

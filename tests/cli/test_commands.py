@@ -1255,6 +1255,18 @@ def test_add_magnet_command(cli):
     assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
 
 
+def test_spritzled_help():
+    from spritzle.daemon.main import main as spritzled_main
+
+    runner = CliRunner()
+    res = runner.invoke(spritzled_main, ["--help"])
+    assert res.exit_code == 0
+    assert "--host" in res.output
+    assert "-H" in res.output
+    assert "127.0.0.1" in res.output
+
+
+
 
 
 
