@@ -1,7 +1,10 @@
 import sys
+from typing import Union
 
 import click
 from tabulate import tabulate
+
+from rich.text import Text
 
 from spritzle.cli.display import (
     format_bytes,
@@ -67,11 +70,13 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
         tags_str = str(tags)
 
     use_color = should_use_color(getattr(client, "color", None)) and not plain
+    state_str = format_state(state, use_color=use_color)
+    state_val: Union[str, Text] = Text.from_markup(state_str) if use_color else state_str
 
     items = [
         ("Name", name),
         ("Info Hash", info_hash),
-        ("State", format_state(state, use_color=use_color)),
+        ("State", state_val),
         ("Progress", format_progress(progress, human=use_color)),
         ("Download Rate", format_speed(dl_rate, human=use_color)),
         ("Upload Rate", format_speed(ul_rate, human=use_color)),
@@ -86,7 +91,8 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
 
     err = data.get("error")
     if err:
-        items.append(("Error", str(err)))
+        err_val: Union[str, Text] = Text(str(err), style="red") if use_color else str(err)
+        items.append(("Error", err_val))
 
     if use_color:
         console = get_console(getattr(client, "color", None))

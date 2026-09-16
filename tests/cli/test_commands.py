@@ -1242,6 +1242,15 @@ def test_info_command(cli):
     data = json.loads(res_json.output)
     assert data["info_hash"] == ih
 
+    # Color output (ensure markup tags like [green] are not leaked as raw text)
+    res_color = runner.invoke(
+        spritzle_cli, ["--color", "--port", port, "info", ih]
+    )
+    assert res_color.exit_code == 0
+    assert "[green]" not in res_color.output
+    assert "[/green]" not in res_color.output
+    assert "State" in res_color.output
+
 
 def test_add_magnet_command(cli):
     runner = CliRunner()

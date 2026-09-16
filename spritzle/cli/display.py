@@ -7,6 +7,7 @@ from rich import box
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from rich.text import Text
 
 
 def should_use_color(color_opt: Optional[bool] = None) -> bool:
@@ -168,7 +169,7 @@ def render_kv_table(
         table.add_column(value_header, no_wrap=True)
 
     for r in range(rows_per_col):
-        row_cells: List[str] = []
+        row_cells: List[Union[str, Text]] = []
         for c in range(num_columns):
             idx = c * rows_per_col + r
             if idx < num_items:
@@ -179,21 +180,23 @@ def render_kv_table(
                 else:
                     k_str = escape(str(k))
 
-                if isinstance(v, bool):
-                    v_str = format_bool(v, human=True, use_color=True)
+                if isinstance(v, Text):
+                    v_cell: Union[str, Text] = v
+                elif isinstance(v, bool):
+                    v_cell = format_bool(v, human=True, use_color=True)
                     if is_modified:
-                        v_str = f"[bold yellow]{v_str}[/bold yellow]"
+                        v_cell = f"[bold yellow]{v_cell}[/bold yellow]"
                 elif v == "":
-                    v_str = '[bold yellow]""[/bold yellow]' if is_modified else '[dim]""[/dim]'
+                    v_cell = '[bold yellow]""[/bold yellow]' if is_modified else '[dim]""[/dim]'
                 elif v is None:
-                    v_str = "[bold yellow]None[/bold yellow]" if is_modified else "[dim]None[/dim]"
+                    v_cell = "[bold yellow]None[/bold yellow]" if is_modified else "[dim]None[/dim]"
                 else:
-                    v_str = (
+                    v_cell = (
                         f"[bold yellow]{escape(str(v))}[/bold yellow]"
                         if is_modified
                         else escape(str(v))
                     )
-                row_cells.extend([k_str, v_str])
+                row_cells.extend([k_str, v_cell])
             else:
                 row_cells.extend(["", ""])
         table.add_row(*row_cells)
