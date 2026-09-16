@@ -12,7 +12,7 @@ _spritzle() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     local global_opts="-c --config -h --host -p --port -t --token --help"
-    local commands="add auth config flags list move_storage pause remove resume settings stats"
+    local commands="add auth config daemon-config flags list move-storage pause remove resume settings stats"
 
     # Find the subcommand if already provided
     cmd=""
@@ -58,7 +58,7 @@ _spritzle() {
                 COMPREPLY=($(compgen -W "$(_spritzle_info_hashes)" -- "${cur}"))
             fi
             ;;
-        move_storage)
+        move-storage)
             if [[ "${cur}" == -* ]]; then
                 COMPREPLY=($(compgen -W "--help" -- "${cur}"))
             elif [[ ${COMP_CWORD} -eq $((i+1)) ]]; then

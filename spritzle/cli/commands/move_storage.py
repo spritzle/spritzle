@@ -6,7 +6,7 @@ from spritzle.cli.display import print_error, print_success
 from spritzle.cli.lookup import resolve_single_torrent
 
 
-@click.command("move_storage", short_help="Move torrent storage to a new path.")
+@click.command("move-storage", short_help="Move torrent storage to a new path.")
 @click.argument("torrent", required=True, metavar="[INFO-HASH|NAME]")
 @click.argument("path", required=True)
 @click.pass_obj

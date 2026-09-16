@@ -48,9 +48,9 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle flags -q name=archlinux.* -u auto_managed",
         "spritzle flags archlinux-x86_64.iso --json",
     ],
-    "move_storage": [
-        "spritzle move_storage archlinux-x86_64.iso /mnt/storage",
-        "spritzle move_storage d3b07384d113edec49eaa6238ad5ff00fc7b0553 /mnt/storage",
+    "move-storage": [
+        "spritzle move-storage archlinux-x86_64.iso /mnt/storage",
+        "spritzle move-storage d3b07384d113edec49eaa6238ad5ff00fc7b0553 /mnt/storage",
     ],
     "stats": [
         "spritzle stats",
@@ -74,10 +74,19 @@ EXAMPLES: Dict[str, List[str]] = {
     ],
     "config": [
         "spritzle config",
-        "spritzle config auth_timeout",
-        "spritzle config auth_timeout 3600",
-        "spritzle config -s auth_timeout 3600",
+        "spritzle config host",
+        "spritzle config host 192.168.1.10",
+        "spritzle config -s port 8080 -s plain true",
+        "spritzle config --unset host",
+        "spritzle config --reset",
         "spritzle config --json",
+    ],
+    "daemon-config": [
+        "spritzle daemon-config",
+        "spritzle daemon-config auth_timeout",
+        "spritzle daemon-config auth_timeout 3600",
+        "spritzle daemon-config -s auth_timeout 3600",
+        "spritzle daemon-config --json",
     ],
     "auth": [
         "spritzle auth",

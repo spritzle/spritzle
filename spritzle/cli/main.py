@@ -4,33 +4,46 @@ import json
 from pathlib import Path
 import pkgutil
 import sys
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 import click
+
+from spritzle.cli.config import CLIConfig
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
 
 class Client(object):
     def __init__(
-        self, host: str, port: int, config: str, token: str, color: Optional[bool] = None
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        config: Union[Path, str, None] = None,
+        token: Optional[str] = None,
+        color: Optional[bool] = None,
     ):
-        self.host = host
-        self.port = port
-        self.config = Path(config)
-        self.token = token
-        self.color = color
+        if config is None:
+            self.config = Path(Path.home(), ".config", "spritzle")
+        else:
+            self.config = Path(config)
 
-        if not token and Path(self.config, "tokens").exists():
+        self.cli_config = CLIConfig(config_dir=self.config)
+
+        self.host = host if host is not None else str(self.cli_config.get("host", "127.0.0.1"))
+        self.port = int(port if port is not None else self.cli_config.get("port", 8080))
+        self.token = token if token is not None else str(self.cli_config.get("token", ""))
+        self.color = color if color is not None else self.cli_config.get("color", None)
+        self.plain = bool(self.cli_config.get("plain", False))
+
+        if not self.token and Path(self.config, "tokens").exists():
             try:
                 with Path(self.config, "tokens").open() as f:
                     d = json.load(f)
-                    if isinstance(d, dict) and f"{host}:{port}" in d:
-                        self.token = d[f"{host}:{port}"]
+                    if isinstance(d, dict) and f"{self.host}:{self.port}" in d:
+                        self.token = d[f"{self.host}:{self.port}"]
             except Exception:
                 pass
-
 
         self.session = None
 
@@ -76,17 +89,17 @@ cmd_dir = Path(__file__).parent / "commands"
 @click.option(
     "-c",
     "--config",
-    default=Path(Path.home(), ".config", "spritzle"),
-    show_default=True,
+    default=None,
+    help="Configuration directory. [default: ~/.config/spritzle]",
 )
-@click.option("-h", "--host", default="127.0.0.1", show_default=True)
-@click.option("-p", "--port", default=8080, type=int, show_default=True)
-@click.option("-t", "--token", default="")
+@click.option("-h", "--host", default=None, help="Daemon host. [default: 127.0.0.1]")
+@click.option("-p", "--port", default=None, type=int, help="Daemon port. [default: 8080]")
+@click.option("-t", "--token", default=None, help="Authentication token.")
 @click.option("--color/--no-color", default=None, help="Enable or disable color output.")
 @click.pass_context
 def cli(ctx, config, host, port, token, color):
     """Command-line interface for Spritzle."""
-    ctx.obj = Client(host, port, config, token, color=color)
+    ctx.obj = Client(host=host, port=port, config=config, token=token, color=color)
 
 
 def load_commands():
@@ -97,7 +110,9 @@ def load_commands():
         except ImportError as e:
             click.echo(e, file=sys.stderr)
         else:
-            cli.add_command(mod.command, name=module_info.name)
+            cmd = mod.command
+            cmd_name = getattr(cmd, "name", None) or module_info.name.replace("_", "-")
+            cli.add_command(cmd, name=cmd_name)
 
 
 load_commands()

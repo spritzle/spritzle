@@ -172,18 +172,18 @@ spritzle resume INFO-HASH
 spritzle resume 44a040be6d74d8d290cd20128788864cbf770719
 ```
 
-### `move_storage` - Move Storage Directory
+### `move-storage` - Move Storage Directory
 
 Moves the download files of a torrent to a new filesystem path.
 
 ```shell
-spritzle move_storage INFO-HASH PATH
+spritzle move-storage INFO-HASH PATH
 ```
 
 **Example:**
 
 ```shell
-spritzle move_storage 44a040be6d74d8d290cd20128788864cbf770719 /mnt/storage/torrents/
+spritzle move-storage 44a040be6d74d8d290cd20128788864cbf770719 /mnt/storage/torrents/
 ```
 
 ### `flags` - Inspect and Modify Torrent Flags

@@ -88,7 +88,7 @@ contains() {
 IFS=, read -a tags <<< "${tags}"
 
 if contains "linuxiso" "${tags}"; then
-	spritzle move_storage "${info_hash}" "/my/linuxiso/storage"
+	spritzle move-storage "${info_hash}" "/my/linuxiso/storage"
 fi
 
 ```
