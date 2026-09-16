@@ -42,9 +42,12 @@ class Hooks:
                     continue
                 if not p.name[0].isalnum():
                     continue
-                if not os.access(p, os.X_OK):
-                    continue
                 if p.name.endswith(hook):
+                    if not os.access(p, os.X_OK):
+                        log.warning(
+                            f"Hook file '{p}' matches hook '{hook}' but is not executable. Run 'chmod +x {p}'."
+                        )
+                        continue
                     hooks.append(p.resolve())
 
         return sorted(hooks)

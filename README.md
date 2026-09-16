@@ -8,12 +8,24 @@ functionality should be provided by a hook extending spritzle.
 Installation
 ------------
 
-Use [uv](https://github.com/astral-sh/uv) to manage dependencies and install the package.
+### From Source (Development)
+
+Clone the repository and install dependencies with [uv](https://github.com/astral-sh/uv):
 
 ```bash
 git clone https://github.com/AndrewResch/spritzle.git
 cd spritzle
 uv sync
+```
+
+### Global CLI & Daemon Installation
+
+To install `spritzle` and `spritzled` directly into your user `PATH` (such as `~/.local/bin`):
+
+```bash
+uv tool install .
+# or with pipx:
+# pipx install .
 ```
 
 Development

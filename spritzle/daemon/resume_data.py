@@ -113,14 +113,14 @@ class ResumeData(object):
         save_all_task = None
         try:
             while True:
-                freq_val = self.core.config.get("resume_data_save_frequency", 60)
+                interval_val = self.core.config.get("save_resume_data_interval", 60)
                 try:
-                    freq = float(freq_val)
-                    if freq <= 0:
-                        freq = 60.0
+                    interval = float(interval_val)
+                    if interval <= 0:
+                        interval = 60.0
                 except (TypeError, ValueError):
-                    freq = 60.0
-                await asyncio.sleep(freq)
+                    interval = 60.0
+                await asyncio.sleep(interval)
                 # Don't interrupt save process when loop is cancelled
                 if self.loop is not None:
                     save_all_task = self.loop.create_task(self.save_all())

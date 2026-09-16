@@ -29,7 +29,7 @@ import ipaddress
 import logging
 import operator
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 
@@ -48,9 +48,11 @@ routes = web.RouteTableDef()
 
 def validate_torrent_url(url_str: str) -> str:
     parsed = urlparse(url_str)
+    if parsed.scheme == "magnet":
+        return url_str
     if parsed.scheme not in ("http", "https"):
         raise web.HTTPBadRequest(
-            reason=f"Unsupported URL scheme '{parsed.scheme}'. Only HTTP and HTTPS are allowed."
+            reason=f"Unsupported URL scheme '{parsed.scheme}'. Only HTTP, HTTPS, and magnet are allowed."
         )
     if not parsed.hostname:
         raise web.HTTPBadRequest(reason="Invalid URL: missing hostname.")
@@ -276,7 +278,8 @@ async def post_torrent(request):
     core = request.app[APP_KEY_CORE]
     config = request.app[APP_KEY_CONFIG]
 
-    atp = {"save_path": config.get("add_torrent_params.save_path", "")}
+    atp_dict: Dict[str, Any] = {"save_path": config.get("add_torrent_params.save_path", "")}
+    magnet_params: Optional[lt.add_torrent_params] = None
 
     try:
         post = await request.json()
@@ -294,7 +297,7 @@ async def post_torrent(request):
 
     def generate_torrent_info(data):
         try:
-            atp["ti"] = lt.torrent_info(lt.bdecode(data))
+            atp_dict["ti"] = lt.torrent_info(lt.bdecode(data))
         except (RuntimeError, TypeError, ValueError) as e:
             raise web.HTTPBadRequest(reason=f"Not a valid torrent file: {e}")
 
@@ -314,18 +317,25 @@ async def post_torrent(request):
     elif "url" in post:
         raw_url = post.pop("url")
         validated_url = validate_torrent_url(raw_url)
-        try:
-
-            timeout = aiohttp.ClientTimeout(total=10)
-            async with aiohttp.ClientSession(timeout=timeout) as client:
-                async with client.get(validated_url) as resp:
-                    if resp.status != 200:
-                        raise web.HTTPBadRequest(
-                            reason=f"Failed to fetch torrent URL (HTTP {resp.status})"
-                        )
-                    generate_torrent_info(await resp.read())
-        except aiohttp.ClientError as ex:
-            raise web.HTTPBadRequest(reason=f"Error fetching torrent URL: {ex}")
+        if validated_url.startswith("magnet:"):
+            try:
+                magnet_params = lt.parse_magnet_uri(validated_url)
+            except Exception as ex:
+                raise web.HTTPBadRequest(reason=f"Invalid magnet URI: {ex}")
+            if not getattr(magnet_params, "save_path", None):
+                magnet_params.save_path = atp_dict.get("save_path", "")
+        else:
+            try:
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as client:
+                    async with client.get(validated_url) as resp:
+                        if resp.status != 200:
+                            raise web.HTTPBadRequest(
+                                reason=f"Failed to fetch torrent URL (HTTP {resp.status})"
+                            )
+                        generate_torrent_info(await resp.read())
+            except aiohttp.ClientError as ex:
+                raise web.HTTPBadRequest(reason=f"Error fetching torrent URL: {ex}")
 
     elif "info_hash" in post:
         raw_info_hash = post.pop("info_hash")
@@ -337,7 +347,7 @@ async def post_torrent(request):
                 raise web.HTTPBadRequest(
                     reason=f"Invalid info-hash length: {raw_info_hash}"
                 )
-            atp["info_hashes"] = info_hash_bytes
+            atp_dict["info_hashes"] = info_hash_bytes
         except (binascii.Error, ValueError) as ex:
             raise web.HTTPBadRequest(reason=f"Invalid hex info-hash: {ex}")
 
@@ -347,9 +357,18 @@ async def post_torrent(request):
     elif not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
         raise web.HTTPBadRequest(reason="'spritzle.tags' must be a list of strings.")
 
-
     # We have already popped all spritzle specific options from post, merge it in
-    atp.update(post)
+    atp: Union[Dict[str, Any], lt.add_torrent_params]
+    if magnet_params is not None:
+        atp = magnet_params
+        for k, v in post.items():
+            try:
+                setattr(atp, k, v)
+            except Exception:
+                pass
+    else:
+        atp = atp_dict
+        atp.update(post)
 
     try:
         torrent_handle = await asyncio.get_running_loop().run_in_executor(

@@ -62,14 +62,14 @@ async def test_resume_data_deleted(cli, core):
     assert not resume_file.is_file()
 
 
-@pytest.mark.parametrize("frequency", [0.1, 0.2])
-async def test_resume_data_save_loop(core, frequency):
+@pytest.mark.parametrize("interval", [0.1, 0.2])
+async def test_resume_data_save_loop(core, interval):
     """
     Verifies save resume data is called, and called as often as specified in config.
     """
     core_run_time = 0.61
-    expected_runs = int(core_run_time / frequency)
-    core.config["resume_data_save_frequency"] = frequency
+    expected_runs = int(core_run_time / interval)
+    core.config["save_resume_data_interval"] = interval
     with patch("spritzle.daemon.resume_data.ResumeData.save_all") as mock_save:
         await core.start()
         await asyncio.sleep(core_run_time)
@@ -278,12 +278,12 @@ async def test_write_data_does_not_pop_newer_future(core, tmp_path):
     await core.stop()
 
 
-async def test_resume_data_save_loop_string_frequency(core):
+async def test_resume_data_save_loop_string_interval(core):
     """
-    Verifies that save_loop does not crash with TypeError when resume_data_save_frequency
+    Verifies that save_loop does not crash with TypeError when save_resume_data_interval
     is set as a string (e.g. "0.1").
     """
-    core.config["resume_data_save_frequency"] = "0.1"
+    core.config["save_resume_data_interval"] = "0.1"
     save_called = asyncio.Event()
 
     async def mock_save_all():

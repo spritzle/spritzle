@@ -9,6 +9,7 @@ EXAMPLES: Dict[str, List[str]] = {
     "add": [
         "spritzle add /path/to/file.torrent",
         "spritzle add http://example.com/file.torrent",
+        "spritzle add 'magnet:?xt=urn:btih:...'",
         "spritzle add <info-hash>",
         "spritzle add -t linux -t iso /path/to/file.torrent",
         "spritzle add -o save_path=/mnt/downloads /path/to/file.torrent",
@@ -65,8 +66,16 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle settings --reset-all",
         "spritzle settings --json",
     ],
+    "info": [
+        "spritzle info archlinux-x86_64.iso",
+        "spritzle info d3b07384d113edec49eaa6238ad5ff00fc7b0553",
+        "spritzle info archlinux-x86_64.iso --json",
+        "spritzle info archlinux-x86_64.iso --plain",
+    ],
     "config": [
         "spritzle config",
+        "spritzle config auth_timeout",
+        "spritzle config auth_timeout 3600",
         "spritzle config -s auth_timeout 3600",
         "spritzle config --json",
     ],

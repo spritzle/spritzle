@@ -20,7 +20,16 @@ async def f(client, password):
     data = {"password": password}
     async with client.session.post(client.url("auth"), json=data) as resp:
         if resp.status != 200:
-            print_error(f"Error: {resp}", color_opt=getattr(client, "color", None))
+            err_msg = resp.reason
+            try:
+                err_json = await resp.json()
+                err_msg = err_json.get("message") or err_json.get("reason") or err_msg
+            except Exception:
+                pass
+            print_error(
+                f"Authentication failed: {err_msg} (HTTP {resp.status})",
+                color_opt=getattr(client, "color", None),
+            )
             sys.exit(1)
 
         d = await resp.json()

@@ -55,7 +55,16 @@ class Client(object):
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        loop.run_until_complete(_do_command(cmd, *args, **kwargs))
+        try:
+            loop.run_until_complete(_do_command(cmd, *args, **kwargs))
+        except aiohttp.ClientConnectorError:
+            from spritzle.cli.display import print_error
+
+            print_error(
+                f"Could not connect to spritzled at {self.url('')}. Is the daemon running? (Run 'spritzled' to start it).",
+                color_opt=self.color,
+            )
+            sys.exit(1)
 
 
 

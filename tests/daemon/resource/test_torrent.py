@@ -745,6 +745,26 @@ async def test_put_flags_string_boolean(cli, core):
     assert bool(handle.flags() & lt.torrent_flags.auto_managed) is False
 
 
+async def test_post_torrent_magnet_uri(cli):
+    magnet = "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=test_archlinux"
+    resp = await cli.post("/torrent", json={"url": magnet, "spritzle.tags": ["linux", "arch"]})
+    assert resp.status == 201
+    body = await resp.json()
+    assert body["info_hash"] == "44a040be6d74d8d290cd20128788864cbf770719"
+
+    resp = await cli.get(f"/torrent/{body['info_hash']}")
+    assert resp.status == 200
+    details = await resp.json()
+    assert details["info_hash"] == "44a040be6d74d8d290cd20128788864cbf770719"
+    assert details.get("spritzle.tags") == ["linux", "arch"]
+
+
+async def test_post_torrent_invalid_magnet_uri(cli):
+    resp = await cli.post("/torrent", json={"url": "magnet:?xt=invalid"})
+    assert resp.status == 400
+
+
+
 
 
 

@@ -11,6 +11,7 @@ from spritzle.cli.display import (
     format_speed,
     format_state,
     get_console,
+    print_error,
     print_json,
     render_rich_table,
     should_use_color,
@@ -63,7 +64,16 @@ async def f(
     field_list: List[str] = [f.strip() for f in fields.split(",") if f.strip()]
     async with client.session.get(client.url("torrent"), params=params) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            err_msg = resp.reason
+            try:
+                err_json = await resp.json()
+                err_msg = err_json.get("message") or err_json.get("reason") or err_msg
+            except Exception:
+                pass
+            print_error(
+                f"Error listing torrents: HTTP {resp.status} ({err_msg})",
+                color_opt=getattr(client, "color", None),
+            )
             sys.exit(1)
         torrents = await resp.json()
 

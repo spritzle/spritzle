@@ -9,17 +9,14 @@ description = ""
 authors = [
     { name = "Andrew Resch", email = "andrewresch@gmail.com" }
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9, <3.14"
 dependencies = [
     "aiohttp>=3.5",
     "PyJWT>=1.7",
     "click>=7.0",
     "tabulate>=0.8.3",
-    "wheel",
     "pyopenssl>=23.2.0",
-    "setuptools",
     "libtorrent",
-    "ty>=0.0.12",
     "rich>=12.0.0",
 ]
 
@@ -35,6 +32,7 @@ dev = [
     "pytest",
     "coverage>=4.5",
     "ruff>=0.14.11",
+    "ty>=0.0.12",
 ]
 
 [tool.ty.environment]

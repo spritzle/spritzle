@@ -26,12 +26,12 @@ from typing import Any, Dict, Optional, Union
 from spritzle.daemon.db import DB
 
 DEFAULTS = {
-    "add_torrent_params.save_path": ".",
+    "add_torrent_params.save_path": str(Path.home() / "Downloads"),
     "auth_password": "password",
     "auth_secret": "",
     "auth_timeout": 120,
     "auth_allow_hosts": ["127.0.0.1", "::1"],
-    "resume_data_save_frequency": 60,
+    "save_resume_data_interval": 60,
 }
 
 

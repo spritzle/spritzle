@@ -1177,6 +1177,85 @@ def test_help_command():
     assert "Examples:" in res_color.output
 
 
+def test_offline_daemon_connection_error():
+    runner = CliRunner()
+    result = runner.invoke(spritzle_cli, ["--port", "59999", "list"])
+    assert result.exit_code == 1
+    assert "Could not connect to spritzled" in result.output
+    assert "Is the daemon running?" in result.output
+
+
+def test_config_positional_arguments(cli):
+    runner = CliRunner()
+    port = str(cli.server.port)
+
+    # Set key via positional arguments
+    res_set = runner.invoke(
+        spritzle_cli, ["--port", port, "config", "auth_timeout", "240"]
+    )
+    assert res_set.exit_code == 0
+
+    # Get single key via positional argument
+    res_get = runner.invoke(
+        spritzle_cli, ["--port", port, "config", "auth_timeout"]
+    )
+    assert res_get.exit_code == 0
+    assert "240" in res_get.output
+
+    # JSON get single key
+    res_json = runner.invoke(
+        spritzle_cli, ["--port", port, "config", "auth_timeout", "--json"]
+    )
+    assert res_json.exit_code == 0
+    d = json.loads(res_json.output)
+    assert d == {"auth_timeout": 240}
+
+
+def test_info_command(cli):
+    runner = CliRunner()
+    port = str(cli.server.port)
+
+    # Add a torrent to core
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    # Plain output
+    res_info = runner.invoke(
+        spritzle_cli, ["--port", port, "info", ih, "--plain"]
+    )
+    assert res_info.exit_code == 0
+    assert ih in res_info.output
+    assert "Info Hash" in res_info.output
+
+    # JSON output
+    res_json = runner.invoke(
+        spritzle_cli, ["--port", port, "info", ih, "--json"]
+    )
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert data["info_hash"] == ih
+
+
+def test_add_magnet_command(cli):
+    runner = CliRunner()
+    port = str(cli.server.port)
+
+    magnet = "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=test_arch"
+    res = runner.invoke(
+        spritzle_cli, ["--port", port, "add", "-t", "linux", magnet]
+    )
+    assert res.exit_code == 0
+    assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
+
+
+
 
 
 

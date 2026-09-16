@@ -16,6 +16,7 @@
 - **Alert lifetime**: Do not call `session.pop_alerts()` while previous alert handlers are still executing; libtorrent invalidates alert pointers upon the next pop.
 - **CLI event loop integration**: Never invoke `asyncio.run()` inside CLI client wrappers (`Client.do_command()`). Tests using `CliRunner` share the thread's event loop with the in-process `aiohttp` server. Reuse `asyncio.get_event_loop().run_until_complete(...)` so test server sockets can be serviced during CLI requests without deadlock.
 - **Universal config typing**: Values retrieved from `Config` (SQLite/JSON) are not type-guaranteed. Always safely coerce numeric config values (e.g. `float(config.get("...", 60))`) before passing them to APIs like `asyncio.sleep()`, `datetime.timedelta`, or socket timeouts. Guard periodic loops and request handlers against unhandled type or value errors to prevent crashes.
+- **Magnet link params typing**: `lt.parse_magnet_uri()` returns an `lt.add_torrent_params` native object rather than a Python `dict`. It does not support dictionary methods like `.update()`. Any extra parameters or overrides must be set as direct attributes via `setattr()` on the params object.
 
 ## 3. API & Data State Conventions
 - **Info-hashes**: Torrent handles use 20-byte SHA-1 info-hashes (40 hex characters). Always key `core.torrent_data` and resume data files on `str(torrent_handle.info_hash())`.

@@ -52,9 +52,8 @@ spritzle add [OPTIONS] URL_OR_FILE
 
 Options:
 * `-t, --tag TEXT`: Assign tags to the torrent (can be specified multiple times).
-* `--file PATH`: Explicit path to a `.torrent` file.
-* `--url TEXT`: Explicit URL to a `.torrent` file.
-* `--info-hash TEXT`: Explicit torrent info-hash.
+* `-o, --option TEXT`: Key=value option passed to add_torrent parameters (can be specified multiple times).
+* `-Q, --quiet`: Print only the added info-hash.
 
 **Examples:**
 
@@ -64,6 +63,9 @@ spritzle add -t linux -t iso archlinux-x86_64.iso.torrent
 
 # Add from a URL
 spritzle add https://archlinux.org/releng/releases/latest/torrent/
+
+# Add from a magnet link
+spritzle add "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=archlinux"
 
 # Add by info-hash
 spritzle add 44a040be6d74d8d290cd20128788864cbf770719
@@ -94,6 +96,34 @@ spritzle list -q state=downloading
 
 # Display only info-hash and name without table borders
 spritzle list -f info_hash -f name --no-header
+```
+
+### `info` - Show Detailed Torrent Information
+
+Displays comprehensive status and metadata for a specific torrent.
+
+```shell
+spritzle info [OPTIONS] TORRENT
+```
+
+Arguments:
+* `TORRENT`: Info-hash or torrent display name (resolves uniquely).
+
+Options:
+* `--json`: Output as JSON.
+* `--plain`: Output plain unstyled text without borders or ANSI colors.
+
+**Examples:**
+
+```shell
+# Inspect by torrent name
+spritzle info archlinux-x86_64.iso
+
+# Inspect by info-hash
+spritzle info 44a040be6d74d8d290cd20128788864cbf770719
+
+# Output raw JSON
+spritzle info archlinux-x86_64.iso --json
 ```
 
 ### `remove` - Remove a Torrent
