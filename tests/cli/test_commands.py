@@ -797,6 +797,11 @@ def test_display_formatters():
     assert "on" in format_bool(True, human=True, use_color=True)
     assert "off" in format_bool(False, human=True, use_color=True)
     assert format_bool(True, human=False) == "True"
+    # Ensure Rich markup renders [on] and [off] as visible text badges
+    from rich.console import Console as TestConsole
+    tc = TestConsole(no_color=True, force_terminal=False)
+    assert tc.render_str(format_bool(True, human=True, use_color=True)).plain == "[on]"
+    assert tc.render_str(format_bool(False, human=True, use_color=True)).plain == "[off]"
 
     # Color overrides
     assert should_use_color(color_opt=True) is True
@@ -944,7 +949,14 @@ def test_render_kv_table_multi_column():
     from rich.console import Console
     from spritzle.cli.display import render_kv_table
 
-    items = [("item_0", "val_0"), ("item_1", "val_1"), ("item_2", "val_2"), ("item_3", "val_3")]
+    items = [
+        ("item_0", "val_0"),
+        ("item_1", "val_1"),
+        ("item_2", "val_2"),
+        ("item_3", "val_3"),
+        ("empty_str", ""),
+        ("bool_flag", True),
+    ]
 
     # Wide console (>= 140) -> 3 column pairs
     buf_wide = io.StringIO()
@@ -954,6 +966,8 @@ def test_render_kv_table_multi_column():
     assert "Wide Table" in output_wide
     assert "item_0" in output_wide
     assert "item_3" in output_wide
+    assert '""' in output_wide
+    assert "[on]" in output_wide
 
     # Medium console (80-139) -> 2 column pairs
     buf_med = io.StringIO()

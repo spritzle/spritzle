@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 
@@ -93,8 +94,8 @@ def format_bool(val: bool, human: bool = True, use_color: bool = True) -> str:
     if not use_color:
         return "True" if val else "False"
     if val:
-        return "[bold green][on][/bold green]"
-    return "[dim][off][/dim]"
+        return f"[bold green]{escape('[on]')}[/bold green]"
+    return f"[dim]{escape('[off]')}[/dim]"
 
 
 def render_rich_table(
@@ -166,9 +167,13 @@ def render_kv_table(
                 k, v = items[idx]
                 if isinstance(v, bool):
                     v_str = format_bool(v, human=True, use_color=True)
+                elif v == "":
+                    v_str = '[dim]""[/dim]'
+                elif v is None:
+                    v_str = "[dim]None[/dim]"
                 else:
-                    v_str = str(v)
-                row_cells.extend([str(k), v_str])
+                    v_str = escape(str(v))
+                row_cells.extend([escape(str(k)), v_str])
             else:
                 row_cells.extend(["", ""])
         table.add_row(*row_cells)
