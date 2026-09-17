@@ -20,10 +20,14 @@
 #   Boston, MA    02110-1301, USA.
 #
 
+import collections.abc
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Iterator, Optional, Union
 
-from spritzle.daemon.db import DB
+import tomlkit
+from tomlkit.items import Table
+from tomlkit.toml_document import TOMLDocument
 
 DEFAULTS = {
     "add_torrent_params.save_path": str(Path.home() / "Downloads"),
@@ -35,15 +39,43 @@ DEFAULTS = {
 }
 
 
-class Config(DB):
+def unwrap_toml_value(val: Any) -> Any:
+    """Unwrap tomlkit primitive types into standard Python primitives."""
+    if hasattr(val, "unwrap"):
+        return val.unwrap()
+    if isinstance(val, dict):
+        return {k: unwrap_toml_value(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [unwrap_toml_value(v) for v in val]
+    return val
+
+
+def _get_doc_keys(d: Any, prefix: str = "") -> list[str]:
+    """Recursively collect dotted key paths from a document/table."""
+    keys: list[str] = []
+    for k, v in d.items():
+        full_key = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, (dict, Table)):
+            if len(v) == 0:
+                keys.append(full_key)
+            else:
+                keys.extend(_get_doc_keys(v, full_key))
+        else:
+            keys.append(full_key)
+    return keys
+
+
+class Config(collections.abc.MutableMapping[str, Any]):
+    """Configuration store for Spritzle daemon backed by a TOML file."""
+
     path: Path
     config_file: Optional[Path]
 
     def __init__(
         self,
-        filename: str = "config.db",
+        filename: str = "daemon.toml",
         config_dir: Union[Path, str, None] = None,
-        defaults: Dict[str, Any] = DEFAULTS,
+        defaults: Optional[Dict[str, Any]] = None,
         in_memory: bool = False,
     ):
         if config_dir is None:
@@ -51,18 +83,162 @@ class Config(DB):
         else:
             self.config_dir = Path(config_dir)
 
-        if not in_memory:
-            self.config_file = Path(self.config_dir, filename)
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-            file_path = self.config_file
-        else:
-            # When in_memory, we don't have a config *file*, but directory might still be relevant
-            self.config_file = None
-            file_path = None
-
-        super().__init__(path=file_path, defaults=defaults, in_memory=in_memory)
-
-        # Alias for backward compatibility if consumers use config.path as directory
-        # We set this AFTER super().__init__ because DB.__init__ overwrites self.path with the file path
-        # (or None if in_memory). Config expects self.path to be the directory.
+        # Retain self.path as config directory for backwards compatibility
         self.path = self.config_dir
+        self.filename = filename
+        self.defaults = dict(DEFAULTS if defaults is None else defaults)
+        self.in_memory = in_memory
+
+        if not in_memory:
+            self.config_file = Path(self.config_dir, self.filename)
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            self.config_file = None
+
+        self._doc: TOMLDocument = tomlkit.document()
+        if not self.in_memory and self.config_file is not None:
+            if self.config_file.exists():
+                self.load()
+            else:
+                self.save()
+
+    def load(self) -> None:
+        """Load configuration from disk if present."""
+        if self.config_file and self.config_file.exists():
+            try:
+                with self.config_file.open("r", encoding="utf-8") as f:
+                    content = f.read()
+                    self._doc = tomlkit.parse(content)
+            except Exception:
+                self._doc = tomlkit.document()
+        else:
+            self._doc = tomlkit.document()
+
+    def save(self) -> None:
+        """Atomically persist current configuration to disk."""
+        if self.in_memory or self.config_file is None:
+            return
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        temp_file = self.config_file.with_name(f".{self.filename}.tmp")
+        with temp_file.open("w", encoding="utf-8") as f:
+            f.write(tomlkit.dumps(self._doc))
+        try:
+            os.chmod(temp_file, 0o600)
+        except OSError:
+            pass
+        temp_file.replace(self.config_file)
+
+    def reset(self) -> None:
+        """Reset all configuration overrides back to defaults."""
+        self._doc = tomlkit.document()
+        if not self.in_memory and self.config_file and self.config_file.exists():
+            try:
+                self.config_file.unlink()
+            except OSError:
+                self.save()
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return merged configuration dictionary containing all keys and defaults."""
+        return {k: self[k] for k in self}
+
+    def __enter__(self) -> "Config":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    def __getitem__(self, key: str) -> Any:
+        if key in self._doc:
+            return unwrap_toml_value(self._doc[key])
+
+        if "." in key:
+            parts = key.split(".")
+            node: Any = self._doc
+            found = True
+            for part in parts:
+                if isinstance(node, (dict, Table)) and part in node:
+                    node = node[part]
+                else:
+                    found = False
+                    break
+            if found:
+                return unwrap_toml_value(node)
+
+        if key in self.defaults:
+            return self.defaults[key]
+
+        raise KeyError(f"Table key {key} not found.")
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if "." in key:
+            if key in self._doc:
+                del self._doc[key]
+            parts = key.split(".")
+            curr: Any = self._doc
+            for part in parts[:-1]:
+                if part not in curr or not isinstance(curr[part], (dict, Table)):
+                    curr[part] = tomlkit.table()
+                curr = curr[part]
+            curr[parts[-1]] = value
+        else:
+            self._doc[key] = value
+        self.save()
+
+    def __delitem__(self, key: str) -> None:
+        deleted = False
+        if key in self._doc:
+            del self._doc[key]
+            deleted = True
+        elif "." in key:
+            parts = key.split(".")
+            curr: Any = self._doc
+            parents: list[tuple[Any, str]] = []
+            for part in parts[:-1]:
+                if isinstance(curr, (dict, Table)) and part in curr:
+                    parents.append((curr, part))
+                    curr = curr[part]
+                else:
+                    break
+            else:
+                if isinstance(curr, (dict, Table)) and parts[-1] in curr:
+                    del curr[parts[-1]]
+                    deleted = True
+                    for parent, part in reversed(parents):
+                        if len(parent[part]) == 0:
+                            del parent[part]
+
+        if not deleted:
+            if key not in self.defaults:
+                raise KeyError(f"Table key {key} not found.")
+
+        self.save()
+
+    def __iter__(self) -> Iterator[str]:
+        keys = set(self.defaults.keys())
+        keys.update(_get_doc_keys(self._doc))
+        return iter(sorted(keys))
+
+    def __len__(self) -> int:
+        keys = set(self.defaults.keys())
+        keys.update(_get_doc_keys(self._doc))
+        return len(keys)
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in self._doc:
+            return True
+        if "." in key:
+            parts = key.split(".")
+            node: Any = self._doc
+            for part in parts:
+                if isinstance(node, (dict, Table)) and part in node:
+                    node = node[part]
+                else:
+                    break
+            else:
+                return True
+        return key in self.defaults

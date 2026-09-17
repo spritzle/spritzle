@@ -50,7 +50,7 @@ By default, all runtime configuration and persistent state are stored in `~/.con
 Daemon configuration and state are organized according to XDG base directories:
 
 **Configuration (`~/.config/spritzle/` or `-c / --config-dir`):**
-* `config.db`: SQLite database containing daemon configuration settings and custom torrent metadata (e.g. tags).
+* `daemon.toml`: TOML file containing daemon configuration settings.
 * `spritzled.lock`: Exclusive file lock (`flock`) ensuring only one instance runs per configuration directory.
 * `hooks/`: Directory containing user-defined hook executables triggered by libtorrent alerts. See [hooks documentation](hooks.md) for details.
 * `tokens`: Saved JWT tokens keyed by `host:port` used by the CLI.
@@ -61,7 +61,7 @@ Daemon configuration and state are organized according to XDG base directories:
 
 ### Key Configuration Settings
 
-Configuration values can be inspected or modified at runtime via the REST API (`/config`) or using `spritzle config`.
+Configuration values can be inspected or modified at runtime via the REST API (`/config`) or using `spritzle daemon-config`, or edited directly in `daemon.toml`.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |

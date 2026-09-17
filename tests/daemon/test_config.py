@@ -33,7 +33,7 @@ def test_config_init_no_dir():
     with patch("pathlib.Path.home", return_value=tmpdir):
         c = Config()
 
-    assert c.config_file == Path(tmpdir, ".config", "spritzle", "config.db")
+    assert c.config_file == Path(tmpdir, ".config", "spritzle", "daemon.toml")
 
     assert c.config_file is not None
     assert c.config_file.is_file()
@@ -103,3 +103,65 @@ def test_reset():
     assert c["foo"] == 1
     c.reset()
     assert c.get("foo") is None
+
+
+def test_dotted_keys():
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir, defaults={"a.b.c": "default_val"})
+        assert c["a.b.c"] == "default_val"
+        c["a.b.c"] = "new_val"
+        assert c["a.b.c"] == "new_val"
+
+        # Verify file on disk has TOML table format
+        assert c.config_file is not None
+        raw = c.config_file.read_text(encoding="utf-8")
+        assert "[a.b]" in raw
+        assert 'c = "new_val"' in raw
+
+        # Reloading preserves dotted structure
+        c2 = Config(config_dir=tempdir, defaults={"a.b.c": "default_val"})
+        assert c2["a.b.c"] == "new_val"
+
+        # Deletion resets to default
+        del c2["a.b.c"]
+        assert c2["a.b.c"] == "default_val"
+
+
+def test_file_permissions():
+    import stat
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        c = Config(config_dir=tempdir)
+        c["auth_secret"] = "mysecret"
+        assert c.config_file is not None
+        mode = stat.S_IMODE(c.config_file.stat().st_mode)
+        assert mode == 0o600
+
+
+def test_unwrap_types():
+    c = Config(in_memory=True)
+    c["my_list"] = ["a", "b", "c"]
+    c["my_int"] = 42
+    c["my_bool"] = True
+    c["my_dict"] = {"nested": "value"}
+
+    assert isinstance(c["my_list"], list)
+    assert isinstance(c["my_int"], int)
+    assert isinstance(c["my_bool"], bool)
+    assert isinstance(c["my_dict"], dict)
+
+
+def test_as_dict():
+    c = Config(in_memory=True, defaults={"def_key": "val1"})
+    c["custom_key"] = "val2"
+    d = c.as_dict()
+    assert d["def_key"] == "val1"
+    assert d["custom_key"] == "val2"
+
+
+def test_delitem_nonexistent():
+    import pytest
+
+    c = Config(in_memory=True)
+    with pytest.raises(KeyError):
+        del c["nonexistent"]
