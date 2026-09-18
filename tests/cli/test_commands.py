@@ -1320,6 +1320,43 @@ def test_cli_config_json_and_plain(tmp_path):
     assert res_err.exit_code == 1
     assert "not found" in res_err.output
 
+    # Unknown key error
+    res_res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "remotes"])
+    assert res_res.exit_code == 1
+    assert "not found" in res_res.output
+
+
+def test_cli_config_ignores_and_preserves_remotes(tmp_path):
+    """Test that remotes table and default_remote are in remotes.toml and preserved on config reset."""
+    from spritzle.cli.config import CLIConfig, RemotesConfig
+
+    cfg_dir = tmp_path / "cfg"
+    remotes_cfg = RemotesConfig(config_dir=cfg_dir)
+    remotes_cfg.set_remote("seedbox", "http://10.0.0.1:8080", "spz_d_test", "spritzle_123")
+    remotes_cfg.set_default_remote("seedbox")
+
+    cli_cfg = CLIConfig(config_dir=cfg_dir)
+    cli_cfg["host"] = "192.168.1.100"
+
+    runner = CliRunner()
+    res = runner.invoke(spritzle_cli, ["--config", str(cfg_dir), "config", "--json"])
+    assert res.exit_code == 0
+    data = json.loads(res.output)
+    assert "remotes" not in data
+    assert "default_remote" not in data
+    assert data["host"] == "192.168.1.100"
+
+    # Reset config overrides
+    res_reset = runner.invoke(spritzle_cli, ["--config", str(cfg_dir), "config", "--reset"])
+    assert res_reset.exit_code == 0
+
+    # Remotes in remotes.toml must still be intact
+    remotes_reloaded = RemotesConfig(config_dir=cfg_dir)
+    assert remotes_reloaded.get_default_remote() == "seedbox"
+    assert "seedbox" in remotes_reloaded.get_remotes()
+    cli_reloaded = CLIConfig(config_dir=cfg_dir)
+    assert cli_reloaded["host"] == "127.0.0.1"  # reset to default
+
 
 def test_cli_config_preserves_toml_comments(tmp_path):
     """Test that manual comments in cli.toml are preserved when keys are updated."""

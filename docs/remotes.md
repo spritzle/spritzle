@@ -45,7 +45,7 @@ API Key for 'seedbox':
 
 During `remote add`, the CLI:
 1. Authenticates against `<url>/status` with the provided API key to verify connectivity, validate the key, and retrieve the daemon's `daemon_id`.
-2. Persists the remote configuration to `~/.config/spritzle/cli.toml`.
+2. Persists the remote configuration to `~/.config/spritzle/remotes.toml` (file mode `0600`).
 3. If no default remote has been configured, automatically marks this new remote as default.
 
 If the remote already exists, use `--force` or `remote set-key` to update it:

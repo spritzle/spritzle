@@ -143,6 +143,7 @@ def show(client, json_output=False, plain=False):
             console,
             table,
             title="Spritzle Client Configuration",
+            num_columns=1,
             key_header="Option",
             value_header="Value",
             modified_keys=modified_keys,

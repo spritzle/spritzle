@@ -17,9 +17,10 @@ pytest_plugins = "aiohttp.pytest_plugin"
 
 
 @pytest.fixture(scope="function")
-def core(loop):
+def core(loop, monkeypatch):
     config = Config(in_memory=True, config_dir="/tmp")
     state_dir = Path(tempfile.mkdtemp(prefix="spritzle-test"))
+    monkeypatch.setenv("SPRITZLE_STATE_DIR", str(state_dir))
     core = Core(config, state_dir)
     settings = {
         "enable_upnp": False,

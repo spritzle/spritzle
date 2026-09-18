@@ -78,7 +78,7 @@ def unwrap_toml_value(val: Any) -> Any:
 
 
 class CLIConfig(collections.abc.MutableMapping[str, Any]):
-    """Configuration store for Spritzle CLI backed by a TOML file."""
+    """Configuration store for Spritzle CLI backed by cli.toml."""
 
     def __init__(
         self,
@@ -168,6 +168,9 @@ class CLIConfig(collections.abc.MutableMapping[str, Any]):
         else:
             raise KeyError(key)
 
+    def __contains__(self, key: object) -> bool:
+        return key in self.defaults or key in self._doc
+
     def __iter__(self) -> Iterator[str]:
         keys = set(self.defaults.keys())
         keys.update(self._doc.keys())
@@ -177,6 +180,49 @@ class CLIConfig(collections.abc.MutableMapping[str, Any]):
         keys = set(self.defaults.keys())
         keys.update(self._doc.keys())
         return len(keys)
+
+
+class RemotesConfig:
+    """Stores and manages remote Spritzle daemons in remotes.toml."""
+
+    def __init__(
+        self,
+        config_dir: Union[Path, str, None] = None,
+        filename: str = "remotes.toml",
+    ):
+        if config_dir is None:
+            self.config_dir = Path(Path.home(), ".config", "spritzle")
+        else:
+            self.config_dir = Path(config_dir)
+
+        self.filename = filename
+        self.config_file = Path(self.config_dir, self.filename)
+        self._doc: TOMLDocument = tomlkit.document()
+        self.load()
+
+    def load(self) -> None:
+        """Load configuration from disk if present."""
+        if self.config_file.exists():
+            try:
+                with self.config_file.open("r", encoding="utf-8") as f:
+                    content = f.read()
+                    self._doc = tomlkit.parse(content)
+            except Exception:
+                self._doc = tomlkit.document()
+        else:
+            self._doc = tomlkit.document()
+
+    def save(self) -> None:
+        """Atomically persist current remotes to disk with 0600 permissions."""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        temp_file = self.config_file.with_name(f".{self.filename}.tmp")
+        with temp_file.open("w", encoding="utf-8") as f:
+            f.write(tomlkit.dumps(self._doc))
+        try:
+            os.chmod(temp_file, 0o600)
+        except OSError:
+            pass
+        temp_file.replace(self.config_file)
 
     def get_remotes(self) -> Dict[str, Dict[str, Any]]:
         remotes = self._doc.get("remotes", {})
@@ -226,7 +272,8 @@ class CLIConfig(collections.abc.MutableMapping[str, Any]):
         if "local" in remotes:
             return remotes["local"]
 
-        s_dir = state_dir or (Path.home() / ".local" / "share" / "spritzle" / "state")
+        env_state_dir = os.environ.get("SPRITZLE_STATE_DIR")
+        s_dir = state_dir or (Path(env_state_dir) if env_state_dir else (Path.home() / ".local" / "share" / "spritzle" / "state"))
         local_file = Path(s_dir) / "local_remote.json"
         if local_file.exists():
             try:

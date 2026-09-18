@@ -174,8 +174,8 @@ def command():
 @click.pass_obj
 def remote_add(client, name: str, url: str, key: Optional[str], force: bool):
     """Add a remote Spritzle daemon with its API key."""
-    client.cli_config.ensure_local_remote()
-    existing = client.cli_config.get_remote(name)
+    client.remotes.ensure_local_remote()
+    existing = client.remotes.get_remote(name)
     if existing and not force:
         print_error(
             f"Remote '{name}' already exists. Use --force or 'remote set-key' to update.",
@@ -195,9 +195,9 @@ def remote_add(client, name: str, url: str, key: Optional[str], force: bool):
         sys.exit(1)
 
     daemon_id = status_data["daemon_id"]
-    client.cli_config.set_remote(name, normalized_url, daemon_id, api_key)
-    if not client.cli_config.get_default_remote():
-        client.cli_config.set_default_remote(name)
+    client.remotes.set_remote(name, normalized_url, daemon_id, api_key)
+    if not client.remotes.get_default_remote():
+        client.remotes.set_default_remote(name)
 
     print_success(
         f"Added remote '{name}' ({normalized_url}) [Daemon ID: {daemon_id}].",
@@ -211,8 +211,8 @@ def remote_add(client, name: str, url: str, key: Optional[str], force: bool):
 @click.pass_obj
 def remote_set_key(client, name: str, key: Optional[str]):
     """Update or import the API key for an existing remote."""
-    client.cli_config.ensure_local_remote()
-    remote_data = client.cli_config.get_remote(name)
+    client.remotes.ensure_local_remote()
+    remote_data = client.remotes.get_remote(name)
     if not remote_data:
         print_error(f"Remote '{name}' does not exist.", color_opt=client.color)
         sys.exit(1)
@@ -238,7 +238,7 @@ def remote_set_key(client, name: str, key: Optional[str]):
         )
         sys.exit(1)
 
-    client.cli_config.set_remote(name, url, actual_daemon_id, api_key)
+    client.remotes.set_remote(name, url, actual_daemon_id, api_key)
     print_success(f"Updated API key for remote '{name}'.", color_opt=client.color)
 
 
@@ -249,9 +249,9 @@ def remote_set_key(client, name: str, key: Optional[str]):
 @click.pass_obj
 def remote_status(client, name: Optional[str], json_output: bool, plain: bool):
     """Check connectivity, latency, version, and uptime for remote daemons."""
-    client.cli_config.ensure_local_remote()
-    remotes = client.cli_config.get_remotes()
-    default_remote = client.cli_config.get_default_remote()
+    client.remotes.ensure_local_remote()
+    remotes = client.remotes.get_remotes()
+    default_remote = client.remotes.get_default_remote()
 
     if not remotes:
         print_error("No remotes configured.", color_opt=client.color)
@@ -338,9 +338,9 @@ def remote_status(client, name: Optional[str], json_output: bool, plain: bool):
 @click.pass_obj
 def remote_list(client, json_output: bool, plain: bool):
     """List configured remotes."""
-    client.cli_config.ensure_local_remote()
-    remotes = client.cli_config.get_remotes()
-    default_remote = client.cli_config.get_default_remote()
+    client.remotes.ensure_local_remote()
+    remotes = client.remotes.get_remotes()
+    default_remote = client.remotes.get_default_remote()
 
     items = []
     for r_name in sorted(remotes.keys()):
@@ -392,12 +392,12 @@ def remote_list(client, json_output: bool, plain: bool):
 @click.pass_obj
 def remote_use(client, name: str):
     """Switch the default remote."""
-    client.cli_config.ensure_local_remote()
-    if not client.cli_config.get_remote(name):
+    client.remotes.ensure_local_remote()
+    if not client.remotes.get_remote(name):
         print_error(f"Remote '{name}' does not exist.", color_opt=client.color)
         sys.exit(1)
 
-    client.cli_config.set_default_remote(name)
+    client.remotes.set_default_remote(name)
     print_success(f"Switched default remote to '{name}'.", color_opt=client.color)
 
 
@@ -406,8 +406,8 @@ def remote_use(client, name: str):
 @click.pass_obj
 def remote_remove(client, name: str):
     """Remove a configured remote."""
-    client.cli_config.ensure_local_remote()
-    if not client.cli_config.remove_remote(name):
+    client.remotes.ensure_local_remote()
+    if not client.remotes.remove_remote(name):
         print_error(f"Remote '{name}' does not exist.", color_opt=client.color)
         sys.exit(1)
 
@@ -421,13 +421,13 @@ def remote_remove(client, name: str):
 @click.pass_obj
 def remote_show(client, name: str, json_output: bool, plain: bool):
     """Show details for a remote."""
-    client.cli_config.ensure_local_remote()
-    remote_data = client.cli_config.get_remote(name)
+    client.remotes.ensure_local_remote()
+    remote_data = client.remotes.get_remote(name)
     if not remote_data:
         print_error(f"Remote '{name}' does not exist.", color_opt=client.color)
         sys.exit(1)
 
-    default_remote = client.cli_config.get_default_remote()
+    default_remote = client.remotes.get_default_remote()
     raw_key = remote_data.get("key", "")
     masked_key = f"{raw_key[:13]}..." if len(raw_key) > 13 else ("(set)" if raw_key else "(none)")
 

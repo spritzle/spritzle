@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import aiohttp
 import click
 
-from spritzle.cli.config import CLIConfig
+from spritzle.cli.config import CLIConfig, RemotesConfig
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
@@ -35,15 +35,26 @@ class Client(object):
             self.config = Path(config)
 
         self.cli_config = CLIConfig(config_dir=self.config)
-        self.cli_config.ensure_local_remote()
+        self.remotes = RemotesConfig(config_dir=self.config)
+        self.remotes_config = self.remotes
+
+        has_custom_host_or_port = (
+            host is not None
+            or port is not None
+            or self.cli_config.is_modified("host")
+            or self.cli_config.is_modified("port")
+        )
+
+        if not has_custom_host_or_port:
+            self.remotes.ensure_local_remote()
 
         self.color = color if color is not None else self.cli_config.get("color", None)
         self.plain = bool(self.cli_config.get("plain", False))
 
-        self.remote_name = remote or self.cli_config.get_default_remote()
-        remote_data = self.cli_config.get_remote(self.remote_name) if self.remote_name else None
+        self.remote_name = remote or self.remotes.get_default_remote()
+        remote_data = self.remotes.get_remote(self.remote_name) if self.remote_name else None
 
-        if remote_data and host is None and port is None:
+        if remote_data and not (remote is None and has_custom_host_or_port):
             self.base_url = remote_data.get("url", "").rstrip("/")
             self.expected_daemon_id = remote_data.get("daemon_id")
             self.token = token if token is not None else remote_data.get("key", "")

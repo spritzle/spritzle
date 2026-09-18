@@ -132,10 +132,10 @@ def test_remote_use_and_remove(cli, core, tmp_path):
 
 
 def test_remote_identity_mismatch_protection(cli, core, tmp_path):
-    from spritzle.cli.config import CLIConfig
+    from spritzle.cli.config import RemotesConfig
 
     raw_key, _ = core.key_manager.create_key(name="test")
-    cfg = CLIConfig(config_dir=tmp_path)
+    cfg = RemotesConfig(config_dir=tmp_path)
     # Configure remote with an intentionally wrong daemon_id
     cfg.set_remote("fakebox", f"http://127.0.0.1:{cli.server.port}", "spz_d_wrong_fingerprint", raw_key)
     cfg.set_default_remote("fakebox")
@@ -150,7 +150,7 @@ def test_remote_identity_mismatch_protection(cli, core, tmp_path):
 
 
 def test_remote_status(cli, core, tmp_path):
-    from spritzle.cli.config import CLIConfig
+    from spritzle.cli.config import RemotesConfig
 
     runner = CliRunner()
     raw_key, _ = core.key_manager.create_key(name="laptop")
@@ -214,7 +214,7 @@ def test_remote_status(cli, core, tmp_path):
     assert "Remote 'nonexistent' does not exist." in res_missing.output
 
     # Unreachable remote
-    cfg = CLIConfig(config_dir=tmp_path)
+    cfg = RemotesConfig(config_dir=tmp_path)
     cfg.set_remote("deadbox", "http://127.0.0.1:1", "spz_d_dead", "spritzle_dummy")
     res_dead = runner.invoke(
         spritzle_cli,

@@ -145,7 +145,9 @@ def render_kv_table(
     num_items = len(items)
     if num_columns is None:
         width = console.width
-        if width >= 140:
+        if num_items <= 8:
+            num_columns = 1
+        elif width >= 140:
             num_columns = 3
         elif width >= 80:
             num_columns = 2
@@ -155,6 +157,7 @@ def render_kv_table(
     num_columns = max(1, min(num_columns, num_items))
     rows_per_col = (num_items + num_columns - 1) // num_columns
 
+    min_w = (len(title) + 6) if title else None
     table = Table(
         title=title,
         caption=caption,
@@ -162,11 +165,12 @@ def render_kv_table(
         box=box_style,
         header_style="bold cyan",
         show_header=True,
+        min_width=min_w,
     )
 
     for _ in range(num_columns):
         table.add_column(key_header, style="cyan", no_wrap=True)
-        table.add_column(value_header, no_wrap=True)
+        table.add_column(value_header, no_wrap=(num_columns > 1))
 
     for r in range(rows_per_col):
         row_cells: List[Union[str, Text]] = []

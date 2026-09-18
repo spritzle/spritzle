@@ -40,6 +40,8 @@
 - **Example conventions**: Never use Ubuntu in examples, docstrings, or test cases. Exclusively use Arch Linux (e.g. `archlinux-x86_64.iso`, `archlinux.*`) as the reference ISO/torrent.
 - **Rich markup escaping**: When rendering strings in Rich tables or badges (such as `[on]` or `[off]`), always escape literal square brackets with `rich.markup.escape()` or backslashes. Rich interprets unescaped brackets as markup directives (e.g. `[on <color>]` for background colors), which causes bracketed text to be silently swallowed into empty tags.
 - **CLI vs. Daemon Configuration Separation**: CLI client preferences are persisted locally in `<config_dir>/cli.toml` via `CLIConfig` and managed via `spritzle config` without requiring a running daemon. Daemon settings are persisted in `<config_dir>/daemon.toml` via `Config` (both using `tomlkit` for comment/style preservation) and managed over the REST API (`/config`) via `spritzle daemon-config` or direct file editing. Configuration values resolve in strict precedence: CLI command-line flags > `SPRITZLE_*` environment variables > `cli.toml` file overrides > hardcoded defaults.
+- **CLI Configuration vs. Remote Profile Separation**: CLI client preferences are persisted locally in `<config_dir>/cli.toml` via `CLIConfig` (managed via `spritzle config`). Remote daemon profiles and API credentials are kept strictly isolated in `<config_dir>/remotes.toml` (mode `0600`) via `RemotesConfig` (managed exclusively via `spritzle remote`), ensuring credentials are never exposed in dotfile repositories or mixed into client option tables.
+
 
 
 ## 5. Continuous Learning & AGENTS.md Maintenance
