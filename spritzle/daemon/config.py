@@ -29,8 +29,18 @@ import tomlkit
 from tomlkit.items import Table
 from tomlkit.toml_document import TOMLDocument
 
+def get_default_save_path() -> str:
+    env_path = os.environ.get("SPRITZLE_SAVE_PATH") or os.environ.get("SPRITZLE_DOWNLOAD_DIR")
+    if env_path:
+        return env_path
+    try:
+        return str(Path.home() / "Downloads")
+    except Exception:
+        return "/tmp/spritzle-downloads"
+
+
 DEFAULTS = {
-    "add_torrent_params.save_path": str(Path.home() / "Downloads"),
+    "add_torrent_params.save_path": get_default_save_path(),
     "save_resume_data_interval": 60,
 }
 

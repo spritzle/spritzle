@@ -14,6 +14,7 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle add -t linux -t iso /path/to/file.torrent",
         "spritzle add -o save_path=/mnt/downloads /path/to/file.torrent",
         "spritzle add -Q /path/to/file.torrent",
+        "echo 'magnet:?xt=urn:btih:...' | spritzle add -",
     ],
     "list": [
         "spritzle list",
@@ -54,8 +55,21 @@ EXAMPLES: Dict[str, List[str]] = {
     ],
     "stats": [
         "spritzle stats",
+        "spritzle stats --all",
+        "spritzle stats --raw",
         "spritzle stats --json",
         "spritzle stats --plain",
+    ],
+    "status": [
+        "spritzle status",
+        "spritzle status --json",
+        "spritzle status --plain",
+    ],
+    "completion": [
+        "spritzle completion bash",
+        "spritzle completion zsh",
+        "spritzle completion fish",
+        'eval "$(spritzle completion bash)"',
     ],
     "settings": [
         "spritzle settings",
@@ -91,7 +105,10 @@ EXAMPLES: Dict[str, List[str]] = {
     "remote": [
         "spritzle remote list",
         "spritzle remote status",
-        "spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c",
+        "spritzle remote add seedbox https://seedbox.example.com:17382 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c",
+        "spritzle remote add local-nas https://192.168.1.50:17382 --key spritzle_... --insecure",
+        "spritzle remote add local-nas https://192.168.1.50:17382 --key spritzle_... --ca-cert /path/to/ca.crt",
+        "spritzle remote add local-nas https://192.168.1.50:17382 --key spritzle_... --fingerprint 2b490f05561a0f58dd713ae53b1b444b",
         "spritzle remote use seedbox",
         "spritzle remote show seedbox",
         "spritzle remote set-key seedbox",

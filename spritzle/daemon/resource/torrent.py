@@ -20,14 +20,16 @@
 #   Boston, MA    02110-1301, USA.
 
 import asyncio
-import json
 from base64 import b64decode
 import binascii
 import functools
-from json import JSONDecodeError
 import ipaddress
+import json
+from json import JSONDecodeError
 import logging
 import operator
+import os
+from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
@@ -356,6 +358,39 @@ async def post_torrent(request):
         tags = []
     elif not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
         raise web.HTTPBadRequest(reason="'spritzle.tags' must be a list of strings.")
+
+    raw_save_path = str(
+        post.get("save_path")
+        or (getattr(magnet_params, "save_path", None) if magnet_params is not None else None)
+        or atp_dict.get("save_path")
+        or config.get("add_torrent_params.save_path", "")
+    )
+
+    def prepare_save_path(sp: str) -> str:
+        expanded = os.path.expanduser(sp.strip()) if sp else str(Path.home() / "Downloads")
+        p = Path(expanded).resolve()
+        if p.exists() and not p.is_dir():
+            raise ValueError(f"Save path '{p}' exists and is not a directory.")
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+        except OSError as err:
+            raise OSError(f"Cannot create save path directory '{p}': {err}")
+        if not os.access(p, os.W_OK | os.X_OK):
+            raise PermissionError(f"Save path directory '{p}' is not writable.")
+        return str(p)
+
+    try:
+        canonical_save_path = await asyncio.get_running_loop().run_in_executor(
+            None, prepare_save_path, raw_save_path
+        )
+    except (ValueError, OSError, PermissionError) as e:
+        raise web.HTTPBadRequest(reason=str(e))
+
+    atp_dict["save_path"] = canonical_save_path
+    if magnet_params is not None:
+        magnet_params.save_path = canonical_save_path
+    if "save_path" in post:
+        post["save_path"] = canonical_save_path
 
     # We have already popped all spritzle specific options from post, merge it in
     atp: Union[Dict[str, Any], lt.add_torrent_params]

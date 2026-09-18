@@ -10,10 +10,10 @@ spritzled [OPTIONS] [COMMAND] [ARGS]...
 
 ### Options
 
-* `-H, --host TEXT`: Hostname or IP to listen on (default: `127.0.0.1`).
-* `-p, --port INTEGER`: Port for the HTTP REST server to listen on (default: `8080`).
-* `-c, --config-dir, --config_dir PATH`: Path to the configuration directory (default: `~/.config/spritzle`).
-* `-l, --log-level [DEBUG|INFO|WARNING|ERROR]`: Daemon log verbosity (default: `INFO`).
+* `-H, --host TEXT`: Hostname or IP to listen on (default: `127.0.0.1`, env: `SPRITZLE_HOST`).
+* `-p, --port INTEGER`: Port for the HTTP REST server to listen on (default: `17382`, env: `SPRITZLE_PORT`).
+* `-c, --config-dir, --config_dir PATH`: Path to the configuration directory (default: `~/.config/spritzle`, env: `SPRITZLE_CONFIG_DIR`).
+* `-l, --log-level [DEBUG|INFO|WARNING|ERROR]`: Daemon log verbosity (default: `INFO`, env: `SPRITZLE_LOG_LEVEL`).
 * `--debug`: Enable asyncio event loop debug mode.
 * `--help`: Show the help message and exit.
 
@@ -70,7 +70,7 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `add_torrent_params.save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. |
+| `add_torrent_params.save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. Defaults to `$SPRITZLE_SAVE_PATH`, `$SPRITZLE_DOWNLOAD_DIR`, or `~/Downloads`. Spritzled auto-creates the directory on startup and validates write permissions. |
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
 
 > [!NOTE]
@@ -92,7 +92,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/spritzled --config-dir %h/.config/spritzle --port 8080 --log-level INFO
+ExecStart=%h/.local/bin/spritzled --config-dir %h/.config/spritzle --port 17382 --log-level INFO
 Restart=on-failure
 RestartSec=5
 

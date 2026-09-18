@@ -68,15 +68,34 @@ def format_uptime(seconds: Union[int, float]) -> str:
     return f"{d}d {h}h"
 
 
-async def query_daemon_status(url: str, key: str, timeout_seconds: float = 10.0) -> Dict[str, Any]:
+async def query_daemon_status(
+    url: str,
+    key: str,
+    timeout_seconds: float = 10.0,
+    insecure: bool = False,
+    ca_cert: Optional[str] = None,
+    fingerprint: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Connect to daemon at url with key, query /status.
     Returns status dict on success (including latency_ms and daemon_id).
     """
+    import ssl
+
+    connector = None
+    if insecure:
+        connector = aiohttp.TCPConnector(ssl=False)
+    elif fingerprint:
+        fp_bytes = bytes.fromhex(fingerprint.replace(":", "").strip())
+        connector = aiohttp.TCPConnector(fingerprint=fp_bytes)
+    elif ca_cert:
+        ssl_ctx = ssl.create_default_context(cafile=ca_cert)
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+
     timeout = aiohttp.ClientTimeout(total=timeout_seconds)
     headers = {"Authorization": f"Bearer {key}"}
     start = time.perf_counter()
-    async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+    async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
         try:
             async with session.get(f"{url}/status") as resp:
                 latency_ms = round((time.perf_counter() - start) * 1000, 1)
@@ -95,6 +114,11 @@ async def query_daemon_status(url: str, key: str, timeout_seconds: float = 10.0)
                 data["daemon_id"] = daemon_id
                 data["latency_ms"] = latency_ms
                 return data
+        except aiohttp.ClientConnectorCertificateError as e:
+            raise click.ClickException(
+                f"TLS certificate verification failed for {url}: {e.certificate_error}. "
+                "Use --fingerprint, --ca-cert, or --insecure."
+            )
         except aiohttp.ClientConnectorError as e:
             raise click.ClickException(f"Could not connect to Spritzle daemon at {url}: {e}")
 
@@ -103,6 +127,9 @@ async def check_single_remote_status(name: str, remote_data: Dict[str, Any], is_
     url = remote_data.get("url", "")
     key = remote_data.get("key", "")
     expected_daemon_id = remote_data.get("daemon_id")
+    insecure = bool(remote_data.get("insecure", False))
+    ca_cert = remote_data.get("ca_cert")
+    fingerprint = remote_data.get("fingerprint")
 
     res: Dict[str, Any] = {
         "name": name,
@@ -119,7 +146,9 @@ async def check_single_remote_status(name: str, remote_data: Dict[str, Any], is_
     }
 
     try:
-        data = await query_daemon_status(url, key, timeout_seconds=5.0)
+        data = await query_daemon_status(
+            url, key, timeout_seconds=5.0, insecure=insecure, ca_cert=ca_cert, fingerprint=fingerprint
+        )
         actual_id = data.get("daemon_id")
         if expected_daemon_id and actual_id != expected_daemon_id:
             res["status"] = "id_mismatch"
@@ -166,6 +195,9 @@ def command():
 @click.argument("name")
 @click.argument("url")
 @click.option("-k", "--key", "key", default=None, help="API key for authentication.")
+@click.option("--insecure", is_flag=True, default=False, help="Skip TLS certificate verification.")
+@click.option("--ca-cert", default=None, type=click.Path(exists=True), help="Path to CA certificate bundle.")
+@click.option("--fingerprint", default=None, help="SHA-256 certificate fingerprint.")
 @click.option(
     "-f",
     "--force",
@@ -174,7 +206,16 @@ def command():
     help="Overwrite existing remote if it exists.",
 )
 @click.pass_obj
-def remote_add(client, name: str, url: str, key: Optional[str], force: bool):
+def remote_add(
+    client,
+    name: str,
+    url: str,
+    key: Optional[str],
+    insecure: bool,
+    ca_cert: Optional[str],
+    fingerprint: Optional[str],
+    force: bool,
+):
     """Add a remote Spritzle daemon with its API key."""
     client.remotes.ensure_local_remote()
     existing = client.remotes.get_remote(name)
@@ -191,13 +232,29 @@ def remote_add(client, name: str, url: str, key: Optional[str], force: bool):
         api_key = click.prompt(f"API Key for '{name}'", hide_input=True)
 
     try:
-        status_data = run_coroutine(query_daemon_status(normalized_url, api_key))
+        status_data = run_coroutine(
+            query_daemon_status(
+                normalized_url,
+                api_key,
+                insecure=insecure,
+                ca_cert=ca_cert,
+                fingerprint=fingerprint,
+            )
+        )
     except click.ClickException as e:
         print_error(str(e), color_opt=client.color)
         sys.exit(1)
 
     daemon_id = status_data["daemon_id"]
-    client.remotes.set_remote(name, normalized_url, daemon_id, api_key)
+    client.remotes.set_remote(
+        name,
+        normalized_url,
+        daemon_id,
+        api_key,
+        insecure=insecure,
+        ca_cert=ca_cert,
+        fingerprint=fingerprint,
+    )
     if not client.remotes.get_default_remote():
         client.remotes.set_default_remote(name)
 

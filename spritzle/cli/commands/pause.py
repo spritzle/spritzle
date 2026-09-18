@@ -3,7 +3,7 @@ import sys
 
 import click
 
-from spritzle.cli.display import print_error, print_success
+from spritzle.cli.display import get_response_error, print_error, print_success
 from spritzle.cli.lookup import resolve_target_torrents
 
 
@@ -28,7 +28,8 @@ async def f(client, torrent, query, all_torrents, quiet=False):
     async def _pause(ih):
         url = client.url(f"torrent/{ih}/pause")
         async with client.session.post(url, json=[]) as resp:
-            return ih, resp.status == 200, resp.reason
+            err = "" if resp.status == 200 else await get_response_error(resp)
+            return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_pause(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]

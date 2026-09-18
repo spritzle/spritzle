@@ -247,3 +247,39 @@ def test_remote_status(cli, core, tmp_path):
     assert dead_data["name"] == "deadbox"
     assert dead_data["status"] == "offline"
 
+
+def test_remote_add_tls_flags(cli, core, tmp_path):
+    from spritzle.cli.config import RemotesConfig
+
+    runner = CliRunner()
+    raw_key, _ = core.key_manager.create_key(name="laptop")
+    daemon_url = f"http://127.0.0.1:{cli.server.port}"
+    ca_file = tmp_path / "ca.crt"
+    ca_file.write_text("dummy ca")
+
+    res = runner.invoke(
+        spritzle_cli,
+        [
+            "-c",
+            str(tmp_path),
+            "remote",
+            "add",
+            "tlsbox",
+            daemon_url,
+            "--key",
+            raw_key,
+            "--insecure",
+            "--ca-cert",
+            str(ca_file),
+            "--fingerprint",
+            "aa:bb:cc:dd",
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    cfg = RemotesConfig(config_dir=tmp_path)
+    remote = cfg.get_remote("tlsbox")
+    assert remote is not None
+    assert remote["insecure"] is True
+    assert remote["ca_cert"] == str(ca_file)
+    assert remote["fingerprint"] == "aa:bb:cc:dd"
+

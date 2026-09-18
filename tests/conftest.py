@@ -18,11 +18,14 @@ pytest_plugins = "aiohttp.pytest_plugin"
 
 @pytest.fixture(scope="function")
 def core(loop, monkeypatch):
+    downloads_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-downloads"))
     config = Config(in_memory=True, config_dir="/tmp")
+    config["add_torrent_params.save_path"] = str(downloads_dir)
     state_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-state"))
     config_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-config"))
     monkeypatch.setenv("SPRITZLE_STATE_DIR", str(state_dir))
     monkeypatch.setenv("SPRITZLE_CONFIG", str(config_dir))
+    monkeypatch.setenv("SPRITZLE_SAVE_PATH", str(downloads_dir))
     core = Core(config, state_dir)
     settings = {
         "enable_upnp": False,
@@ -39,6 +42,7 @@ def core(loop, monkeypatch):
         loop.run_until_complete(core.stop())
     shutil.rmtree(str(state_dir), ignore_errors=True)
     shutil.rmtree(str(config_dir), ignore_errors=True)
+    shutil.rmtree(str(downloads_dir), ignore_errors=True)
 
 
 @pytest.fixture

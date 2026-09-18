@@ -20,12 +20,26 @@ uv sync
 
 ### Global CLI & Daemon Installation
 
-To install `spritzle` and `spritzled` directly into your user `PATH` (such as `~/.local/bin`):
+To install the pure-Python `spritzle` CLI (no native dependencies required):
 
 ```bash
-uv tool install .
+uv tool install spritzle
 # or with pipx:
-# pipx install .
+# pipx install spritzle
+```
+
+To install the `spritzled` daemon (includes native `libtorrent` bindings):
+
+```bash
+uv tool install "spritzle[daemon]"
+# or with pipx:
+# pipx install "spritzle[daemon]"
+```
+
+On Linux distributions where `libtorrent` is installed via your system package manager (e.g. `python-libtorrent` on Arch Linux), install with system site packages enabled:
+
+```bash
+pipx install --system-site-packages spritzle
 ```
 
 Development

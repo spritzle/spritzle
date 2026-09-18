@@ -36,10 +36,10 @@ To configure a new remote daemon, supply a name, the daemon URL, and the API key
 
 ```shell
 # Add remote with explicit key
-spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c
+spritzle remote add seedbox https://seedbox.example.com:17382 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c
 
 # Or omit --key to be prompted securely
-spritzle remote add seedbox https://seedbox.example.com:8080
+spritzle remote add seedbox https://seedbox.example.com:17382
 API Key for 'seedbox': 
 ```
 
@@ -50,8 +50,26 @@ During `remote add`, the CLI:
 
 If the remote already exists, use `--force` or `remote set-key` to update it:
 ```shell
-spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_newkey --force
+spritzle remote add seedbox https://seedbox.example.com:17382 --key spritzle_newkey --force
 ```
+
+#### Connecting over TLS / HTTPS (Self-Signed Certificates & Private CAs)
+
+When connecting to remote daemons using HTTPS with private certificates, `remote add` supports several verification options:
+
+```shell
+# Trust a custom Certificate Authority bundle
+spritzle remote add nas https://192.168.1.50:17382 --ca-cert /path/to/ca.crt
+
+# Pin the server certificate's SHA-256 fingerprint
+spritzle remote add nas https://192.168.1.50:17382 --fingerprint 2b490f05561a0f58dd713ae53b1b444bc82d02951e737c768910eb6cecebcf98
+
+# Skip certificate authority verification
+spritzle remote add nas https://192.168.1.50:17382 --insecure
+```
+
+> [!NOTE]
+> Even when using `--insecure`, Spritzle protects your credentials by verifying the daemon's unique `daemon_id` on every authenticated request via the `X-Spritzle-Daemon-Id` header. The CLI will refuse to transmit API keys if the daemon identity does not match.
 
 ### Checking Daemon Status & Latency (`remote status`)
 
@@ -67,9 +85,9 @@ spritzle remote status seedbox
 
 Output:
 ```
-  Name     Status   Latency  URL                              Version  Uptime     Torrents
-* local    online      2 ms  http://127.0.0.1:8080            1.0.0    2h 15m            3
-  seedbox  online     42 ms  https://seedbox.example.com:8080 1.0.0    14d 6h           48
+  Name     Status   Latency  URL                               Version  Uptime     Torrents
+* local    online      2 ms  http://127.0.0.1:17382            1.0.0    2h 15m            3
+  seedbox  online     42 ms  https://seedbox.example.com:17382 1.0.0    14d 6h           48
 ```
 
 Possible status states:
@@ -107,9 +125,9 @@ spritzle remote list
 
 Output:
 ```
-  Name     URL                              Daemon ID
-* local    http://127.0.0.1:8080            spz_d_1a2b3c4d
-  seedbox  https://seedbox.example.com:8080 spz_d_4a9e2f80
+  Name     URL                               Daemon ID
+* local    http://127.0.0.1:17382            spz_d_1a2b3c4d
+  seedbox  https://seedbox.example.com:17382 spz_d_4a9e2f80
 ```
 
 Machine-readable output formats are supported:

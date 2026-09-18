@@ -252,3 +252,23 @@ def print_warning(msg: str, color_opt: Optional[bool] = None) -> None:
         console.print(f"[bold yellow]⚠[/bold yellow] {msg}")
     else:
         print(f"Warning: {msg}", file=sys.stderr)
+
+
+async def get_response_error(resp: Any) -> str:
+    """Extract descriptive error message from daemon response."""
+    msg = getattr(resp, "reason", None) or f"HTTP {getattr(resp, 'status', 500)}"
+    if hasattr(resp, "json"):
+        try:
+            data = await resp.json()
+            if isinstance(data, dict):
+                msg = data.get("message") or data.get("reason") or msg
+        except Exception:
+            if hasattr(resp, "text"):
+                try:
+                    text = await resp.text()
+                    if text:
+                        msg = text.strip()
+                except Exception:
+                    pass
+    return str(msg).strip().rstrip("\r\n")
+

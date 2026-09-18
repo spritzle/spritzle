@@ -6,6 +6,8 @@ from tabulate import tabulate
 
 from spritzle.cli.display import (
     get_console,
+    get_response_error,
+    print_error,
     print_json,
     render_kv_table,
     should_use_color,
@@ -48,26 +50,28 @@ async def setter(client, torrent, header, sets, unsets, query, all_torrents, **k
         async with client.session.put(
             client.url(f"torrent/{ih}/flags"), json=d
         ) as resp:
-            return ih, resp.status == 200, resp.reason
+            err = "" if resp.status == 200 else await get_response_error(resp)
+            return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_set_flags(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]
     if errors:
         for ih, reason in errors:
-            click.echo(f"Error setting flags on {ih}: {reason}", file=sys.stderr)
+            print_error(f"Error setting flags on {ih}: {reason}", color_opt=getattr(client, "color", None))
         sys.exit(1)
 
 
 async def show(client, torrent, header, json_output=False, plain=False, **kwargs):
     if not torrent:
-        click.echo("Error: Specify a torrent to show flags.", file=sys.stderr)
+        print_error("Specify a torrent to show flags.", color_opt=getattr(client, "color", None))
         sys.exit(1)
 
     info_hash = await resolve_single_torrent(client, torrent)
 
     async with client.session.get(client.url(f"torrent/{info_hash}/flags")) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            err_msg = await get_response_error(resp)
+            print_error(f"Error getting flags for {info_hash}: {err_msg}", color_opt=getattr(client, "color", None))
             sys.exit(1)
 
         t = await resp.json()

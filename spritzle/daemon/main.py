@@ -106,11 +106,12 @@ async def error_middleware(request, handler):
         for k, v in response.headers.items()
         if k.lower() not in ("content-type", "content-length")
     }
+    safe_msg = response.text.rstrip("\r\n") if response.text else response.reason
     return aiohttp.web.json_response(
         {
             "status": response.status,
             "reason": response.reason,
-            "message": response.text,
+            "message": safe_msg,
         },
         status=response.status,
         reason=response.reason,
@@ -134,7 +135,6 @@ def setup_app(app, core, log):
 
     app.middlewares.extend([error_middleware, debug_middleware])
 
-
     async def on_startup(app):
         await app[APP_KEY_CORE].start()
 
@@ -157,13 +157,38 @@ def setup_app(app, core, log):
     app.router.add_routes(torrent_routes)
 
 
+CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
+
+
+def check_libtorrent() -> None:
+    try:
+        import libtorrent  # noqa: F401
+    except ModuleNotFoundError:
+        click.echo(
+            "Error: 'libtorrent' Python bindings are required to run the Spritzle daemon.\n\n"
+            "Installation options:\n"
+            "  1. Install wheel with daemon dependencies:\n"
+            "     pip install 'spritzle[daemon]'\n"
+            "     # or with uv:\n"
+            "     uv tool install 'spritzle[daemon]'\n\n"
+            "  2. Install via your Linux distribution package manager:\n"
+            "     Arch Linux: sudo pacman -S python-libtorrent\n"
+            "     Debian/Ubuntu: sudo apt install python3-libtorrent\n"
+            "     (Note: Ensure virtual environment is created with --system-site-packages)\n\n"
+            "Note: The 'spritzle' CLI is pure-Python and does not require libtorrent.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def run_daemon(
     host: str = "127.0.0.1",
-    port: int = 8080,
+    port: int = 17382,
     debug: bool = False,
     config_dir: Optional[str] = None,
     log_level: str = "INFO",
 ):
+    check_libtorrent()
     log = setup_logger(name="spritzle", level=log_level)
     log.info(
         f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, log_level={log_level}, debug={debug}"
@@ -196,11 +221,12 @@ def run_daemon(
         aiohttp.web.run_app(app, host=host, port=port, loop=loop)
     except OSError as e:
         log.error(f"Failed to bind to {host}:{port}: {e}")
-        log.error(f"Specify another port with -p / --port (e.g. spritzled -p {port + 1}).")
+        log.error(f"Check for conflicting services with: ss -tulpn | grep ':{port}'")
+        log.error(f"Specify another port with -p / --port (e.g. spritzled -p {port + 1}) or set SPRITZLE_PORT.")
         sys.exit(1)
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
 @click.option(
     "-H",
     "--host",
@@ -209,7 +235,7 @@ def run_daemon(
     help="Host to listen on.",
 )
 @click.option("--debug", default=False, is_flag=True, help="Enable debug mode.")
-@click.option("-p", "--port", default=8080, type=int, show_default=True, help="Port to listen on.")
+@click.option("-p", "--port", default=17382, type=int, show_default=True, help="Port to listen on.")
 @click.option(
     "-c",
     "--config-dir",

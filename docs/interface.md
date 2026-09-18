@@ -25,7 +25,7 @@ Returns status, persistent daemon identifier, software version, uptime (in secon
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/status "Authorization: Bearer spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c"
+$ http GET http://localhost:17382/status "Authorization: Bearer spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c"
 HTTP/1.1 200 OK
 Content-Length: 120
 Content-Type: application/json; charset=utf-8
@@ -87,7 +87,7 @@ Returns the current daemon configuration dictionary.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/config "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/config "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
@@ -104,7 +104,7 @@ Replaces all configuration settings with the provided JSON object.
 **Example**
 
 ```shell
-$ http PUT http://localhost:8080/config "Authorization: Bearer $TOKEN" save_resume_data_interval:=30
+$ http PUT http://localhost:17382/config "Authorization: Bearer $TOKEN" save_resume_data_interval:=30
 HTTP/1.1 200 OK
 ```
 
@@ -115,7 +115,7 @@ Partially updates specified keys in the daemon configuration.
 **Example**
 
 ```shell
-$ http PATCH http://localhost:8080/config "Authorization: Bearer $TOKEN" add_torrent_params.save_path="/mnt/storage/downloads"
+$ http PATCH http://localhost:17382/config "Authorization: Bearer $TOKEN" add_torrent_params.save_path="/mnt/storage/downloads"
 HTTP/1.1 200 OK
 ```
 
@@ -136,7 +136,7 @@ Returns a dictionary of the current libtorrent session settings.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/session/settings?modified=true "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/session/settings?modified=true "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
@@ -153,7 +153,7 @@ Updates one or more session settings. The request body must be a JSON object map
 **Example**
 
 ```shell
-$ http PUT http://localhost:8080/session/settings "Authorization: Bearer $TOKEN" connections_limit:=200 download_rate_limit:=1048576
+$ http PUT http://localhost:17382/session/settings "Authorization: Bearer $TOKEN" connections_limit:=200 download_rate_limit:=1048576
 HTTP/1.1 200 OK
 ```
 
@@ -165,7 +165,7 @@ Returns the factory baseline defaults for all libtorrent session settings.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/session/settings/defaults "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/session/settings/defaults "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 ```
@@ -182,7 +182,7 @@ Resets specified session settings or all session settings back to baseline defau
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/session/settings/reset "Authorization: Bearer $TOKEN" keys:='["download_rate_limit"]'
+$ http POST http://localhost:17382/session/settings/reset "Authorization: Bearer $TOKEN" keys:='["download_rate_limit"]'
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
@@ -201,7 +201,7 @@ Returns a dictionary of the session stats.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/session/stats "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/session/stats "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 9092
 Content-Type: application/json; charset=utf-8
@@ -226,7 +226,7 @@ Content-Type: application/json; charset=utf-8
 Returns a boolean indicating if DHT is running or not.
 
 ```shell
-$ http GET http://localhost:8080/session/dht "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/session/dht "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 4
 Content-Type: application/json; charset=utf-8
@@ -251,8 +251,8 @@ String queries support regex matching (`eq` or omitted operator) and regex non-m
 
 **Examples:**
 ```shell
-$ http GET http://localhost:8080/torrent?name=^archlinux.*$
-$ http GET http://localhost:8080/torrent?state.ne=seeding
+$ http GET http://localhost:17382/torrent?name=^archlinux.*$
+$ http GET http://localhost:17382/torrent?state.ne=seeding
 ```
 
 ##### Booleans
@@ -260,8 +260,8 @@ Booleans evaluate against `"true"` and `"false"`. Supports `eq` (or omitted) and
 
 **Examples:**
 ```shell
-$ http GET http://localhost:8080/torrent?paused=true
-$ http GET http://localhost:8080/torrent?auto_managed.ne=true
+$ http GET http://localhost:17382/torrent?paused=true
+$ http GET http://localhost:17382/torrent?auto_managed.ne=true
 ```
 
 ##### Numbers
@@ -269,8 +269,8 @@ Number expressions support comparison operators: `eq` (or omitted), `lt`, `gt`, 
 
 **Examples:**
 ```shell
-$ http GET http://localhost:8080/torrent?progress.ge=0.5
-$ http GET http://localhost:8080/torrent?download_rate.gt=102400
+$ http GET http://localhost:17382/torrent?progress.ge=0.5
+$ http GET http://localhost:17382/torrent?download_rate.gt=102400
 ```
 
 ##### Lists (Tags)
@@ -281,14 +281,14 @@ For list fields such as `spritzle.tags`, four operators are supported:
 
 **Examples:**
 ```shell
-$ http GET http://localhost:8080/torrent?spritzle.tags=linux
-$ http GET http://localhost:8080/torrent?spritzle.tags.all=linux,iso
+$ http GET http://localhost:17382/torrent?spritzle.tags=linux
+$ http GET http://localhost:17382/torrent?spritzle.tags.all=linux,iso
 ```
 
 **Example Response:**
 
 ```shell
-$ http GET http://localhost:8080/torrent "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/torrent "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 44
 Content-Type: application/json; charset=utf-8
@@ -320,11 +320,11 @@ Adding a torrent by uploading a torrent file requires the use of a multipart/for
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" file="$(base64 random_one_file.torrent)" save_path=/tmp
+$ http POST http://localhost:17382/torrent "Authorization: Bearer $TOKEN" file="$(base64 random_one_file.torrent)" save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Location: http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719
+Location: http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719
 
 {
     "info_hash": "44a040be6d74d8d290cd20128788864cbf770719"
@@ -338,11 +338,11 @@ Adding a torrent by url is done by setting the **url** key.
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" url=https://archlinux.org/releng/releases/latest/torrent/ save_path=/tmp
+$ http POST http://localhost:17382/torrent "Authorization: Bearer $TOKEN" url=https://archlinux.org/releng/releases/latest/torrent/ save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Location: http://localhost:8080/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
+Location: http://localhost:17382/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
 
 {
     "info_hash": "88066b90278f2de655ee2dd44e784c340b54e45c"
@@ -356,11 +356,11 @@ Adding a torrent by info-hash is done by setting the **info_hash** key.
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" info_hash=88066b90278f2de655ee2dd44e784c340b54e45c save_path=/tmp
+$ http POST http://localhost:17382/torrent "Authorization: Bearer $TOKEN" info_hash=88066b90278f2de655ee2dd44e784c340b54e45c save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Location: http://localhost:8080/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
+Location: http://localhost:17382/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
 
 {
     "info_hash": "88066b90278f2de655ee2dd44e784c340b54e45c"
@@ -377,10 +377,10 @@ the `delete_files` parameter to the query string.
 **Examples:**
 ```shell
 # Remove all torrents and delete their downloaded files
-$ http DELETE "http://localhost:8080/torrent?delete_files" "Authorization: Bearer $TOKEN"
+$ http DELETE "http://localhost:17382/torrent?delete_files" "Authorization: Bearer $TOKEN"
 
 # Remove only finished torrents
-$ http DELETE "http://localhost:8080/torrent?progress.ge=1.0" "Authorization: Bearer $TOKEN"
+$ http DELETE "http://localhost:17382/torrent?progress.ge=1.0" "Authorization: Bearer $TOKEN"
 ```
 
 ### /torrent/\<info-hash\>
@@ -391,7 +391,7 @@ Returns a status dictionary for the torrent.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719 "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719 "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 4059
 Content-Type: application/json; charset=utf-8
@@ -419,7 +419,7 @@ the `delete_files` parameter to the query string.
 **Example**
 
 ```shell
-$ http DELETE "http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719?delete_files" "Authorization: Bearer $TOKEN"
+$ http DELETE "http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719?delete_files" "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 0
 ```
@@ -433,7 +433,7 @@ Returns a `{"<flag_name>": bool}` dictionary of torrent flags.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
@@ -461,7 +461,7 @@ Update multiple flags at once by passing a JSON object mapping flag names to boo
 **Example**
 
 ```shell
-$ http PUT http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN" auto_managed:=false sequential_download:=true
+$ http PUT http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN" auto_managed:=false sequential_download:=true
 HTTP/1.1 200 OK
 ```
 
@@ -474,7 +474,7 @@ Returns the boolean status of a single flag.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN"
+$ http GET http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 
 true
@@ -487,7 +487,7 @@ Sets the boolean value for a single flag. The body should be a boolean JSON lite
 **Example**
 
 ```shell
-$ http PUT http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN" value:=true
+$ http PUT http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN" value:=true
 HTTP/1.1 200 OK
 ```
 
@@ -517,10 +517,10 @@ Invokes an allowed libtorrent handle operation on the torrent. The request body 
 
 ```shell
 # Pause a torrent
-$ http POST http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/pause "Authorization: Bearer $TOKEN"
+$ http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/pause "Authorization: Bearer $TOKEN"
 
 # Move storage directory
-$ echo '["/mnt/storage/downloads"]' | http POST http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/move_storage "Authorization: Bearer $TOKEN"
+$ echo '["/mnt/storage/downloads"]' | http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/move_storage "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 ```
 
@@ -534,7 +534,7 @@ Initiates graceful Spritzle shutdown. Flushes resume data, saves libtorrent sess
 **Example**
 
 ```shell
-$ http DELETE http://localhost:8080/core "Authorization: Bearer $TOKEN"
+$ http DELETE http://localhost:17382/core "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 0
 ```

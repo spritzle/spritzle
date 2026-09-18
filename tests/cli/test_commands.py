@@ -1350,6 +1350,85 @@ def test_no_underscore_aliases():
     assert "No such command 'move_storage'" in res2.output
 
 
+def test_status_command(cli):
+    """Test the top-level 'status' command."""
+    runner = CliRunner()
+
+    # Default output
+    res = runner.invoke(spritzle_cli, ["status"])
+    assert res.exit_code == 0
+    assert "Status" in res.output and "online" in res.output
+
+    # Plain output
+    res_plain = runner.invoke(spritzle_cli, ["status", "--plain"])
+    assert res_plain.exit_code == 0
+    assert "status\tonline" in res_plain.output
+
+    # JSON output
+    res_json = runner.invoke(spritzle_cli, ["status", "--json"])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert data["status"] == "online"
+    assert "daemon_id" in data
+    assert "num_torrents" in data
+
+
+def test_completion_command():
+    """Test the 'completion' command for various shells."""
+    runner = CliRunner()
+
+    res_bash = runner.invoke(spritzle_cli, ["completion", "bash"])
+    assert res_bash.exit_code == 0
+    assert "_spritzle_completion" in res_bash.output or "complete" in res_bash.output
+
+    res_zsh = runner.invoke(spritzle_cli, ["completion", "zsh"])
+    assert res_zsh.exit_code == 0
+    assert "compdef" in res_zsh.output or "_spritzle" in res_zsh.output
+
+    res_fish = runner.invoke(spritzle_cli, ["completion", "fish"])
+    assert res_fish.exit_code == 0
+    assert "command spritzle" in res_fish.output
+
+
+def test_stats_command_all_and_raw(cli):
+    """Test the 'stats' command with --all and --raw."""
+    runner = CliRunner()
+
+    # High-level summary by default
+    res_default = runner.invoke(spritzle_cli, ["stats"])
+    assert res_default.exit_code == 0
+    assert "Torrents: Downloading" in res_default.output or "Session Statistics" in res_default.output
+
+    # Detailed session metrics with --all
+    res_all = runner.invoke(spritzle_cli, ["stats", "--all"])
+    assert res_all.exit_code == 0
+    assert "net." in res_all.output or "session." in res_all.output or "dht." in res_all.output
+
+    # Raw metrics
+    res_raw = runner.invoke(spritzle_cli, ["stats", "--raw"])
+    assert res_raw.exit_code == 0
+
+
+def test_add_command_stdin(cli):
+    """Test adding a torrent via stdin pipe."""
+    runner = CliRunner()
+    magnet = "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=test_stdin"
+
+    res = runner.invoke(spritzle_cli, ["add", "-"], input=magnet)
+    assert res.exit_code == 0, res.output
+    assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
+
+
+def test_add_command_invalid_magnet_preflight():
+    """Test preflight validation for truncated/unquoted magnet links."""
+    runner = CliRunner()
+    # Magnet missing xt
+    res = runner.invoke(spritzle_cli, ["add", "magnet:?dn=test"])
+    assert res.exit_code != 0
+    assert "missing 'xt' parameter" in res.output
+
+
+
 
 
 

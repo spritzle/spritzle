@@ -6,6 +6,7 @@ from tabulate import tabulate
 
 from spritzle.cli.display import (
     get_console,
+    get_response_error,
     print_error,
     print_json,
     print_success,
@@ -76,7 +77,8 @@ async def setter(client, set_value):
         client.url("session/settings"), json=d, headers=headers
     ) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            err_msg = await get_response_error(resp)
+            print_error(f"Error setting properties: {err_msg}", getattr(client, "color", None))
             sys.exit(1)
 
 
@@ -92,11 +94,7 @@ async def resetter(client, reset_keys, reset_all):
         client.url("session/settings/reset"), json=payload, headers=headers
     ) as resp:
         if resp.status != 200:
-            try:
-                err_data = await resp.json()
-                err = err_data.get("reason", await resp.text())
-            except Exception:
-                err = await resp.text()
+            err = await get_response_error(resp)
             print_error(f"Error resetting settings: {err}", getattr(client, "color", None))
             sys.exit(1)
 
@@ -117,13 +115,15 @@ async def resetter(client, reset_keys, reset_all):
 async def show(client, modified=False, defaults=False, json_output=False, plain=False):
     async with client.session.get(client.url("session/settings")) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            err_msg = await get_response_error(resp)
+            print_error(f"Error getting settings: {err_msg}", getattr(client, "color", None))
             sys.exit(1)
         settings = await resp.json()
 
     async with client.session.get(client.url("session/settings/defaults")) as resp:
         if resp.status != 200:
-            click.echo(f"Error: {resp}", file=sys.stderr)
+            err_msg = await get_response_error(resp)
+            print_error(f"Error getting default settings: {err_msg}", getattr(client, "color", None))
             sys.exit(1)
         default_settings = await resp.json()
 

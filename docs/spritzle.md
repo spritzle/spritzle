@@ -33,7 +33,7 @@ Spritzle CLI manages connections to local and remote daemons using **remotes** a
 * **Remote daemons:** Configured using the `spritzle remote` command:
   ```shell
   # Add a remote daemon and import its API key
-  spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_...
+  spritzle remote add seedbox https://seedbox.example.com:17382 --key spritzle_...
 
   # List remotes
   spritzle remote list
@@ -51,11 +51,14 @@ See the [remotes documentation](remotes.md) for full details on remote daemon ma
 
 ### `add` - Add a Torrent
 
-Adds a torrent by file path, HTTP URL, or info-hash.
+Adds a torrent by file path, HTTP URL, info-hash, magnet link, or `-` from standard input.
 
 ```shell
 spritzle add [OPTIONS] URL_OR_FILE
 ```
+
+Arguments:
+* `URL_OR_FILE`: Local torrent file path, HTTP/HTTPS URL, magnet link, 40-char info-hash, or `-` to read from stdin.
 
 Options:
 * `-t, --tag TEXT`: Assign tags to the torrent (can be specified multiple times).
@@ -71,11 +74,14 @@ spritzle add -t linux -t iso archlinux-x86_64.iso.torrent
 # Add from a URL
 spritzle add https://archlinux.org/releng/releases/latest/torrent/
 
-# Add from a magnet link
+# Add from a magnet link (always quote magnets to protect shell & and ? characters)
 spritzle add "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=archlinux"
 
 # Add by info-hash
 spritzle add 44a040be6d74d8d290cd20128788864cbf770719
+
+# Add from stdin pipe
+echo "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719" | spritzle add -
 ```
 
 ### `list` - List Torrents
@@ -408,10 +414,40 @@ spritzle settings --reset-all
 
 ### `stats` - View Session Statistics
 
-Outputs libtorrent session performance metrics (rates, cache statistics, peer counts).
+Outputs libtorrent session performance metrics. By default, displays a clean summary dashboard showing active speeds, data transferred, connected peers and seeds, and DHT status.
 
 ```shell
 spritzle stats [OPTIONS]
+```
+
+Options:
+* `-a, --all`: Display all internal libtorrent session counters (100+ counters).
+* `--raw`: Display raw unformatted byte and count values.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled tabular output without ANSI colors.
+
+**Examples:**
+
+```shell
+# View high-level session summary dashboard
+spritzle stats
+
+# View all 100+ raw session counters
+spritzle stats --all
+
+# View raw unformatted numbers for scripting
+spritzle stats --raw --plain
+
+# Output stats as JSON
+spritzle stats --json
+```
+
+### `status` - Daemon Health & Status Overview
+
+Displays connection health, latency, daemon identity, version, uptime, and torrent counts for the active daemon.
+
+```shell
+spritzle status [OPTIONS]
 ```
 
 Options:
@@ -421,23 +457,47 @@ Options:
 **Examples:**
 
 ```shell
-# View stats table
-spritzle stats
+# Inspect active daemon status
+spritzle status
 
-# Output stats as JSON
-spritzle stats --json
+# Output status as JSON
+spritzle status --json
+```
+
+### `completion` - Shell Completion Scripts
+
+Generates shell completion setup code for Bash, Zsh, or Fish.
+
+```shell
+spritzle completion [SHELL]
+```
+
+Arguments:
+* `[SHELL]`: Target shell (`bash`, `zsh`, `fish`). Auto-detects from `$SHELL` if omitted.
+
+**Examples:**
+
+```shell
+# Load completion in current Bash shell
+eval "$(spritzle completion bash)"
+
+# Load completion in current Zsh shell
+eval "$(spritzle completion zsh)"
+
+# Load completion in Fish shell
+spritzle completion fish | source
 ```
 
 ### `remote` - Manage Remote Daemon Profiles & Credentials
 
-Manages remote daemon profiles, connection URLs, daemon fingerprints, and API keys stored in `<config_dir>/remotes.toml`.
+Manages remote daemon profiles, connection URLs, daemon fingerprints, TLS verification options, and API keys stored in `<config_dir>/remotes.toml`.
 
 ```shell
 spritzle remote COMMAND [ARGS]...
 ```
 
 Subcommands:
-* `add <name> <url> [--key <key>] [--force]`: Register and verify a new daemon endpoint.
+* `add <name> <url> [--key <key>] [--force] [--insecure] [--ca-cert <path>] [--fingerprint <hex>]`: Register and verify a new daemon endpoint.
 * `list [--plain] [--json]`: List all configured remotes and default indicator.
 * `use <name>`: Set default remote profile.
 * `status [<name>] [--plain] [--json]`: Concurrently probe remotes, check latency, verify identity, and report uptime.
@@ -449,7 +509,11 @@ Subcommands:
 
 ```shell
 # Add and verify remote
-spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c
+spritzle remote add seedbox https://seedbox.example.com:17382 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c
+
+# Add remote with custom CA or self-signed certificate
+spritzle remote add nas https://192.168.1.100:17382 --key spritzle_... --ca-cert /path/to/ca.crt
+spritzle remote add nas https://192.168.1.100:17382 --key spritzle_... --insecure
 
 # Probe health and latency across all remotes
 spritzle remote status

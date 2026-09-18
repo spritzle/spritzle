@@ -12,13 +12,15 @@ authors = [
 requires-python = ">=3.11, <3.14"
 dependencies = [
     "aiohttp>=3.5",
-    "PyJWT>=1.7",
-    "click>=7.0",
+    "click>=8.0",
     "tabulate>=0.8.3",
-    "pyopenssl>=23.2.0",
-    "libtorrent",
     "rich>=12.0.0",
     "tomlkit>=0.13.0",
+]
+
+[project.optional-dependencies]
+daemon = [
+    "libtorrent",
 ]
 
 [project.scripts]
@@ -30,6 +32,7 @@ packages = ["spritzle"]
 
 [dependency-groups]
 dev = [
+    "libtorrent",
     "pytest",
     "coverage>=4.5",
     "ruff>=0.14.11",

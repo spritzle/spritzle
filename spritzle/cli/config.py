@@ -239,13 +239,28 @@ class RemotesConfig:
         remotes = self.get_remotes()
         return remotes.get(name)
 
-    def set_remote(self, name: str, url: str, daemon_id: str, key: str) -> None:
+    def set_remote(
+        self,
+        name: str,
+        url: str,
+        daemon_id: str,
+        key: str,
+        insecure: bool = False,
+        ca_cert: Optional[str] = None,
+        fingerprint: Optional[str] = None,
+    ) -> None:
         if "remotes" not in self._doc or not isinstance(self._doc["remotes"], dict):
             self._doc["remotes"] = tomlkit.table()
         remote_tbl = tomlkit.table()
         remote_tbl["url"] = url
         remote_tbl["daemon_id"] = daemon_id
         remote_tbl["key"] = key
+        if insecure:
+            remote_tbl["insecure"] = True
+        if ca_cert:
+            remote_tbl["ca_cert"] = str(ca_cert)
+        if fingerprint:
+            remote_tbl["fingerprint"] = str(fingerprint)
         self._doc["remotes"][name] = remote_tbl
         self.save()
 

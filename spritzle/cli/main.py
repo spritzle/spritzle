@@ -49,6 +49,9 @@ class Client(object):
             self.base_url = remote_data.get("url", "").rstrip("/")
             self.expected_daemon_id = remote_data.get("daemon_id")
             self.token = remote_data.get("key", "")
+            self.insecure = bool(remote_data.get("insecure", False))
+            self.ca_cert = remote_data.get("ca_cert")
+            self.fingerprint = remote_data.get("fingerprint")
             parsed = urlparse(self.base_url)
             self.host = parsed.hostname or "127.0.0.1"
             self.port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -56,8 +59,11 @@ class Client(object):
             self.base_url = None
             self.expected_daemon_id = None
             self.token = ""
+            self.insecure = False
+            self.ca_cert = None
+            self.fingerprint = None
             self.host = "127.0.0.1"
-            self.port = 8080
+            self.port = 17382
 
         self.session = None
 
@@ -108,7 +114,20 @@ class Client(object):
 
             trace_config.on_request_end.append(on_request_end)
 
-            async with aiohttp.ClientSession(headers=headers, trace_configs=[trace_config]) as session:
+            import ssl
+            connector = None
+            if self.insecure:
+                connector = aiohttp.TCPConnector(ssl=False)
+            elif self.fingerprint:
+                fp_bytes = bytes.fromhex(self.fingerprint.replace(":", "").strip())
+                connector = aiohttp.TCPConnector(fingerprint=fp_bytes)
+            elif self.ca_cert:
+                ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
+                connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+
+            async with aiohttp.ClientSession(
+                headers=headers, trace_configs=[trace_config], connector=connector
+            ) as session:
                 self.session = session
                 await cmd(self, *args, **kwargs)
 
@@ -119,6 +138,15 @@ class Client(object):
             asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(_do_command(cmd, *args, **kwargs))
+        except aiohttp.ClientConnectorCertificateError as e:
+            from spritzle.cli.display import print_error
+
+            print_error(
+                f"TLS certificate verification failed for {self.url('')}: {e.certificate_error}\n"
+                "If using a self-signed certificate, update the remote with --fingerprint, --ca-cert, or --insecure.",
+                color_opt=self.color,
+            )
+            sys.exit(1)
         except aiohttp.ClientConnectorError:
             from spritzle.cli.display import print_error
 

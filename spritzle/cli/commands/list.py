@@ -96,6 +96,27 @@ async def f(
 
     is_interactive = should_use_color(getattr(client, "color", None)) and not plain and not raw
 
+    if not raw_items:
+        if is_interactive:
+            console = get_console(getattr(client, "color", None))
+            if query:
+                console.print("[yellow]No torrents match the specified filter.[/yellow]")
+            else:
+                console.print(
+                    "[bold]No torrents in session.[/bold]\n\n"
+                    "To add a torrent, run:\n"
+                    "  [cyan]spritzle add <path | url | magnet | info-hash>[/cyan]\n\n"
+                    "Examples:\n"
+                    "  spritzle add archlinux-x86_64.iso.torrent\n"
+                    "  spritzle add \"magnet:?xt=urn:btih:...\""
+                )
+            return
+        else:
+            if header:
+                tablefmt = "simple" if not plain else "plain"
+                print(tabulate([], headers=field_list, tablefmt=tablefmt))
+            return
+
     table = []
     for item in raw_items:
         values = []
@@ -109,7 +130,17 @@ async def f(
                 elif field == "progress":
                     formatted_val = format_progress(val, human=True)
                 elif field == "state":
-                    formatted_val = format_state(str(val), use_color=True)
+                    errc = item.get("errc")
+                    has_error = False
+                    if isinstance(errc, dict) and errc.get("value", 0) != 0:
+                        has_error = True
+                    elif item.get("last_error"):
+                        has_error = True
+
+                    if has_error:
+                        formatted_val = "[bold red]error[/bold red]"
+                    else:
+                        formatted_val = format_state(str(val), use_color=True)
                 elif isinstance(val, bool):
                     formatted_val = format_bool(val, human=True, use_color=True)
                 elif isinstance(val, list):
@@ -118,7 +149,19 @@ async def f(
                     formatted_val = str(val)
                 values.append(formatted_val)
             else:
-                values.append(type_formatters.get(type(val), str)(val))
+                if field == "state":
+                    errc = item.get("errc")
+                    has_error = False
+                    if isinstance(errc, dict) and errc.get("value", 0) != 0:
+                        has_error = True
+                    elif item.get("last_error"):
+                        has_error = True
+                    if has_error:
+                        values.append("error")
+                    else:
+                        values.append(str(val))
+                else:
+                    values.append(type_formatters.get(type(val), str)(val))
         table.append(values)
 
     if is_interactive:

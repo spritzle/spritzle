@@ -22,6 +22,7 @@
 
 import asyncio
 import importlib.metadata
+import os
 from pathlib import Path
 import logging
 import functools
@@ -71,6 +72,8 @@ class Core(object):
             "status_notification", self.on_status_notification_alert
         )
         self.alert.register_handler("state_changed_alert", self.on_state_changed_alert)
+        self.alert.register_handler("file_error_alert", self.on_file_error_alert)
+        self.alert.register_handler("torrent_error_alert", self.on_torrent_error_alert)
 
     def get_default_settings(self) -> Dict[str, Any]:
         return {
@@ -135,8 +138,18 @@ class Core(object):
             info_hash = str(handle.info_hash())
             if info_hash not in self.torrent_data:
                 log.warning(f"Restoring missing metadata for ghost torrent {info_hash}")
-                self.torrent_data[info_hash] = {}
-                
+        default_save_path = self.config.get("add_torrent_params.save_path")
+        if default_save_path:
+            p = Path(os.path.expanduser(str(default_save_path)))
+            if not p.exists():
+                try:
+                    p.mkdir(parents=True, exist_ok=True)
+                    log.info(f"Created default download directory: {p}")
+                except Exception as e:
+                    log.warning(f"Default download directory '{p}' could not be created: {e}")
+            elif not os.access(p, os.W_OK | os.X_OK):
+                log.warning(f"Default download directory '{p}' is not writable!")
+
         log.debug("Core started.")
 
     async def stop(self):
@@ -222,3 +235,23 @@ class Core(object):
     async def on_state_changed_alert(self, alert):
         if alert.handle.need_save_resume_data():
             self.resume_data.save_torrent(alert.handle)
+
+    async def on_file_error_alert(self, alert):
+        info_hash = str(alert.handle.info_hash()) if alert.handle.is_valid() else ""
+        msg = f"File error in torrent {info_hash}: {alert.message()}"
+        log.error(msg)
+        if info_hash:
+            self.torrent_data.setdefault(info_hash, {})["last_error"] = alert.message()
+            self.hooks.run_hooks(
+                "file_error_alert", info_hash, ",".join(self.get_torrent_tags(info_hash))
+            )
+
+    async def on_torrent_error_alert(self, alert):
+        info_hash = str(alert.handle.info_hash()) if alert.handle.is_valid() else ""
+        msg = f"Torrent error in {info_hash}: {alert.message()}"
+        log.error(msg)
+        if info_hash:
+            self.torrent_data.setdefault(info_hash, {})["last_error"] = alert.message()
+            self.hooks.run_hooks(
+                "torrent_error_alert", info_hash, ",".join(self.get_torrent_tags(info_hash))
+            )

@@ -3,15 +3,13 @@ import sys
 
 import click
 
-from spritzle.cli.display import print_error, print_success
+from spritzle.cli.display import get_response_error, print_error, print_success
 from spritzle.cli.lookup import resolve_target_torrents
 
 
 @click.command("remove", short_help="Remove a torrent from the session.")
 @click.argument("torrent", required=False, metavar="[INFO-HASH|NAME]")
-@click.option(
-    "--delete-files", default=False, is_flag=True, help="Delete downloaded files."
-)
+@click.option("--delete-files", is_flag=True, help="Delete torrent files from storage.")
 @click.option("-q", "--query", multiple=True, help="Query string to filter torrents.")
 @click.option("--all", "all_torrents", is_flag=True, help="Remove all torrents.")
 @click.option("--quiet", "-Q", is_flag=True, default=False, help="Print only affected info-hashes.")
@@ -35,7 +33,8 @@ async def f(client, torrent, delete_files, query, all_torrents, quiet=False):
     async def _remove(ih):
         url = client.url(f"torrent/{ih}")
         async with client.session.delete(url, params=params) as resp:
-            return ih, resp.status == 200, resp.reason
+            err = "" if resp.status == 200 else await get_response_error(resp)
+            return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_remove(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]

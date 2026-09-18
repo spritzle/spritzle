@@ -20,7 +20,7 @@ _spritzle() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     local global_opts="-c --config -r --remote --color --no-color --help"
-    local commands="add config daemon-config flags help info list move-storage pause remote remove resume settings stats"
+    local commands="add completion config daemon-config flags help info list move-storage pause remote remove resume settings stats status"
 
     # Find the subcommand if already provided
     cmd=""
@@ -114,7 +114,19 @@ _spritzle() {
             ;;
         stats)
             if [[ "${cur}" == -* ]]; then
+                COMPREPLY=($(compgen -W "-a --all --raw --json --plain --help" -- "${cur}"))
+            fi
+            ;;
+        status)
+            if [[ "${cur}" == -* ]]; then
                 COMPREPLY=($(compgen -W "--json --plain --help" -- "${cur}"))
+            fi
+            ;;
+        completion)
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=($(compgen -W "--help" -- "${cur}"))
+            else
+                COMPREPLY=($(compgen -W "bash zsh fish" -- "${cur}"))
             fi
             ;;
         config)
@@ -142,7 +154,7 @@ _spritzle() {
                         ;;
                     add)
                         if [[ "${cur}" == -* ]]; then
-                            COMPREPLY=($(compgen -W "--key --force --help" -- "${cur}"))
+                            COMPREPLY=($(compgen -W "--key --force --insecure --ca-cert --fingerprint --help" -- "${cur}"))
                         fi
                         ;;
                 esac
