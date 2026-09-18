@@ -224,66 +224,25 @@ def test_client_init_with_valid_tokens_file(tmp_path):
     assert client.token == "my-saved-token"
 
 
-def test_auth_command(cli, tmp_path):
-    import json
-    runner = CliRunner()
-    result = runner.invoke(
-        spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--config", str(tmp_path),
-            "auth",
-            "--password", "password",
-        ],
-    )
-    assert result.exit_code == 0
-    tokens_file = tmp_path / "tokens"
-    assert tokens_file.exists()
-    data = json.loads(tokens_file.read_text())
-    assert f"127.0.0.1:{cli.server.port}" in data
-    assert len(data[f"127.0.0.1:{cli.server.port}"]) > 0
-
-
-def test_auth_command_nonexistent_config_dir(cli, tmp_path):
-    import json
+def test_remote_add_command_nonexistent_config_dir(cli, core, tmp_path):
     config_dir = tmp_path / "nonexistent" / "config"
     assert not config_dir.exists()
 
+    raw_key, _ = core.key_manager.create_key(name="test")
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
         [
-            "--port", str(cli.server.port),
             "--config", str(config_dir),
-            "auth",
-            "--password", "password",
+            "remote", "add",
+            "testremote", f"http://127.0.0.1:{cli.server.port}",
+            "--key", raw_key,
         ],
     )
     assert result.exit_code == 0
-    tokens_file = config_dir / "tokens"
-    assert tokens_file.exists()
-    data = json.loads(tokens_file.read_text())
-    assert f"127.0.0.1:{cli.server.port}" in data
+    assert "Added remote 'testremote'" in result.output
+    assert config_dir.exists()
 
-
-def test_auth_command_corrupted_non_dict_tokens_file(cli, tmp_path):
-    tokens_file = tmp_path / "tokens"
-    tokens_file.write_text("[1, 2, 3]")  # Non-empty list, truthy but not a dict
-
-    runner = CliRunner()
-    result = runner.invoke(
-        spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--config", str(tmp_path),
-            "auth",
-            "--password", "password",
-        ],
-    )
-    assert result.exit_code == 0
-    data = json.loads(tokens_file.read_text())
-    assert isinstance(data, dict)
-    assert f"127.0.0.1:{cli.server.port}" in data
 
 
 def test_flags_command(cli):
@@ -536,20 +495,21 @@ def test_move_storage_command(cli):
     assert f"Moved storage for {info_hash} to /tmp/new_storage" in result.output
 
 
-def test_spritzled_token_command(tmp_path):
-    import jwt
-    from spritzle.daemon.config import Config
+def test_spritzled_key_command(tmp_path):
     from spritzle.daemon.main import main as daemon_cli
 
     runner = CliRunner()
-    result = runner.invoke(daemon_cli, ["token", "-c", str(tmp_path), "-e", "3600"])
+    result = runner.invoke(daemon_cli, ["key", "create", "-c", str(tmp_path), "--name", "testkey"])
     assert result.exit_code == 0
-    token = result.output.strip()
-    assert token
+    assert "Created API key for 'testkey'" in result.output
+    assert "spritzle_" in result.output
 
-    config = Config(config_dir=str(tmp_path))
-    decoded = jwt.decode(token, config["auth_secret"], algorithms=["HS256"])
-    assert "exp" in decoded
+    # List keys
+    result_list = runner.invoke(daemon_cli, ["key", "list", "-c", str(tmp_path)])
+    assert result_list.exit_code == 0
+    assert "testkey" in result_list.output
+    assert "active" in result_list.output
+
 
 
 def test_pause_by_name(cli):
@@ -1115,7 +1075,8 @@ def test_daemon_config_json_and_plain(cli):
     assert res_json.exit_code == 0
     data = json.loads(res_json.output)
     assert isinstance(data, dict)
-    assert "auth_timeout" in data
+    assert "save_resume_data_interval" in data
+
 
     # Plain mode
     res_plain = runner.invoke(
@@ -1123,7 +1084,8 @@ def test_daemon_config_json_and_plain(cli):
         ["--port", str(cli.server.port), "--token", "test-token", "daemon-config", "--plain"],
     )
     assert res_plain.exit_code == 0
-    assert "auth_timeout" in res_plain.output
+    assert "save_resume_data_interval" in res_plain.output
+
 
     # Color mode
     res_color = runner.invoke(

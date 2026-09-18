@@ -8,3 +8,6 @@ if TYPE_CHECKING:
 APP_KEY_LOG = aiohttp.web.AppKey("spritzle.log", logging.Logger)
 APP_KEY_CORE = aiohttp.web.AppKey("spritzle.core", Any)
 APP_KEY_CONFIG = aiohttp.web.AppKey("spritzle.config", Any)
+APP_KEY_IDENTITY = aiohttp.web.AppKey("spritzle.identity", Any)
+APP_KEY_KEY_MANAGER = aiohttp.web.AppKey("spritzle.key_manager", Any)
+

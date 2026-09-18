@@ -7,6 +7,51 @@ any language or environment.
 **_Note:_** All examples shown are using [httpie](https://httpie.org), a command line HTTP client, to send requests to spritzle.
 This is similar to curl, but allows for much easier interface with JSON REST apis.
 
+Authentication & Status
+-----------------------
+
+All endpoints require authentication using a valid API key with prefix `spritzle_`.
+API keys can be supplied via either:
+- HTTP Header: `Authorization: Bearer <api_key>`
+- HTTP Header: `X-API-Key: <api_key>`
+
+Upon successful authentication, `spritzled` attaches its persistent daemon instance identifier in the `X-Spritzle-Daemon-Id` response header. Unauthenticated or invalid requests receive `HTTP 401 Unauthorized` and do not leak daemon identity or version details.
+
+### /status
+#### GET
+
+Returns status, persistent daemon identifier, software version, uptime (in seconds), and active torrent count. Requires authentication.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/status "Authorization: Bearer spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c"
+HTTP/1.1 200 OK
+Content-Length: 120
+Content-Type: application/json; charset=utf-8
+X-Spritzle-Daemon-Id: spz_d_4a9e2f80c1
+
+{
+    "daemon_id": "spz_d_4a9e2f80c1",
+    "num_torrents": 5,
+    "status": "ok",
+    "uptime": 8123.4,
+    "version": "1.0.0"
+}
+```
+
+### /keys
+#### GET
+List all API keys (active and revoked).
+
+#### POST
+Create a new API key. Accepts optional `{"name": "client_name"}` JSON payload. Returns the raw API key (only displayed once upon creation).
+
+### /keys/{id}
+#### DELETE
+Revoke an existing API key by its unique ID.
+
+
 Session
 -------
 

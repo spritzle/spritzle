@@ -31,12 +31,9 @@ from tomlkit.toml_document import TOMLDocument
 
 DEFAULTS = {
     "add_torrent_params.save_path": str(Path.home() / "Downloads"),
-    "auth_password": "password",
-    "auth_secret": "",
-    "auth_timeout": 120,
-    "auth_allow_hosts": ["127.0.0.1", "::1"],
     "save_resume_data_interval": 60,
 }
+
 
 
 def unwrap_toml_value(val: Any) -> Any:

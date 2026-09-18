@@ -177,3 +177,67 @@ class CLIConfig(collections.abc.MutableMapping[str, Any]):
         keys = set(self.defaults.keys())
         keys.update(self._doc.keys())
         return len(keys)
+
+    def get_remotes(self) -> Dict[str, Dict[str, Any]]:
+        remotes = self._doc.get("remotes", {})
+        if isinstance(remotes, dict):
+            return {k: unwrap_toml_value(v) for k, v in remotes.items() if isinstance(v, dict)}
+        return {}
+
+    def get_remote(self, name: str) -> Optional[Dict[str, Any]]:
+        remotes = self.get_remotes()
+        return remotes.get(name)
+
+    def set_remote(self, name: str, url: str, daemon_id: str, key: str) -> None:
+        if "remotes" not in self._doc or not isinstance(self._doc["remotes"], dict):
+            self._doc["remotes"] = tomlkit.table()
+        remote_tbl = tomlkit.table()
+        remote_tbl["url"] = url
+        remote_tbl["daemon_id"] = daemon_id
+        remote_tbl["key"] = key
+        self._doc["remotes"][name] = remote_tbl
+        self.save()
+
+    def remove_remote(self, name: str) -> bool:
+        if "remotes" in self._doc and isinstance(self._doc["remotes"], dict):
+            if name in self._doc["remotes"]:
+                del self._doc["remotes"][name]
+                if self.get_default_remote() == name:
+                    if "default_remote" in self._doc:
+                        del self._doc["default_remote"]
+                self.save()
+                return True
+        return False
+
+    def get_default_remote(self) -> Optional[str]:
+        if "default_remote" in self._doc:
+            return str(self._doc["default_remote"])
+        return None
+
+    def set_default_remote(self, name: str) -> None:
+        self._doc["default_remote"] = name
+        self.save()
+
+    def ensure_local_remote(self, state_dir: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+        """
+        Auto-discovers local daemon configuration if 'local' remote is not yet registered.
+        """
+        remotes = self.get_remotes()
+        if "local" in remotes:
+            return remotes["local"]
+
+        s_dir = state_dir or (Path.home() / ".local" / "share" / "spritzle" / "state")
+        local_file = Path(s_dir) / "local_remote.json"
+        if local_file.exists():
+            try:
+                with local_file.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and "url" in data and "daemon_id" in data and "api_key" in data:
+                    self.set_remote("local", data["url"], data["daemon_id"], data["api_key"])
+                    if not self.get_default_remote():
+                        self.set_default_remote("local")
+                    return self.get_remote("local")
+            except Exception:
+                pass
+        return None
+

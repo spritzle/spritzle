@@ -23,8 +23,8 @@
 import asyncio
 import fcntl
 from pathlib import Path
-import secrets
 import sys
+
 import traceback
 from typing import Optional
 
@@ -32,16 +32,23 @@ import aiohttp.web
 import click
 
 from .resource.auth import routes as auth_routes
-from .resource.auth import auth_middleware, create_jwt_token
+from .resource.auth import auth_middleware
 from .resource.config import routes as config_routes
 from .resource.core import routes as core_routes
 from .resource.session import routes as session_routes
 from .resource.torrent import routes as torrent_routes
 
-from .keys import APP_KEY_CONFIG, APP_KEY_CORE, APP_KEY_LOG
+from .keys import (
+    APP_KEY_CONFIG,
+    APP_KEY_CORE,
+    APP_KEY_IDENTITY,
+    APP_KEY_KEY_MANAGER,
+    APP_KEY_LOG,
+)
 from .core import Core
 from .config import Config
 from .logger import setup_logger
+
 
 
 @aiohttp.web.middleware
@@ -94,6 +101,11 @@ async def error_middleware(request, handler):
         )
     if response.status < 400:
         return response
+    headers = {
+        k: v
+        for k, v in response.headers.items()
+        if k.lower() not in ("content-type", "content-length")
+    }
     return aiohttp.web.json_response(
         {
             "status": response.status,
@@ -102,7 +114,9 @@ async def error_middleware(request, handler):
         },
         status=response.status,
         reason=response.reason,
+        headers=headers,
     )
+
 
 
 
@@ -111,14 +125,15 @@ app = aiohttp.web.Application()
 
 def setup_app(app, core, log):
     config = core.config
-    if not config["auth_secret"]:
-        config["auth_secret"] = secrets.token_hex()
 
     app[APP_KEY_LOG] = log
     app[APP_KEY_CORE] = core
     app[APP_KEY_CONFIG] = config
+    app[APP_KEY_IDENTITY] = core.identity
+    app[APP_KEY_KEY_MANAGER] = core.key_manager
 
     app.middlewares.extend([error_middleware, debug_middleware])
+
 
     async def on_startup(app):
         await app[APP_KEY_CORE].start()
@@ -172,7 +187,9 @@ def run_daemon(
         log.error("Exiting..")
         sys.exit(1)
 
-    setup_app(app, Core(config), log)
+    core = Core(config)
+    core.key_manager.ensure_local_client_remote(f"http://{host}:{port}", core.identity.daemon_id)
+    setup_app(app, core, log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     app.middlewares.append(auth_middleware)
     try:
@@ -222,7 +239,14 @@ def main(ctx, host, port, debug, config_dir, log_level):
         )
 
 
-@main.command("token", short_help="Generate an authentication token.")
+@main.group("key", short_help="Manage API keys.")
+def key_group():
+    """Manage API keys for the daemon."""
+    pass
+
+
+@key_group.command("create", short_help="Create a new API key.")
+@click.option("-n", "--name", default="", help="Name/description for the API key.")
 @click.option(
     "-c",
     "--config-dir",
@@ -232,30 +256,64 @@ def main(ctx, host, port, debug, config_dir, log_level):
     type=str,
     help="Configuration directory.",
 )
+@click.pass_context
+def key_create(ctx, name, config_dir):
+    """Create a new API key."""
+    cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
+    config = Config(config_dir=cfg_dir)
+    core = Core(config)
+    raw_key, meta = core.key_manager.create_key(name=name)
+    click.echo(f"Created API key for '{meta['name']}' ({meta['id']}):")
+    click.echo(raw_key)
+
+
+@key_group.command("list", short_help="List API keys.")
 @click.option(
-    "-e",
-    "--expires-in",
+    "-c",
+    "--config-dir",
+    "--config_dir",
+    "config_dir",
     default=None,
-    type=float,
-    help="Token expiration time in seconds (0 for no expiration).",
+    type=str,
+    help="Configuration directory.",
 )
 @click.pass_context
-def generate_token(ctx, config_dir, expires_in):
-    """Generate an authentication JWT token for the daemon."""
-    cfg_dir = config_dir or (ctx.parent.params.get("config_dir") if ctx.parent else None)
+def key_list(ctx, config_dir):
+    """List API keys."""
+    cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
     config = Config(config_dir=cfg_dir)
-    if not config["auth_secret"]:
-        config["auth_secret"] = secrets.token_hex()
+    core = Core(config)
+    keys = core.key_manager.list_keys()
+    if not keys:
+        click.echo("No API keys found.")
+        return
+    for k in keys:
+        status = "active" if k.get("is_active", True) else "revoked"
+        click.echo(f"{k['id']}  {k.get('name', 'unnamed'):<15}  {k['prefix']:<14}  {status}")
 
-    if expires_in is not None:
-        timeout_val = float(expires_in)
+
+@key_group.command("revoke", short_help="Revoke an API key.")
+@click.argument("key_id_or_name")
+@click.option(
+    "-c",
+    "--config-dir",
+    "--config_dir",
+    "config_dir",
+    default=None,
+    type=str,
+    help="Configuration directory.",
+)
+@click.pass_context
+def key_revoke(ctx, key_id_or_name, config_dir):
+    """Revoke an API key by ID or name."""
+    cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
+    config = Config(config_dir=cfg_dir)
+    core = Core(config)
+    if core.key_manager.revoke_key(key_id_or_name):
+        click.echo(f"Revoked API key: {key_id_or_name}")
     else:
-        try:
-            timeout_val = float(config.get("auth_timeout", 120))
-        except (TypeError, ValueError):
-            timeout_val = 120.0
+        click.echo(f"API key not found: {key_id_or_name}", err=True)
+        sys.exit(1)
 
-    token = create_jwt_token(config["auth_secret"], timeout_val)
-    click.echo(token)
 
 

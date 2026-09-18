@@ -25,13 +25,16 @@ import importlib.metadata
 from pathlib import Path
 import logging
 import functools
+import time
 from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
 import libtorrent as lt
 
 from .alert import Alert
+from .api_keys import KeyManager
 from .config import Config
 from .hooks import Hooks
+from .identity import Identity
 from .resume_data import ResumeData
 from .torrent import Torrent
 
@@ -41,7 +44,9 @@ log = logging.getLogger("spritzle")
 class Core(object):
     def __init__(self, config: Config, state_dir: Optional[Path] = None):
         self.config = config
+        self.start_time = time.time()
         self.session: Optional[lt.session] = None
+
         self.hooks = Hooks(Path(self.config.path, "hooks"))
         if state_dir is None:
             self.state_dir = Path(Path.home(), ".local", "share", "spritzle", "state")
@@ -49,6 +54,8 @@ class Core(object):
             self.state_dir = state_dir
         # TODO check dir for rw, etc
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.identity = Identity(self.state_dir)
+        self.key_manager = KeyManager(self.state_dir)
         self.session_stats_waiters: Set[asyncio.Future] = set()
         # A place to keep additional data on torrents, that isn't stored in
         # libtorrent.  This is key'd on info_hash.
@@ -58,6 +65,7 @@ class Core(object):
         self.alert = Alert()
         self.resume_data = ResumeData(self)
         self.torrent = Torrent(self)
+
         self.alert.register_handler("session_stats_alert", self.on_session_stats_alert)
         self.alert.register_handler(
             "status_notification", self.on_status_notification_alert

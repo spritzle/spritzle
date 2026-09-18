@@ -42,8 +42,9 @@ async def test_load(core):
 
 
 async def test_new_torrent_saved(cli, core):
-    assert len(list(core.state_dir.iterdir())) == 0
+    assert len(list(core.state_dir.glob("*.resume"))) == 0
     torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+
     info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
     await cli.post("/torrent", json={"url": torrent_address})
     with open(core.state_dir / f"{info_hash}.resume", mode="rb") as f:

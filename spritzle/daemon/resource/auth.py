@@ -1,7 +1,7 @@
 #
-# spritzle/auth.py
+# spritzle/daemon/resource/auth.py
 #
-# Copyright (C) 2016 Andrew Resch <andrewresch@gmail.com>
+# Copyright (C) 2016-2026 Andrew Resch <andrewresch@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,88 +20,113 @@
 #   Boston, MA    02110-1301, USA.
 #
 
-import ipaddress
-import secrets
-from datetime import datetime, timedelta, timezone
+import importlib.metadata
 from json import JSONDecodeError
+import time
+from typing import Any
 
-import jwt
 from aiohttp import web
 
-
-from spritzle.daemon.keys import APP_KEY_CONFIG
+from spritzle.daemon.keys import APP_KEY_CORE, APP_KEY_IDENTITY, APP_KEY_KEY_MANAGER
 
 routes = web.RouteTableDef()
 
 
-def create_jwt_token(secret: str, timeout_seconds: float = 120.0) -> str:
-    payload = {}
-    if timeout_seconds is not None and timeout_seconds > 0:
-        payload["exp"] = datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
-    jwt_token = jwt.encode(payload, secret, "HS256")
-    if isinstance(jwt_token, bytes):
-        jwt_token = jwt_token.decode("utf-8")
-    return jwt_token
-
-
-@routes.post("/auth")
-async def post_auth(request):
-    config = request.app[APP_KEY_CONFIG]
-    try:
-        post = await request.json()
-    except JSONDecodeError as ex:
-        raise web.HTTPBadRequest(reason="Invalid JSON", text=ex.msg)
-
-    if not isinstance(post, dict):
-        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
-
-    provided_password = str(post.get("password", ""))
-    expected_password = str(config.get("auth_password", ""))
-    if not secrets.compare_digest(provided_password, expected_password):
-        raise web.HTTPUnauthorized(reason="Incorrect password")
+@routes.get("/status")
+async def get_status(request: web.Request) -> web.Response:
+    """Returns daemon status, identity, version, uptime, and high-level stats."""
+    core = request.app.get(APP_KEY_CORE)
+    identity = request.app.get(APP_KEY_IDENTITY) or (core.identity if core else None)
+    daemon_id = identity.daemon_id if identity else "unknown"
 
     try:
-        timeout_val = float(config.get("auth_timeout", 120))
-    except (TypeError, ValueError):
-        timeout_val = 120.0
+        version = importlib.metadata.version("spritzle")
+    except Exception:
+        version = "1.0.0"
 
-    jwt_token = create_jwt_token(config["auth_secret"], timeout_val)
-    return web.json_response({"token": jwt_token})
+    uptime = round(time.time() - core.start_time, 1) if (core and hasattr(core, "start_time")) else 0.0
+    num_torrents = len(core.session.get_torrents()) if (core and core.session) else 0
 
+    return web.json_response({
+        "status": "ok",
+        "daemon_id": daemon_id,
+        "version": version,
+        "uptime": uptime,
+        "num_torrents": num_torrents,
+    })
+
+
+@routes.get("/keys")
+async def get_keys(request: web.Request) -> web.Response:
+    """Lists all active and revoked API keys."""
+    core = request.app.get(APP_KEY_CORE)
+    key_manager = request.app.get(APP_KEY_KEY_MANAGER) or (core.key_manager if core else None)
+    if not key_manager:
+        raise web.HTTPInternalServerError(reason="Key manager not initialized")
+    return web.json_response(key_manager.list_keys())
+
+
+@routes.post("/keys")
+async def post_keys(request: web.Request) -> web.Response:
+    """Creates a new API key."""
+    core = request.app.get(APP_KEY_CORE)
+    key_manager = request.app.get(APP_KEY_KEY_MANAGER) or (core.key_manager if core else None)
+    if not key_manager:
+        raise web.HTTPInternalServerError(reason="Key manager not initialized")
+
+    name = ""
+    if request.can_read_body:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                name = str(body.get("name", ""))
+        except (JSONDecodeError, UnicodeDecodeError):
+            pass
+
+    raw_key, meta = key_manager.create_key(name=name)
+    return web.json_response({"key": raw_key, **meta}, status=201)
+
+
+@routes.delete("/keys/{id}")
+async def delete_key(request: web.Request) -> web.Response:
+    """Revokes an API key by its ID or name."""
+    core = request.app.get(APP_KEY_CORE)
+    key_manager = request.app.get(APP_KEY_KEY_MANAGER) or (core.key_manager if core else None)
+    if not key_manager:
+        raise web.HTTPInternalServerError(reason="Key manager not initialized")
+
+    key_id = request.match_info["id"]
+    revoked = key_manager.revoke_key(key_id)
+    if not revoked:
+        raise web.HTTPNotFound(reason="Key not found")
+    return web.json_response({"revoked": True})
 
 
 @web.middleware
-async def auth_middleware(request, handler):
-    config = request.app[APP_KEY_CONFIG]
+async def auth_middleware(request: web.Request, handler: Any) -> web.Response:
+    core = request.app.get(APP_KEY_CORE)
+    identity = request.app.get(APP_KEY_IDENTITY) or (core.identity if core else None)
+    daemon_id = identity.daemon_id if identity else ""
 
-    peername = request.transport.get_extra_info("peername") if request.transport else None
-    if peername:
-        peer_host = peername[0]
-        allow_hosts = set(config.get("auth_allow_hosts", []))
-        if peer_host in allow_hosts:
-            return await handler(request)
-        try:
-            ip = ipaddress.ip_address(peer_host)
-            mapped = getattr(ip, "ipv4_mapped", None)
-            if mapped and str(mapped) in allow_hosts:
-                return await handler(request)
-        except ValueError:
-            pass
+    api_key = request.headers.get("x-api-key")
+    if not api_key:
+        auth_header = request.headers.get("authorization")
+        if auth_header:
+            if auth_header.lower().startswith("bearer "):
+                api_key = auth_header[7:].strip()
+            else:
+                api_key = auth_header.strip()
 
-    if request.rel_url.path == "/auth":
-        return await handler(request)
+    if not api_key:
+        raise web.HTTPUnauthorized(reason="Authorization key required")
 
-    jwt_token = request.headers.get("authorization", None)
-    if jwt_token is None:
-        raise web.HTTPUnauthorized(reason="Authorization token required")
+    key_manager = request.app.get(APP_KEY_KEY_MANAGER) or (core.key_manager if core else None)
+    key_info = key_manager.verify_key(api_key) if key_manager else None
+    if key_info is None:
+        raise web.HTTPUnauthorized(reason="API key is invalid or revoked")
 
-    if jwt_token.lower().startswith("bearer "):
-        jwt_token = jwt_token[7:].strip()
-
-    try:
-        jwt.decode(jwt_token, config["auth_secret"], algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        raise web.HTTPUnauthorized(reason="Token is invalid")
-
-    return await handler(request)
-
+    request["auth_identity"] = key_info
+    response = await handler(request)
+    if daemon_id:
+        response.headers["X-Spritzle-Daemon-Id"] = daemon_id
+    return response
