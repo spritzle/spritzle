@@ -86,10 +86,12 @@ spritzle list [OPTIONS]
 ```
 
 Options:
-* `-f, --field TEXT`: Fields to display (can be specified multiple times; default: `name`, `progress`, `download_payload_rate`, `upload_payload_rate`, `state`, `info_hash`).
-* `-q, --query TEXT`: Filter query expression in the format `<field>.<op>=<value>` (e.g. `state=seeding`, `progress.ge=0.5`, `spritzle.tags=linux`).
-* `-s, --sort TEXT`: Sort results by field name.
+* `-f, --fields TEXT`: Comma-separated list of torrent status fields to print (default: `name,state,progress,download_rate,upload_rate,spritzle.tags`).
+* `-q, --query TEXT`: Filter query expression in the format `<field[.(op)]>=<value>` (e.g. `state=seeding`, `progress.ge=0.5`, `spritzle.tags.in=linux,iso`). Can be specified multiple times.
 * `--header / --no-header`: Toggle table headers.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled tabular output without ANSI colors or Rich borders.
+* `--raw`: Output unformatted raw values (e.g. bytes and fractions instead of human units).
 
 **Examples:**
 
@@ -100,8 +102,11 @@ spritzle list
 # Filter torrents by state
 spritzle list -q state=downloading
 
-# Display only info-hash and name without table borders
-spritzle list -f info_hash -f name --no-header
+# Display specific fields as JSON
+spritzle list -f info_hash,name,progress --json
+
+# Plain table without borders
+spritzle list -f info_hash,name --no-header --plain
 ```
 
 ### `info` - Show Detailed Torrent Information
@@ -109,11 +114,11 @@ spritzle list -f info_hash -f name --no-header
 Displays comprehensive status and metadata for a specific torrent.
 
 ```shell
-spritzle info [OPTIONS] TORRENT
+spritzle info [OPTIONS] [INFO-HASH|NAME]
 ```
 
 Arguments:
-* `TORRENT`: Info-hash or torrent display name (resolves uniquely).
+* `[INFO-HASH|NAME]`: 40-character hex info-hash or torrent display name (resolves uniquely).
 
 Options:
 * `--json`: Output as JSON.
@@ -134,48 +139,94 @@ spritzle info archlinux-x86_64.iso --json
 
 ### `remove` - Remove a Torrent
 
-Removes a torrent from the daemon session.
+Removes one or more torrents from the daemon session.
 
 ```shell
-spritzle remove [OPTIONS] INFO-HASH
+spritzle remove [OPTIONS] [INFO-HASH|NAME]
 ```
+
+Arguments:
+* `[INFO-HASH|NAME]`: Info-hash or torrent display name (optional if `--query` or `--all` is specified).
 
 Options:
 * `--delete-files`: Also delete the downloaded payload files from disk.
+* `-q, --query TEXT`: Query expression to filter torrents to remove (can be specified multiple times).
+* `--all`: Remove all torrents in the session.
+* `-Q, --quiet`: Output only affected info-hashes.
 
 **Examples:**
 
 ```shell
+# Remove by info-hash or name
+spritzle remove archlinux-x86_64.iso
 spritzle remove 44a040be6d74d8d290cd20128788864cbf770719
-spritzle remove --delete-files 44a040be6d74d8d290cd20128788864cbf770719
+
+# Remove and delete downloaded files from disk
+spritzle remove --delete-files archlinux-x86_64.iso
+
+# Remove all finished torrents
+spritzle remove -q progress.ge=1.0
+
+# Remove all torrents quietly
+spritzle remove --all -Q
 ```
 
 ### `pause` - Pause a Torrent
 
-Pauses downloading and uploading for a torrent.
+Pauses downloading and uploading for one or more torrents.
 
 ```shell
-spritzle pause INFO-HASH
+spritzle pause [OPTIONS] [INFO-HASH|NAME]
 ```
 
-**Example:**
+Arguments:
+* `[INFO-HASH|NAME]`: Info-hash or torrent display name (optional if `--query` or `--all` is specified).
+
+Options:
+* `-q, --query TEXT`: Filter torrents to pause.
+* `--all`: Pause all torrents in the session.
+* `-Q, --quiet`: Output only affected info-hashes.
+
+**Examples:**
 
 ```shell
-spritzle pause 44a040be6d74d8d290cd20128788864cbf770719
+# Pause a single torrent
+spritzle pause archlinux-x86_64.iso
+
+# Pause all downloading torrents
+spritzle pause -q state=downloading
+
+# Pause all torrents
+spritzle pause --all
 ```
 
 ### `resume` - Resume a Torrent
 
-Resumes a previously paused torrent.
+Resumes one or more previously paused torrents.
 
 ```shell
-spritzle resume INFO-HASH
+spritzle resume [OPTIONS] [INFO-HASH|NAME]
 ```
 
-**Example:**
+Arguments:
+* `[INFO-HASH|NAME]`: Info-hash or torrent display name (optional if `--query` or `--all` is specified).
+
+Options:
+* `-q, --query TEXT`: Filter torrents to resume.
+* `--all`: Resume all torrents in the session.
+* `-Q, --quiet`: Output only affected info-hashes.
+
+**Examples:**
 
 ```shell
-spritzle resume 44a040be6d74d8d290cd20128788864cbf770719
+# Resume a single torrent
+spritzle resume archlinux-x86_64.iso
+
+# Resume all paused torrents
+spritzle resume -q paused=true
+
+# Resume all torrents
+spritzle resume --all
 ```
 
 ### `move-storage` - Move Storage Directory
@@ -183,36 +234,49 @@ spritzle resume 44a040be6d74d8d290cd20128788864cbf770719
 Moves the download files of a torrent to a new filesystem path.
 
 ```shell
-spritzle move-storage INFO-HASH PATH
+spritzle move-storage [INFO-HASH|NAME] PATH
 ```
 
 **Example:**
 
 ```shell
-spritzle move-storage 44a040be6d74d8d290cd20128788864cbf770719 /mnt/storage/torrents/
+spritzle move-storage archlinux-x86_64.iso /mnt/storage/torrents/
 ```
 
 ### `flags` - Inspect and Modify Torrent Flags
 
-Views or modifies libtorrent flags for a specific torrent.
+Views or modifies libtorrent flags for one or more torrents.
 
 ```shell
-spritzle flags [OPTIONS] INFO-HASH
+spritzle flags [OPTIONS] [INFO-HASH|NAME]
 ```
+
+Arguments:
+* `[INFO-HASH|NAME]`: Info-hash or torrent display name (required for view; optional for setters when `--query` or `--all` is specified).
 
 Options:
 * `-s, --sets TEXT`: Enable flag(s) (e.g. `sequential_download`, `super_seeding`, `auto_managed`).
 * `-u, --unsets TEXT`: Disable flag(s).
-* `--header / --no-header`: Toggle table headers.
+* `-q, --query TEXT`: Filter torrents to modify flags on.
+* `--all`: Modify flags across all torrents in the session.
+* `--header / --no-header`: Toggle table headers when displaying flags.
+* `--json`: Output as JSON.
+* `--plain`: Output plain unstyled text without ANSI colors.
 
 **Examples:**
 
 ```shell
-# View flags
-spritzle flags 44a040be6d74d8d290cd20128788864cbf770719
+# View flags for a torrent
+spritzle flags archlinux-x86_64.iso
 
 # Set sequential downloading
-spritzle flags 44a040be6d74d8d290cd20128788864cbf770719 -s sequential_download
+spritzle flags archlinux-x86_64.iso -s sequential_download
+
+# Disable auto_managed across all torrents matching a query
+spritzle flags -q state=downloading -u auto_managed
+
+# Output flags as JSON
+spritzle flags archlinux-x86_64.iso --json
 ```
 
 ### `config` - View and Update CLI Client Configuration
@@ -223,6 +287,17 @@ Displays or modifies client-side preferences in `<config_dir>/cli.toml` (offline
 spritzle config [OPTIONS] [KEY] [VALUE]
 ```
 
+Options:
+* `-s, --set KEY VALUE`: Set a configuration value (`nargs=2`, can be specified multiple times).
+* `-u, --unset KEY`: Remove an explicit configuration override.
+* `--reset`: Reset all CLI configuration overrides back to defaults.
+* `--json`: Output configuration as JSON.
+* `--plain`: Output plain unstyled text without ANSI colors.
+
+Supported `cli.toml` options:
+* `color`: Enable (`true`), disable (`false`), or auto-detect (`null`) ANSI terminal colors.
+* `plain`: Force plain unstyled tabular output (`true`/`false`).
+
 **Examples:**
 
 ```shell
@@ -232,17 +307,27 @@ spritzle config
 # Get a specific key
 spritzle config plain
 
-# Set a configuration option
+# Set a configuration option directly or with --set
 spritzle config plain true
+spritzle config -s color false
+
+# Unset an override or reset to defaults
+spritzle config --unset plain
+spritzle config --reset
 ```
 
 ### `daemon-config` - View and Update Daemon Configuration
 
-Displays or modifies keys in the active daemon's `daemon.toml` configuration table via the REST API.
+Displays or modifies keys in the active daemon's `daemon.toml` configuration table via the REST API (`/config`).
 
 ```shell
 spritzle daemon-config [OPTIONS] [KEY] [VALUE]
 ```
+
+Options:
+* `-s, --set KEY VALUE`: Set a daemon configuration value (`nargs=2`, can be specified multiple times).
+* `--json`: Output configuration as JSON.
+* `--plain`: Output plain unstyled text without ANSI colors.
 
 **Examples:**
 
@@ -250,33 +335,51 @@ spritzle daemon-config [OPTIONS] [KEY] [VALUE]
 # Show all daemon configuration
 spritzle daemon-config
 
-# Get a specific key
-spritzle daemon-config auth_timeout
+# Get a specific configuration key
+spritzle daemon-config save_resume_data_interval
 
-# Update a key
+# Update a configuration key directly or with --set
 spritzle daemon-config save_resume_data_interval 30
+spritzle daemon-config -s add_torrent_params.save_path /mnt/storage/downloads
+
+# Output as JSON
+spritzle daemon-config --json
 ```
 
 ### `settings` - View and Update libtorrent Settings
 
-Inspects or modifies libtorrent session settings.
+Inspects, resets, or modifies libtorrent session settings for the running daemon session.
 
 ```shell
 spritzle settings [OPTIONS]
 ```
 
 Options:
-* `-s, --sets TEXT`: Setting key/value pair in format `key=value`.
-* `--header / --no-header`: Toggle table headers.
+* `-s, --set KEY VALUE`: Set a session setting value (`nargs=2`, can be specified multiple times; e.g. `-s connections_limit 200`).
+* `-r, --reset TEXT`: Reset specified setting(s) back to libtorrent baseline defaults.
+* `--reset-all`: Reset all settings to factory baseline defaults.
+* `-m, --modified`: Show only settings that differ from libtorrent baseline defaults.
+* `-d, --defaults`: Show default baseline values for all settings.
+* `--json`: Output settings as JSON.
+* `--plain`: Force plain unstyled tabular output without ANSI colors.
 
 **Examples:**
 
 ```shell
-# View current settings
+# View all current session settings
 spritzle settings
 
-# Change max connections
-spritzle settings -s connections_limit=200
+# View only modified settings
+spritzle settings --modified
+
+# Change download rate limit and connection limits (KEY VALUE syntax)
+spritzle settings -s download_rate_limit 1048576 -s connections_limit 200
+
+# Reset a modified setting back to default
+spritzle settings -r download_rate_limit
+
+# Reset all session settings to defaults
+spritzle settings --reset-all
 ```
 
 ### `stats` - View Session Statistics
@@ -285,6 +388,41 @@ Outputs libtorrent session performance metrics (rates, cache statistics, peer co
 
 ```shell
 spritzle stats [OPTIONS]
+```
+
+Options:
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled tabular output without ANSI colors.
+
+**Examples:**
+
+```shell
+# View stats table
+spritzle stats
+
+# Output stats as JSON
+spritzle stats --json
+```
+
+### `help` - Help & Command Usage Examples
+
+Displays built-in usage guides and copy-pasteable examples for any Spritzle command.
+
+```shell
+spritzle help [COMMAND]
+```
+
+**Examples:**
+
+```shell
+# Show top-level command list and overview
+spritzle help
+
+# Show detailed help and examples for 'remote'
+spritzle help remote
+
+# Show detailed help and examples for 'settings'
+spritzle help settings
 ```
 
 ---

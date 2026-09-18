@@ -44,7 +44,14 @@
 
 
 
-## 5. Continuous Learning & AGENTS.md Maintenance
+## 5. Documentation & Shell Asset Maintenance
+- **Documentation Co-Evolution**: Whenever adding, modifying, or deprecating CLI commands, options/flags, configuration keys, or REST API endpoints, immediately update the corresponding documentation files in `docs/` (`spritzle.md`, `spritzled.md`, `interface.md`, `remotes.md`, `hooks.md`, `design.md`) and `README.md`. Never allow code and documentation to drift.
+- **Setting & Scope Accuracy**: Maintain strict separation in documentation between **daemon configuration** (`daemon.toml` managed via `/config` or `spritzle daemon-config`), **client preferences** (`cli.toml` managed via `spritzle config`), and **libtorrent session settings** (`session.state` managed via `/session/settings` or `spritzle settings`). Never document session settings (such as `listen_interfaces` or rate limits) as keys in `daemon.toml`.
+- **Option Arity & Syntax Precision**: Verify CLI option arity before documenting usage examples. If an option accepts two arguments (`nargs=2`, such as `-s / --set KEY VALUE`), document and test the arguments as space-separated tokens (`-s download_rate_limit 1048576`), never with an equals sign (`-s download_rate_limit=...`), which causes Click option parsing errors.
+- **Shell Completion Synchronization**: Whenever CLI command names, global flags, or subcommand options are added, modified, or removed, update [`scripts/complete.sh`](file:///home/aresch/Projects/spritzle/scripts/complete.sh) accordingly. Always validate syntax using `bash -n scripts/complete.sh`.
+- **CLI Help Examples Synchronization**: Keep the `EXAMPLES` dictionary in [`spritzle/cli/commands/help.py`](file:///home/aresch/Projects/spritzle/spritzle/cli/commands/help.py) synchronized with working, copy-pasteable invocations reflecting all current subcommands, options, and realistic sample values.
+
+## 6. Continuous Learning & AGENTS.md Maintenance
 - **Autonomous knowledge capture**: Whenever you discover non-obvious codebase behavior, resolve subtle concurrency or libtorrent edge cases, establish new project patterns, or receive explicit user corrections and design decisions, automatically update `AGENTS.md` to document the learning for future agents.
 - **Categorization & concise style**: Place new entries into the most relevant section (or create a new section if necessary). Keep guidelines actionable, specific, and formatted consistently with existing entries (`- **Rule Name**: Explanation and rationale.`).
 - **High-signal invariants**: Only record durable project rules, architectural constraints, and hard-won pitfalls. Do not record transient task state, temporary notes, or generic programming advice.

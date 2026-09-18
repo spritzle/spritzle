@@ -52,6 +52,52 @@ Create a new API key. Accepts optional `{"name": "client_name"}` JSON payload. R
 Revoke an existing API key by its unique ID.
 
 
+Daemon Configuration
+--------------------
+
+Manage daemon settings stored in `daemon.toml`.
+
+### /config
+#### GET
+
+Returns the current daemon configuration dictionary.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/config "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+    "add_torrent_params.save_path": "/home/user/Downloads",
+    "save_resume_data_interval": 60
+}
+```
+
+#### PUT
+
+Replaces all configuration settings with the provided JSON object.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:8080/config "Authorization: Bearer $TOKEN" save_resume_data_interval:=30
+HTTP/1.1 200 OK
+```
+
+#### PATCH
+
+Partially updates specified keys in the daemon configuration.
+
+**Example**
+
+```shell
+$ http PATCH http://localhost:8080/config "Authorization: Bearer $TOKEN" add_torrent_params.save_path="/mnt/storage/downloads"
+HTTP/1.1 200 OK
+```
+
+
 Session
 -------
 
@@ -60,13 +106,70 @@ The session resource contains information about the libtorrent session.
 ### /session/settings
 #### GET
 
-Returns a dictionary of the session settings.
+Returns a dictionary of the current libtorrent session settings.
 
-### /session/stats
+**Query Parameters:**
+* `modified=true`: Return only settings that differ from libtorrent baseline default values.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/session/settings?modified=true "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+    "download_rate_limit": 1048576,
+    "user_agent": "Spritzle/1.0 libtorrent/2.0.11"
+}
+```
+
 #### PUT
 
-Allows changing the session settings. New settings should be JSON format in the
-body of request.
+Updates one or more session settings. The request body must be a JSON object mapping setting names to values.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:8080/session/settings "Authorization: Bearer $TOKEN" connections_limit:=200 download_rate_limit:=1048576
+HTTP/1.1 200 OK
+```
+
+### /session/settings/defaults
+#### GET
+
+Returns the factory baseline defaults for all libtorrent session settings.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/session/settings/defaults "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+```
+
+### /session/settings/reset
+#### POST
+
+Resets specified session settings or all session settings back to baseline defaults.
+
+**Payload:**
+* `{"keys": ["setting1", "setting2"]}`: Reset specified settings.
+* `{"all": true}`: Reset all settings to baseline defaults.
+
+**Example**
+
+```shell
+$ http POST http://localhost:8080/session/settings/reset "Authorization: Bearer $TOKEN" keys:='["download_rate_limit"]'
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+    "reset": [
+        "download_rate_limit"
+    ]
+}
+```
 
 ### /session/stats
 #### GET
@@ -76,12 +179,10 @@ Returns a dictionary of the session stats.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/session/stats
+$ http GET http://localhost:8080/session/stats "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 9092
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:03:50 GMT
-Server: Python/3.6 aiohttp/3.1.3
 
 {
     "dht.dht_allocated_observers": 10,
@@ -92,14 +193,7 @@ Server: Python/3.6 aiohttp/3.1.3
     "net.on_udp_counter": 60,
     "net.sent_tracker_bytes": 0,
     "peer.aborted_peers": 0,
-    ...
-    "peer.error_utp_peers": 0,
-    "peer.incoming_connections": 0,
     "picker.piece_picker_busy_loops": 0,
-    "ses.non_filter_torrents": 0,
-    "ses.num_checking_torrents": 0,
-    "sock_bufs.socket_recv_size10": 0,
-    "sock_bufs.socket_recv_size11": 0,
     "utp.num_utp_connected": 0
 }
 ```
@@ -110,12 +204,10 @@ Server: Python/3.6 aiohttp/3.1.3
 Returns a boolean indicating if DHT is running or not.
 
 ```shell
-$ http GET http://localhost:8080/session/dht
+$ http GET http://localhost:8080/session/dht "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 4
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:04:49 GMT
-Server: Python/3.6 aiohttp/3.1.3
 
 true
 ```
@@ -130,43 +222,54 @@ A torrent resource contains all the information you would need to know about a t
 
 Returns a list of all info-hashes in the session, filtered by the query expression.
 
-The query string format is field.operator=expression, where expression is different dependent upon the field's type and operator is the last '.' separated field of the key.
+The query string format is `<field>[.(op)]=<expression>`, where `<op>` is the operator and `<expression>` depends on the field's type.
 
 ##### Strings
-String operations are regular expressions.
+String queries support regex matching (`eq` or omitted operator) and regex non-matching (`ne`).
 
-**Example**
-
+**Examples:**
 ```shell
-$ http GET /torrent?info_hash=^44a04.*$
+$ http GET http://localhost:8080/torrent?name=^archlinux.*$
+$ http GET http://localhost:8080/torrent?state.ne=seeding
 ```
 
 ##### Booleans
-Booleans are evaluated against two string: 'true', 'false'.
+Booleans evaluate against `"true"` and `"false"`. Supports `eq` (or omitted) and `ne`.
 
-**Example**
-```
-$ http GET /torrent?boolkey=true
+**Examples:**
+```shell
+$ http GET http://localhost:8080/torrent?paused=true
+$ http GET http://localhost:8080/torrent?auto_managed.ne=true
 ```
 
 ##### Numbers
-Number expressions can use one of five operators (lt, gt, ne, ge, le), when no operator is presnet in the key an equality operator will be used.
+Number expressions support comparison operators: `eq` (or omitted), `lt`, `gt`, `ne`, `ge`, `le`.
 
-**Example**
-
+**Examples:**
 ```shell
-$ http GET /torrent?block_size.ge=0
+$ http GET http://localhost:8080/torrent?progress.ge=0.5
+$ http GET http://localhost:8080/torrent?download_rate.gt=102400
 ```
 
-**Example**
+##### Lists (Tags)
+For list fields such as `spritzle.tags`, four operators are supported:
+* `any` (or omitted): Regex match against any item in the list.
+* `all`: Matches if all comma-separated items are present in the list (`spritzle.tags.all=linux,iso`).
+* `in`: Matches if any item in the torrent's list is present in the comma-separated target list (`spritzle.tags.in=linux,distro`).
+
+**Examples:**
+```shell
+$ http GET http://localhost:8080/torrent?spritzle.tags=linux
+$ http GET http://localhost:8080/torrent?spritzle.tags.all=linux,iso
+```
+
+**Example Response:**
 
 ```shell
-$ http GET http://localhost:8080/torrent
+$ http GET http://localhost:8080/torrent "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 44
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:05:42 GMT
-Server: Python/3.6 aiohttp/3.1.3
 
 [
     "44a040be6d74d8d290cd20128788864cbf770719"
@@ -250,19 +353,18 @@ Server: Python/3.6 aiohttp/3.1.3
 
 #### DELETE
 
-Remove all torrents from the session.
+Remove torrents from the session. If query parameters are provided (e.g. `state=seeding`), only torrents matching the query expression are removed; otherwise, all torrents in the session are removed.
 
-Optionally, the downloaded files can be deleted when the torrent is removed by adding
-the **delete_files** key to the query string.
+Optionally, downloaded files can be deleted when the torrent is removed by adding
+the `delete_files` parameter to the query string.
 
-**Example**
+**Examples:**
 ```shell
-$ http DELETE http://localhost:8080/torrent?delete_files
-HTTP/1.1 200 OK
-Content-Length: 0
-Content-Type: application/octet-stream
-Date: Tue, 08 May 2018 01:16:03 GMT
-Server: Python/3.6 aiohttp/3.1.3
+# Remove all torrents and delete their downloaded files
+$ http DELETE "http://localhost:8080/torrent?delete_files" "Authorization: Bearer $TOKEN"
+
+# Remove only finished torrents
+$ http DELETE "http://localhost:8080/torrent?progress.ge=1.0" "Authorization: Bearer $TOKEN"
 ```
 
 ### /torrent/\<info-hash\>
@@ -273,12 +375,10 @@ Returns a status dictionary for the torrent.
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719
+$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719 "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 4059
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:18:07 GMT
-Server: Python/3.6 aiohttp/3.1.3
 
 {
     "auto_managed": false,
@@ -287,13 +387,9 @@ Server: Python/3.6 aiohttp/3.1.3
     "has_incoming": false,
     "has_metadata": true,
     "info_hash": "44a040be6d74d8d290cd20128788864cbf770719",
-    ...
-    "total_redundant_bytes": 0,
-    "total_upload": 0,
-    "total_wanted": 4194304,
-    "upload_rate": 0,
-    "uploads_limit": -1,
-    "verified_pieces": []
+    "name": "archlinux-x86_64.iso",
+    "progress": 0.42,
+    "total_size": 1234567890
 }
 ```
 
@@ -302,34 +398,28 @@ Server: Python/3.6 aiohttp/3.1.3
 Remove torrent from the session.
 
 Optionally, the downloaded files can be deleted when the torrent is removed by adding
-the **delete_files** key to the query string.
+the `delete_files` parameter to the query string.
 
 **Example**
 
 ```shell
-$ http DELETE http://localhost:8080/torrent/88066b90278f2de655ee2dd44e784c340b54e45c?delete_files
+$ http DELETE "http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719?delete_files" "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 0
-Content-Type: application/octet-stream
-Date: Tue, 08 May 2018 01:12:36 GMT
-Server: Python/3.6 aiohttp/3.1.3
 ```
 
-### /torrent/<info-hash>/flags
+### /torrent/\<info-hash\>/flags
 
 #### GET
                                     
-Returns a (string, bool) dictionary of the torrent flags.
+Returns a `{"<flag_name>": bool}` dictionary of torrent flags.
 
 **Example**
 
 ```shell
-$ http GET http://localhost:8080/torrent/0175df556a2123361a55c1f72ad1aa73d03d7830/flags Authorization:$TOKEN
+$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
-Content-Length: 320
 Content-Type: application/json; charset=utf-8
-Date: Thu, 14 Feb 2019 05:30:52 GMT
-Server: Python/3.7 aiohttp/3.5.4
 
 {
     "apply_ip_filter": true,
@@ -347,36 +437,75 @@ Server: Python/3.7 aiohttp/3.5.4
     "upload_mode": false
 }
 ```
+
 #### PUT
 
-Change the flags by passing in a dictionary (string, bool).
+Update multiple flags at once by passing a JSON object mapping flag names to booleans.
 
 **Example**
 
 ```shell
-$ http PUT http://localhost:8080/torrent/0175df556a2123361a55c1f72ad1aa73d03d7830/flags Authorization:$TOKEN auto_managed:=false share_mode:=true
-
+$ http PUT http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags "Authorization: Bearer $TOKEN" auto_managed:=false sequential_download:=true
 HTTP/1.1 200 OK
-Content-Length: 320
-Content-Type: application/json; charset=utf-8
-Date: Thu, 14 Feb 2019 06:03:57 GMT
-Server: Python/3.7 aiohttp/3.5.4
+```
 
-{
-    "apply_ip_filter": true,
-    "auto_managed": false,
-    "duplicate_is_error": false,
-    "override_trackers": false,
-    "override_web_seeds": false,
-    "paused": false,
-    "seed_mode": false,
-    "sequential_download": false,
-    "share_mode": true,
-    "stop_when_ready": false,
-    "super_seeding": false,
-    "update_subscribe": false,
-    "upload_mode": false
-}
+### /torrent/\<info-hash\>/flags/\<flag\>
+
+#### GET
+
+Returns the boolean status of a single flag.
+
+**Example**
+
+```shell
+$ http GET http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+
+true
+```
+
+#### PUT
+
+Sets the boolean value for a single flag. The body should be a boolean JSON literal or `{"value": true/false}`.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/flags/sequential_download "Authorization: Bearer $TOKEN" value:=true
+HTTP/1.1 200 OK
+```
+
+### /torrent/\<info-hash\>/\<method\>
+
+#### POST
+
+Invokes an allowed libtorrent handle operation on the torrent. The request body must be a JSON array of arguments (or empty array `[]` if the method takes no arguments).
+
+**Allowed Methods:**
+* `pause`: Pauses the torrent.
+* `resume`: Resumes the torrent.
+* `force_recheck`: Forces piece hash verification.
+* `force_reannounce`: Forces tracker reannouncement.
+* `force_dht_announce`: Forces DHT announce.
+* `queue_position_up` / `queue_position_down` / `queue_position_top` / `queue_position_bottom`: Adjusts queue position.
+* `set_max_uploads`: Sets upload slot limit (argument: `[limit]`).
+* `set_upload_limit`: Sets upload rate limit in bytes/second (argument: `[bytes_per_sec]`).
+* `set_download_limit`: Sets download rate limit in bytes/second (argument: `[bytes_per_sec]`).
+* `set_max_connections`: Sets max connection count (argument: `[limit]`).
+* `set_sequential_download`: Enables or disables sequential downloading (argument: `[true|false]`).
+* `clear_error`: Clears error state on the torrent.
+* `flush_cache`: Flushes the torrent disk cache.
+* `move_storage`: Moves storage directory to a new path (argument: `["/new/path"]`).
+
+**Examples:**
+
+```shell
+# Pause a torrent
+$ http POST http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/pause "Authorization: Bearer $TOKEN"
+
+# Move storage directory
+$ echo '["/mnt/storage/downloads"]' | http POST http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719/move_storage "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
 ```
 
 Core

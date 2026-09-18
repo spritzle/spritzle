@@ -27,54 +27,54 @@ Manage API keys for the daemon directly from the host.
 Creates a new API key (printed once to stdout) and saves its SHA-256 hash to state.
 
 ```shell
-spritzled key create [--name <name>]
+spritzled key create [-n, --name <name>] [-c, --config-dir <path>]
 ```
 
 ##### `spritzled key list`
 Lists all active and revoked API keys.
 
 ```shell
-spritzled key list
+spritzled key list [-c, --config-dir <path>]
 ```
 
 ##### `spritzled key revoke`
 Revokes an active API key by ID or name.
 
 ```shell
-spritzled key revoke <id_or_name>
+spritzled key revoke <id_or_name> [-c, --config-dir <path>]
 ```
 
 ---
 
 ## Configuration & Storage
 
-By default, all runtime configuration and persistent state are stored in `~/.config/spritzle/` (or the directory passed via `-c / --config-dir`).
+By default, all runtime configuration and persistent state are organized according to XDG base directories:
 
 ### File Layout
 
-Daemon configuration and state are organized according to XDG base directories:
-
 **Configuration (`~/.config/spritzle/` or `-c / --config-dir`):**
 * `daemon.toml`: TOML file containing daemon configuration settings.
-* `spritzled.lock`: Exclusive file lock (`flock`) ensuring only one instance runs per configuration directory.
+* `spritzled.lock`: Exclusive file lock (`flock`) ensuring only one daemon process runs per configuration directory.
 * `hooks/`: Directory containing user-defined hook executables triggered by libtorrent alerts. See [hooks documentation](hooks.md) for details.
 
 **State (`~/.local/share/spritzle/state/`):**
 * `identity`: Contains the persistent `daemon_id` used by clients to verify daemon identity.
 * `keys.json`: Stored SHA-256 hashes and metadata for API keys.
-* `local_remote.json`: Discovery file containing connection details and API key for local CLI clients (mode 0600).
+* `local_remote.json`: Discovery file written on daemon startup containing connection details (`url`), daemon identifier (`daemon_id`), and auto-generated API key (`api_key`) for local CLI clients (file mode `0600`).
 * `session.state`: Bencoded libtorrent session state, restored on startup and saved on clean shutdown.
 * `<info_hash>.resume`: Fastresume metadata file for each active torrent.
 
-### Key Configuration Settings
+### Key Configuration Settings (`daemon.toml`)
 
-Configuration values can be inspected or modified at runtime via the REST API (`/config`) or using `spritzle daemon-config`, or edited directly in `daemon.toml`.
+Daemon-level configuration values can be inspected or modified at runtime via the REST API (`/config`) or using `spritzle daemon-config`, or edited directly in `daemon.toml`.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `add_torrent_params.save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. |
-| `listen_interfaces` | string | `"0.0.0.0:6881"` | libtorrent network interfaces and ports to bind to. |
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
+
+> [!NOTE]
+> Daemon configuration in `daemon.toml` is distinct from **libtorrent session settings** (such as `listen_interfaces`, `download_rate_limit`, `connections_limit`, etc.). Libtorrent session settings are preserved in `session.state` across restarts and can be inspected or adjusted at runtime via the REST API (`/session/settings`) or the CLI command `spritzle settings`.
 
 For detailed information on configuring clients and third-party integrations, see the [remotes documentation](remotes.md).
 

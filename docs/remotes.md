@@ -12,7 +12,7 @@ All authenticated operations in Spritzle use high-entropy API keys (formatted as
 ### Daemon Identity Protection
 Every `spritzled` daemon automatically generates a unique, persistent **Daemon ID** (`daemon_id`) stored in its state directory (e.g. `spz_d_4a9e2f80c1`).
 
-When you add a remote to `spritzle-cli`, the client probes the daemon, verifies its identity, and records the `daemon_id`. Before dispatching commands or sending API keys to a remote daemon, the CLI validates that the target daemon's identity matches the stored fingerprint. If a remote IP or port is reassigned to another service, the CLI refuses to transmit your API key, preventing credential leakage.
+When you add a remote to `spritzle`, the client probes the daemon, verifies its identity, and records the `daemon_id`. Before dispatching commands or sending API keys to a remote daemon, the CLI validates that the target daemon's identity matches the stored fingerprint. If a remote IP or port is reassigned to another service, the CLI refuses to transmit your API key, preventing credential leakage.
 
 ---
 
@@ -22,7 +22,7 @@ When `spritzled` runs locally, it automatically generates an API key for the loc
 ```
 ~/.local/share/spritzle/state/local_remote.json  (permissions 0600)
 ```
-On its first run, `spritzle-cli` automatically reads this discovery file and configures a `local` remote as the default. Local commands (`spritzle list`, `spritzle stats`) work immediately out of the box without requiring manual authentication or key importing.
+On its first run, `spritzle` automatically reads this discovery file and configures a `local` remote as the default. Local commands (`spritzle list`, `spritzle stats`) work immediately out of the box without requiring manual authentication or key importing.
 
 ---
 

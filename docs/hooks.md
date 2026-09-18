@@ -17,28 +17,38 @@ This allows for a very flexible extension and simple system.
 Defined Hooks
 -------------
 
-Hooks are run when a corresponding [libtorrent alert](http://libtorrent.org/reference-Alerts.html) fires. Currently, all torrent alerts that belong to the status_notification category will activate.  See the [libtorrent alert](http://libtorrent.org/reference-Alerts.html) page for all possible alerts.
+Hooks are run when a corresponding [libtorrent alert](https://libtorrent.org/reference-Alerts.html) fires. Currently, all torrent alerts that belong to the `status_notification` category activate hooks.
 
-These hooks will be passed the following arguments in this order:
+Common hookable alerts include:
+* `torrent_finished_alert`: Fires when a torrent finishes downloading.
+* `state_changed_alert`: Fires when torrent state transitions (e.g. from downloading to seeding or checking).
+* `torrent_added_alert`: Fires when a new torrent is added.
+* `torrent_removed_alert`: Fires when a torrent is removed from the session.
+* `torrent_error_alert`: Fires when a torrent encounters an I/O or storage error.
+* `tracker_reply_alert`: Fires when a tracker announce succeeds.
 
-* info_hash: a string of the torrent's info_hash
-* tags: a comma-delimited string of tags associated with this torrent
+See the [libtorrent alerts documentation](https://libtorrent.org/reference-Alerts.html) for all possible alerts.
+
+These hooks will be passed the following positional command-line arguments:
+
+* `info_hash` ($1): 40-character hex string of the torrent's info-hash.
+* `tags` ($2): Comma-delimited string of tags associated with this torrent (e.g. `linux,iso`).
 
 Writing Hooks
 -------------
 
-When a hookable alert fires, Spritzle will try to run hooks for that alert in the following manner:
+When a hookable alert fires, Spritzle runs matching hook executables in the following manner:
 
- * find files in the hooks directory that name ends in the alert name
-   * files that start with a non-alphanumeric character are ignored
-   * files that are not set executable are ignored
- * hooks are then run in alphanumeric order
+* Searches files in `<config_dir>/hooks/` whose filename ends in the alert name (e.g. `*torrent_finished_alert`).
+  * Files starting with a non-alphanumeric character (e.g. `.`, `_`, `#`) are ignored.
+  * Files without the executable permission bit set are ignored.
+* Matching hook scripts are executed in alphanumeric sort order.
 
-As an example, let's write some hooks for the [torrent_finished_alert](http://libtorrent.org/reference-Alerts.html#torrent-finished-alert).
+As an example, let's write hooks for `torrent_finished_alert`.
 
-The default directory for hooks is ~/.config/spritzle/hooks.
+The default directory for hooks is `~/.config/spritzle/hooks/`.
 
-We want to have multiple hooks run when this alert fires, so we are going to prepend the hook file names with a number.
+To have multiple hooks run in a deterministic order when this alert fires, prepend filenames with an ordering number:
 
 ```bash
 touch ~/.config/spritzle/hooks/100_torrent_finished_alert
@@ -46,7 +56,7 @@ touch ~/.config/spritzle/hooks/200_torrent_finished_alert
 touch ~/.config/spritzle/hooks/300_torrent_finished_alert
 ```
 
-Edit these files and put in any you wish to do when the script runs. It's suggested to use the spritzle program if you need to interact with spritzled.  Some examples are in the Examples section, but here is what the beginning of your script may look like if written in bash.
+Edit these files with whatever logic you wish to run. Use the `spritzle` CLI inside hooks to interact with `spritzled`. Here is what the beginning of a bash hook script looks like:
 
 ```bash
 #!/bin/bash
@@ -61,7 +71,7 @@ tags=$2
 
 ```
 
-Remember that any hook that you want executed needs to have it's execute bit set.
+Remember that every hook script must have its execute bit set:
 
 ```bash
 chmod +x ~/.config/spritzle/hooks/*_torrent_finished_alert
@@ -70,7 +80,7 @@ chmod +x ~/.config/spritzle/hooks/*_torrent_finished_alert
 Examples
 --------
 
-torrent_finished_alert - move storage of datas for a torrent after it completes based on a tag.
+`torrent_finished_alert` - move storage of data for a torrent after it completes based on a tag:
 
 ```bash
 #!/bin/bash
