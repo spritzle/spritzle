@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 import click
+from rich import box
 from rich.markup import escape
 from rich.table import Table
 from tabulate import tabulate
@@ -37,6 +38,7 @@ from spritzle.cli.display import (
     print_error,
     print_json,
     print_success,
+    render_kv_table,
     should_use_color,
 )
 
@@ -287,12 +289,18 @@ def remote_status(client, name: Optional[str], json_output: bool, plain: bool):
             uptime = r["uptime_formatted"] or "-"
             torrents = str(r["num_torrents"]) if r["num_torrents"] is not None else "-"
             rows.append([prefix, r["name"], r["status"], latency, r["url"], version, uptime, torrents])
-        headers = ["", "NAME", "STATUS", "LATENCY", "URL", "VERSION", "UPTIME", "TORRENTS"]
+        headers = ["", "Name", "Status", "Latency", "URL", "Version", "Uptime", "Torrents"]
         click.echo(tabulate(rows, headers=headers, tablefmt="plain"))
         return
 
-    table = Table(box=None, header_style="bold cyan")
-    table.add_column("", justify="center", width=2)
+    has_default = any(r["is_default"] for r in results)
+    table = Table(
+        box=box.ROUNDED,
+        header_style="bold cyan",
+        caption="* default remote" if has_default else None,
+        caption_style="dim italic",
+    )
+    table.add_column("", justify="center", width=1)
     table.add_column("Name", style="bold")
     table.add_column("Status")
     table.add_column("Latency", justify="right")
@@ -365,12 +373,18 @@ def remote_list(client, json_output: bool, plain: bool):
         for item in items:
             prefix = "*" if item["is_default"] else " "
             table_rows.append([prefix, item["name"], item["url"], item["daemon_id"]])
-        headers = ["", "NAME", "URL", "DAEMON ID"]
+        headers = ["", "Name", "URL", "Daemon ID"]
         click.echo(tabulate(table_rows, headers=headers, tablefmt="plain"))
         return
 
-    table = Table(box=None, header_style="bold cyan")
-    table.add_column("", justify="center", width=2)
+    has_default = any(item["is_default"] for item in items)
+    table = Table(
+        box=box.ROUNDED,
+        header_style="bold cyan",
+        caption="* default remote" if has_default else None,
+        caption_style="dim italic",
+    )
+    table.add_column("", justify="center", width=1)
     table.add_column("Name", style="bold")
     table.add_column("URL")
     table.add_column("Daemon ID", style="dim")
@@ -450,17 +464,23 @@ def remote_show(client, name: str, json_output: bool, plain: bool):
         ("Name", info["name"]),
         ("URL", info["url"]),
         ("Daemon ID", info["daemon_id"]),
-        ("Default", "Yes" if info["is_default"] else "No"),
+        ("Default", info["is_default"]),
         ("API Key", info["key_prefix"]),
     ]
 
     if not use_color:
-        click.echo(tabulate(rows, headers=["Property", "Value"], tablefmt="plain"))
+        table_rows = [
+            (k, ("Yes" if v else "No") if isinstance(v, bool) else str(v))
+            for k, v in rows
+        ]
+        click.echo(tabulate(table_rows, headers=["Property", "Value"], tablefmt="plain"))
         return
 
-    table = Table(box=None, header_style="bold cyan")
-    table.add_column("Property", style="bold")
-    table.add_column("Value")
-    for prop, val in rows:
-        table.add_row(escape(prop), escape(str(val)))
-    console.print(table)
+    render_kv_table(
+        console,
+        rows,
+        title=f"Remote: {name}",
+        key_header="Property",
+        value_header="Value",
+        num_columns=1,
+    )

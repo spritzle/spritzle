@@ -60,6 +60,16 @@ def test_remote_add_and_list(cli, core, tmp_path):
     assert "seedbox" in res_list.output
     assert core.identity.daemon_id in res_list.output
 
+    # List remotes (rich / interactive)
+    res_rich = runner.invoke(
+        spritzle_cli,
+        ["--color", "-c", str(tmp_path), "remote", "list"],
+    )
+    assert res_rich.exit_code == 0
+    assert "╭" in res_rich.output
+    assert "seedbox" in res_rich.output
+    assert "* default remote" in res_rich.output
+
     # List remotes (json)
     res_json = runner.invoke(
         spritzle_cli,
@@ -80,7 +90,7 @@ def test_remote_show_and_set_key(cli, core, tmp_path):
         ["-c", str(tmp_path), "remote", "add", "box", daemon_url, "--key", raw_key1],
     )
 
-    # Show remote
+    # Show remote (json)
     res_show = runner.invoke(
         spritzle_cli,
         ["-c", str(tmp_path), "remote", "show", "box", "--json"],
@@ -89,6 +99,16 @@ def test_remote_show_and_set_key(cli, core, tmp_path):
     info = json.loads(res_show.output)
     assert info["name"] == "box"
     assert info["daemon_id"] == core.identity.daemon_id
+
+    # Show remote (rich / interactive)
+    res_show_rich = runner.invoke(
+        spritzle_cli,
+        ["--color", "-c", str(tmp_path), "remote", "show", "box"],
+    )
+    assert res_show_rich.exit_code == 0
+    assert "╭" in res_show_rich.output
+    assert "Remote: box" in res_show_rich.output
+    assert "Property" in res_show_rich.output
 
     # Update key
     raw_key2, _ = core.key_manager.create_key(name="k2")
@@ -164,11 +184,13 @@ def test_remote_status(cli, core, tmp_path):
     # Check status of all remotes (rich / default)
     res_all = runner.invoke(
         spritzle_cli,
-        ["-c", str(tmp_path), "remote", "status"],
+        ["--color", "-c", str(tmp_path), "remote", "status"],
     )
     assert res_all.exit_code == 0
+    assert "╭" in res_all.output
     assert "box" in res_all.output
     assert "online" in res_all.output
+    assert "* default remote" in res_all.output
 
     # Check status of all remotes (plain)
     res_plain = runner.invoke(
