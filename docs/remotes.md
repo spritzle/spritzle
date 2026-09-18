@@ -174,3 +174,11 @@ spritzled key list
 # Instantly revoke a key by ID or name
 spritzled key revoke "sonarr"
 ```
+
+---
+
+## 6. Related Documentation
+
+* [spritzle CLI Guide](spritzle.md): Client usage, subcommands, and environment variables.
+* [spritzled Daemon Guide](spritzled.md): Daemon configuration, state storage, and systemd service setup.
+* [REST API Interface](interface.md): Full HTTP REST API reference including `/status` and `/keys`.

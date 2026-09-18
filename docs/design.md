@@ -26,7 +26,7 @@ Request Lifetime
 ```
 
     +------------+                               +------------+
-    |HTTP Request|                               |HTTP Response
+    |HTTP Request|                               |HTTP Response|
     +-----+------+                               +------------+
           |                                            ^
           |                                            |
@@ -49,3 +49,25 @@ Request Lifetime
     |arguments   |         |operations |         |response    |
     +------------+         +-----------+         +------------+
 ```
+
+Core Architecture & Subsystems
+------------------------------
+
+* **Core Engine (`spritzle.daemon.core`):**
+  Acts as the central daemon orchestrator. Manages the lifecycle of the native `libtorrent.session`, session state restoration, and coordinates all sub-components.
+
+* **Alert Dispatcher (`spritzle.daemon.alert`):**
+  A continuous background asyncio task that monitors `libtorrent.session.wait_for_alert()`, drains alerts with `pop_alerts()`, and dispatches typed alert instances to registered callbacks (such as session stats, status changes, and hook triggers).
+
+* **Resume Data Engine (`spritzle.daemon.resume_data`):**
+  Periodically and on-demand saves torrent fastresume files (`<info_hash>.resume`). Offloads blocking disk I/O to a background thread pool executor so disk operations never stall network transfers or the REST API.
+
+* **Hook Dispatcher (`spritzle.daemon.hooks`):**
+  Asynchronously invokes user-defined scripts in `~/.config/spritzle/hooks/` whenever `status_notification` alerts fire (such as torrent completion), passing info-hashes and metadata tags.
+
+* **Client & Remote Isolation:**
+  * Client preferences reside exclusively in `cli.toml` (`CLIConfig`).
+  * Remote daemon endpoints and credentials reside in `remotes.toml` (`RemotesConfig`, mode `0600`).
+  * Daemon-level settings reside in `daemon.toml` (`Config`).
+  * Libtorrent session settings are preserved in binary `session.state`.
+

@@ -52,6 +52,28 @@ Create a new API key. Accepts optional `{"name": "client_name"}` JSON payload. R
 Revoke an existing API key by its unique ID.
 
 
+Error Responses
+---------------
+
+Spritzle daemons return structured JSON error responses with standard HTTP status codes:
+
+```json
+{
+    "status": 400,
+    "reason": "Bad Request",
+    "message": "Invalid info-hash format: 123"
+}
+```
+
+Common status codes:
+* `200 OK`: Request succeeded.
+* `201 Created`: Resource successfully created (e.g. `POST /torrent`, `POST /keys`).
+* `400 Bad Request`: Malformed JSON, invalid query parameter, unknown flag, or unsupported torrent method.
+* `401 Unauthorized`: Missing, invalid, or revoked API key.
+* `404 Not Found`: Torrent or API key not found.
+* `500 Internal Server Error`: Unexpected daemon error.
+
+
 Daemon Configuration
 --------------------
 
@@ -298,13 +320,11 @@ Adding a torrent by uploading a torrent file requires the use of a multipart/for
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent file="$(base64 random_one_file.torrent)" save_path=/tmp
+$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" file="$(base64 random_one_file.torrent)" save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:08:43 GMT
 Location: http://localhost:8080/torrent/44a040be6d74d8d290cd20128788864cbf770719
-Server: Python/3.6 aiohttp/3.1.3
 
 {
     "info_hash": "44a040be6d74d8d290cd20128788864cbf770719"
@@ -318,13 +338,11 @@ Adding a torrent by url is done by setting the **url** key.
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent url=https://www.archlinux.org/releng/releases/2016.02.01/torrent/ save_path=/tmp
+$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" url=https://archlinux.org/releng/releases/latest/torrent/ save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:12:01 GMT
 Location: http://localhost:8080/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
-Server: Python/3.6 aiohttp/3.1.3
 
 {
     "info_hash": "88066b90278f2de655ee2dd44e784c340b54e45c"
@@ -338,13 +356,11 @@ Adding a torrent by info-hash is done by setting the **info_hash** key.
 **Example**
 
 ```shell
-$ http POST http://localhost:8080/torrent info_hash=88066b90278f2de655ee2dd44e784c340b54e45c save_path=/tmp
+$ http POST http://localhost:8080/torrent "Authorization: Bearer $TOKEN" info_hash=88066b90278f2de655ee2dd44e784c340b54e45c save_path=/tmp
 HTTP/1.1 201 Created
 Content-Length: 57
 Content-Type: application/json; charset=utf-8
-Date: Tue, 08 May 2018 01:15:07 GMT
 Location: http://localhost:8080/torrent/88066b90278f2de655ee2dd44e784c340b54e45c
-Server: Python/3.6 aiohttp/3.1.3
 
 {
     "info_hash": "88066b90278f2de655ee2dd44e784c340b54e45c"
@@ -513,15 +529,12 @@ Core
 ### /core
 #### DELETE
 
-Initiates Spritzle shutdown.
+Initiates graceful Spritzle shutdown. Flushes resume data, saves libtorrent session state, and cleanly terminates the daemon.
 
 **Example**
 
 ```shell
-$ http DELETE http://localhost:8080/core
+$ http DELETE http://localhost:8080/core "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 0
-Content-Type: application/octet-stream
-Date: Tue, 08 May 2018 01:21:31 GMT
-Server: Python/3.6 aiohttp/3.1.3
 ```

@@ -113,3 +113,19 @@ Check service status and logs:
 systemctl --user status spritzled
 journalctl --user -u spritzled -f
 ```
+
+---
+
+## Process Lifecycle & Signals
+
+`spritzled` handles process signals gracefully to ensure no download progress, resume data, or configuration is lost:
+
+* **Graceful Shutdown (`SIGINT`, `SIGTERM`, or `DELETE /core`):**
+  1. Stops the alert monitoring loop.
+  2. Flushes in-flight fastresume data (`<info_hash>.resume`) for all active torrents to disk.
+  3. Bencodes and saves libtorrent session state to `session.state`.
+  4. Releases the advisory file lock (`spritzled.lock`) and closes HTTP listener sockets.
+
+* **Single Instance Guarantee:**
+  * An exclusive non-blocking advisory file lock (`flock`) on `~/.config/spritzle/spritzled.lock` ensures only one daemon instance runs per configuration directory.
+  * If another instance is already running, `spritzled` exits immediately with code 1.

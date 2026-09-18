@@ -19,8 +19,9 @@ spritzle [OPTIONS] COMMAND [ARGS]...
 
 Global options can be set via environment variables prefixed with `SPRITZLE_`:
 * `SPRITZLE_REMOTE`: Remote daemon profile name.
-* `SPRITZLE_CONFIG`: Local configuration directory path.
-* `SPRITZLE_COLOR`: Enable or disable color output.
+* `SPRITZLE_CONFIG`: Local configuration directory path (`~/.config/spritzle`).
+* `SPRITZLE_STATE_DIR`: State directory path (`~/.local/share/spritzle/state`).
+* `SPRITZLE_COLOR`: Enable (`1`, `true`) or disable (`0`, `false`) color output.
 
 ---
 
@@ -92,6 +93,16 @@ Options:
 * `--json`: Output as JSON.
 * `--plain`: Force plain unstyled tabular output without ANSI colors or Rich borders.
 * `--raw`: Output unformatted raw values (e.g. bytes and fractions instead of human units).
+
+**Common Fields for `--fields`:**
+* `name`: Torrent display name.
+* `state`: Lifecycle state (`queued_for_checking`, `checking_files`, `downloading`, `finished`, `seeding`, `allocating`, `checking_resume_data`).
+* `progress`: Completion fraction from `0.0` to `1.0`.
+* `download_rate` / `upload_rate`: Current payload transfer rates (bytes/s).
+* `total_done` / `total_size`: Downloaded payload bytes and total torrent size.
+* `num_peers` / `num_seeds`: Connected peers and active seeds.
+* `spritzle.tags`: Custom metadata tags attached to the torrent.
+* `info_hash`: 40-character hex SHA-1 info-hash.
 
 **Examples:**
 
@@ -255,13 +266,26 @@ Arguments:
 * `[INFO-HASH|NAME]`: Info-hash or torrent display name (required for view; optional for setters when `--query` or `--all` is specified).
 
 Options:
-* `-s, --sets TEXT`: Enable flag(s) (e.g. `sequential_download`, `super_seeding`, `auto_managed`).
-* `-u, --unsets TEXT`: Disable flag(s).
+* `-s, --sets TEXT`: Enable flag(s) (can be specified multiple times).
+* `-u, --unsets TEXT`: Disable flag(s) (can be specified multiple times).
 * `-q, --query TEXT`: Filter torrents to modify flags on.
 * `--all`: Modify flags across all torrents in the session.
 * `--header / --no-header`: Toggle table headers when displaying flags.
 * `--json`: Output as JSON.
 * `--plain`: Output plain unstyled text without ANSI colors.
+
+**Supported Flags:**
+* `auto_managed`: Torrent is queued, started, and stopped automatically by the queue manager.
+* `sequential_download`: Download pieces sequentially in order (useful for streaming media).
+* `super_seeding`: Super seeding / initial seeding mode to efficiently distribute pieces to a sparse swarm.
+* `apply_ip_filter`: Apply IP blocklist/filters to incoming and outgoing peers.
+* `paused`: Pause torrent activity.
+* `seed_mode`: Assume files exist on disk and are verified without checking piece hashes.
+* `share_mode`: Prioritize uploading to maintain a target share ratio.
+* `stop_when_ready`: Automatically pause the torrent once metadata is received or checking is finished.
+* `upload_mode`: Upload only; do not download pieces.
+* `override_trackers`: Allow tracker updates to override metadata trackers.
+* `override_web_seeds`: Allow web seeds from metadata to be overridden.
 
 **Examples:**
 
@@ -403,6 +427,38 @@ spritzle stats
 # Output stats as JSON
 spritzle stats --json
 ```
+
+### `remote` - Manage Remote Daemon Profiles & Credentials
+
+Manages remote daemon profiles, connection URLs, daemon fingerprints, and API keys stored in `<config_dir>/remotes.toml`.
+
+```shell
+spritzle remote COMMAND [ARGS]...
+```
+
+Subcommands:
+* `add <name> <url> [--key <key>] [--force]`: Register and verify a new daemon endpoint.
+* `list [--plain] [--json]`: List all configured remotes and default indicator.
+* `use <name>`: Set default remote profile.
+* `status [<name>] [--plain] [--json]`: Concurrently probe remotes, check latency, verify identity, and report uptime.
+* `show <name>`: Display detailed connection metadata for a remote (masks API key).
+* `set-key <name> [<key>]`: Update or import a new API key for a remote.
+* `remove <name>`: Delete a remote configuration profile.
+
+**Examples:**
+
+```shell
+# Add and verify remote
+spritzle remote add seedbox https://seedbox.example.com:8080 --key spritzle_8f3a9b2c1d4e5f6a7b8c9d0e1f2a3b4c
+
+# Probe health and latency across all remotes
+spritzle remote status
+
+# Switch default active remote
+spritzle remote use seedbox
+```
+
+For comprehensive details on daemon identity protection, see the [remotes guide](remotes.md).
 
 ### `help` - Help & Command Usage Examples
 
