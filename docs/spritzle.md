@@ -10,21 +10,17 @@ spritzle [OPTIONS] COMMAND [ARGS]...
 
 ### Global Options
 
-* `-r, --remote TEXT`: Named remote daemon profile to use (default: active remote in `cli.toml` or auto-discovered `local`).
-* `-h, --host TEXT`: Hostname or IP address of the `spritzled` daemon (default: `127.0.0.1`). Both IPv4 and IPv6 (e.g. `::1`) are supported.
-* `-p, --port INTEGER`: Port of the `spritzled` daemon (default: `8080`).
+* `-r, --remote TEXT`: Named remote daemon profile to use (default: active remote in `remotes.toml` or auto-discovered `local`).
 * `-c, --config PATH`: Local configuration directory (default: `~/.config/spritzle`).
-* `-t, --token TEXT`: Explicit API key for authentication.
+* `--color / --no-color`: Enable or disable colored output.
 * `--help`: Show the help message and exit.
 
 ### Environment Variables
 
-All global options can be set via environment variables prefixed with `SPRITZLE_`:
+Global options can be set via environment variables prefixed with `SPRITZLE_`:
 * `SPRITZLE_REMOTE`: Remote daemon profile name.
-* `SPRITZLE_HOST`: Daemon hostname or IP.
-* `SPRITZLE_PORT`: Daemon port number.
 * `SPRITZLE_CONFIG`: Local configuration directory path.
-* `SPRITZLE_TOKEN`: API key.
+* `SPRITZLE_COLOR`: Enable or disable color output.
 
 ---
 
@@ -219,25 +215,46 @@ spritzle flags 44a040be6d74d8d290cd20128788864cbf770719
 spritzle flags 44a040be6d74d8d290cd20128788864cbf770719 -s sequential_download
 ```
 
-### `config` - View and Update Daemon Configuration
+### `config` - View and Update CLI Client Configuration
 
-Displays or modifies keys in the daemon's SQLite configuration table.
+Displays or modifies client-side preferences in `<config_dir>/cli.toml` (offline command, requires no running daemon).
 
 ```shell
-spritzle config [KEY] [VALUE]
+spritzle config [OPTIONS] [KEY] [VALUE]
 ```
 
 **Examples:**
 
 ```shell
-# Show all configuration
+# Show all client configuration
 spritzle config
 
 # Get a specific key
-spritzle config auth_timeout
+spritzle config plain
+
+# Set a configuration option
+spritzle config plain true
+```
+
+### `daemon-config` - View and Update Daemon Configuration
+
+Displays or modifies keys in the active daemon's `daemon.toml` configuration table via the REST API.
+
+```shell
+spritzle daemon-config [OPTIONS] [KEY] [VALUE]
+```
+
+**Examples:**
+
+```shell
+# Show all daemon configuration
+spritzle daemon-config
+
+# Get a specific key
+spritzle daemon-config auth_timeout
 
 # Update a key
-spritzle config save_resume_data_interval 30
+spritzle daemon-config save_resume_data_interval 30
 ```
 
 ### `settings` - View and Update libtorrent Settings

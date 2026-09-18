@@ -30,9 +30,6 @@ import tomlkit
 from tomlkit.toml_document import TOMLDocument
 
 CLI_DEFAULTS: Dict[str, Any] = {
-    "host": "127.0.0.1",
-    "port": 8080,
-    "token": "",
     "color": None,
     "plain": False,
 }
@@ -87,7 +84,11 @@ class CLIConfig(collections.abc.MutableMapping[str, Any]):
         defaults: Optional[Dict[str, Any]] = None,
     ):
         if config_dir is None:
-            self.config_dir = Path(Path.home(), ".config", "spritzle")
+            env_config = os.environ.get("SPRITZLE_CONFIG") or os.environ.get("SPRITZLE_CONFIG_DIR")
+            if env_config:
+                self.config_dir = Path(env_config)
+            else:
+                self.config_dir = Path(Path.home(), ".config", "spritzle")
         else:
             self.config_dir = Path(config_dir)
 
@@ -191,7 +192,11 @@ class RemotesConfig:
         filename: str = "remotes.toml",
     ):
         if config_dir is None:
-            self.config_dir = Path(Path.home(), ".config", "spritzle")
+            env_config = os.environ.get("SPRITZLE_CONFIG") or os.environ.get("SPRITZLE_CONFIG_DIR")
+            if env_config:
+                self.config_dir = Path(env_config)
+            else:
+                self.config_dir = Path(Path.home(), ".config", "spritzle")
         else:
             self.config_dir = Path(config_dir)
 
@@ -266,12 +271,8 @@ class RemotesConfig:
 
     def ensure_local_remote(self, state_dir: Optional[Path] = None) -> Optional[Dict[str, Any]]:
         """
-        Auto-discovers local daemon configuration if 'local' remote is not yet registered.
+        Auto-discovers local daemon configuration and keeps 'local' remote updated.
         """
-        remotes = self.get_remotes()
-        if "local" in remotes:
-            return remotes["local"]
-
         env_state_dir = os.environ.get("SPRITZLE_STATE_DIR")
         s_dir = state_dir or (Path(env_state_dir) if env_state_dir else (Path.home() / ".local" / "share" / "spritzle" / "state"))
         local_file = Path(s_dir) / "local_remote.json"
@@ -280,11 +281,18 @@ class RemotesConfig:
                 with local_file.open("r", encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, dict) and "url" in data and "daemon_id" in data and "api_key" in data:
-                    self.set_remote("local", data["url"], data["daemon_id"], data["api_key"])
-                    if not self.get_default_remote():
-                        self.set_default_remote("local")
+                    existing = self.get_remote("local")
+                    if (
+                        not existing
+                        or existing.get("daemon_id") != data["daemon_id"]
+                        or existing.get("url") != data["url"]
+                        or existing.get("key") != data["api_key"]
+                    ):
+                        self.set_remote("local", data["url"], data["daemon_id"], data["api_key"])
+                        if not self.get_default_remote():
+                            self.set_default_remote("local")
                     return self.get_remote("local")
             except Exception:
                 pass
-        return None
+        return self.get_remote("local")
 

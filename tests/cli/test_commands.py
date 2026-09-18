@@ -19,7 +19,7 @@ def test_list_commands(cli):
     # But let's try basic connection first.
 
     result = runner.invoke(
-        spritzle_cli, ["--port", str(cli.server.port), "--token", "test-token", "list"]
+        spritzle_cli, ["list"]
     )
 
     # Ideally, we should add some torrents to the core before listing,
@@ -38,34 +38,37 @@ def test_stats_command(cli):
     """
     runner = CliRunner()
     result = runner.invoke(
-        spritzle_cli, ["--port", str(cli.server.port), "--token", "test-token", "stats"]
+        spritzle_cli, ["stats"]
     )
     assert result.exit_code == 0
     print(result.output)
 
 
-def test_client_url_formatting():
+def test_client_url_formatting(tmp_path):
     from spritzle.cli.main import Client
-    client = Client("127.0.0.1", 8080, "/tmp", "token")
+    from spritzle.cli.config import RemotesConfig
+
+    remotes = RemotesConfig(config_dir=tmp_path)
+    remotes.set_remote("test", "http://127.0.0.1:8080", "daemon_id", "token")
+    client = Client(config=tmp_path, remote="test")
     assert client.url("torrent") == "http://127.0.0.1:8080/torrent"
     assert client.url("torrent", "foo=bar") == "http://127.0.0.1:8080/torrent?foo=bar"
 
 
-def test_client_url_formatting_ipv6():
+def test_client_url_formatting_ipv6(tmp_path):
     from spritzle.cli.main import Client
+    from spritzle.cli.config import RemotesConfig
     from yarl import URL
 
-    client = Client("::1", 8080, "/tmp", "token")
+    remotes = RemotesConfig(config_dir=tmp_path)
+    remotes.set_remote("test", "http://[::1]:8080", "daemon_id", "token")
+    client = Client(config=tmp_path, remote="test")
     assert client.url("torrent") == "http://[::1]:8080/torrent"
     assert client.url("torrent", "foo=bar") == "http://[::1]:8080/torrent?foo=bar"
     # Must parse successfully with yarl without ValueError
     u = URL(client.url("torrent"))
     assert u.host == "::1"
     assert u.port == 8080
-
-    # Already bracketed
-    client_bracketed = Client("[::1]", 8080, "/tmp", "token")
-    assert client_bracketed.url("torrent") == "http://[::1]:8080/torrent"
 
 
 
@@ -86,7 +89,7 @@ def test_remove_delete_files_command(cli, loop):
     with patch.object(cli.app[APP_KEY_CORE].torrent, "remove", wraps=cli.app[APP_KEY_CORE].torrent.remove) as mock_remove:
         result = runner.invoke(
             spritzle_cli,
-            ["--port", str(cli.server.port), "--token", "test-token", "remove", "--delete-files", info_hash]
+            ["remove", "--delete-files", info_hash]
         )
         assert result.exit_code == 0
         assert mock_remove.called
@@ -102,10 +105,7 @@ def test_add_command_option_with_equal_sign(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "add",
+        ["add",
             "-o", "save_path=/tmp/test=path",
             t_file,
         ]
@@ -118,10 +118,7 @@ def test_list_command_missing_field_and_query_equal_sign(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "list",
+        ["list",
             "-f", "name,non_existent_field",
             "-q", "name=test=foo",
         ]
@@ -149,10 +146,7 @@ def test_list_command_non_string_list_field(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "list",
+        ["list",
             "-f", "name,custom_ints",
         ],
     )
@@ -165,10 +159,7 @@ def test_daemon_config_command_types(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "daemon-config",
+        ["daemon-config",
             "-s", "auth_timeout", "300",
         ]
     )
@@ -189,10 +180,7 @@ def test_settings_command_boolean_setter(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "settings",
+        ["settings",
             "-s", "enable_dht", "false",
         ]
     )
@@ -201,27 +189,13 @@ def test_settings_command_boolean_setter(cli):
 
 
 
-def test_client_init_with_empty_or_invalid_tokens_file(tmp_path):
-    from spritzle.cli.main import Client
-    tokens_file = tmp_path / "tokens"
-    tokens_file.write_text("")  # empty file
+def test_remotes_config_corrupted_file(tmp_path):
+    from spritzle.cli.config import RemotesConfig
+    remotes_file = tmp_path / "remotes.toml"
+    remotes_file.write_text("not a valid toml file : [")
 
-    client = Client("127.0.0.1", 8080, str(tmp_path), "")
-    assert client.token == ""
-
-    tokens_file.write_text("not a dictionary")
-    client = Client("127.0.0.1", 8080, str(tmp_path), "")
-    assert client.token == ""
-
-
-def test_client_init_with_valid_tokens_file(tmp_path):
-    import json
-    from spritzle.cli.main import Client
-    tokens_file = tmp_path / "tokens"
-    tokens_file.write_text(json.dumps({"127.0.0.1:8080": "my-saved-token"}))
-
-    client = Client("127.0.0.1", 8080, str(tmp_path), "")
-    assert client.token == "my-saved-token"
+    cfg = RemotesConfig(config_dir=tmp_path)
+    assert cfg.get_remotes() == {}
 
 
 def test_remote_add_command_nonexistent_config_dir(cli, core, tmp_path):
@@ -258,10 +232,7 @@ def test_flags_command(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "flags",
+        ["flags",
             info_hash,
         ],
     )
@@ -271,10 +242,7 @@ def test_flags_command(cli):
     # Test setting a flag
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "flags",
+        ["flags",
             info_hash,
             "-s", "auto_managed",
         ],
@@ -285,10 +253,7 @@ def test_flags_command(cli):
     # Test unsetting a flag
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "flags",
+        ["flags",
             info_hash,
             "-u", "auto_managed",
         ],
@@ -301,10 +266,7 @@ def test_add_command_nonexistent_file(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "add",
+        ["add",
             "/path/to/nonexistent/file.torrent",
         ],
     )
@@ -318,10 +280,7 @@ def test_add_command_info_hash(cli):
     valid_hash = "0123456789abcdef0123456789abcdef01234567"
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "add",
+        ["add",
             valid_hash,
         ],
     )
@@ -360,7 +319,7 @@ def test_cli_daemon_config_and_flags_send_json_content_type(cli):
     with patch.object(ClientSession, "patch", mock_patch), patch.object(ClientSession, "put", mock_put):
         res1 = runner.invoke(
             spritzle_cli,
-            ["--port", str(cli.server.port), "--token", "test-token", "daemon-config", "-s", "auth_timeout", "120"],
+            ["daemon-config", "-s", "auth_timeout", "120"],
         )
         assert res1.exit_code == 0
         assert "application/json" in captured_content_types
@@ -377,7 +336,7 @@ def test_cli_daemon_config_and_flags_send_json_content_type(cli):
 
         res2 = runner.invoke(
             spritzle_cli,
-            ["--port", str(cli.server.port), "--token", "test-token", "flags", valid_hash, "-s", "auto_managed"],
+            ["flags", valid_hash, "-s", "auto_managed"],
         )
         assert res2.exit_code == 0
         assert "application/json" in captured_content_types
@@ -419,10 +378,7 @@ def test_add_command_missing_location_header(cli, monkeypatch):
 
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port", str(cli.server.port),
-            "--token", "test-token",
-            "add",
+        ["add",
             valid_hash,
         ],
     )
@@ -443,7 +399,7 @@ def test_pause_command(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", info_hash],
+        ["pause", info_hash],
     )
     assert result.exit_code == 0
     assert "paused successfully" in result.output
@@ -462,7 +418,7 @@ def test_resume_command(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "resume", info_hash],
+        ["resume", info_hash],
     )
     assert result.exit_code == 0
     assert "resumed successfully" in result.output
@@ -481,12 +437,7 @@ def test_move_storage_command(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        [
-            "--port",
-            str(cli.server.port),
-            "--token",
-            "test-token",
-            "move-storage",
+        ["move-storage",
             info_hash,
             "/tmp/new_storage",
         ],
@@ -525,7 +476,7 @@ def test_pause_by_name(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "file1.txt"],
+        ["pause", "file1.txt"],
     )
     assert result.exit_code == 0
     assert "paused successfully" in result.output
@@ -545,7 +496,7 @@ def test_pause_ambiguous_name(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "file"],
+        ["pause", "file"],
     )
     assert result.exit_code == 1
     assert "Multiple torrents match 'file'" in result.output
@@ -555,7 +506,7 @@ def test_pause_nonexistent_name(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "nonexistent_torrent"],
+        ["pause", "nonexistent_torrent"],
     )
     assert result.exit_code == 1
     assert "No torrent found matching 'nonexistent_torrent'" in result.output
@@ -575,7 +526,7 @@ def test_pause_query_and_all(cli):
     # Pause by query
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "-q", "name=file1.*"],
+        ["pause", "-q", "name=file1.*"],
     )
     assert result.exit_code == 0
     assert "Paused 1 torrents successfully" in result.output
@@ -583,7 +534,7 @@ def test_pause_query_and_all(cli):
     # Pause by --all
     result_all = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "--all"],
+        ["pause", "--all"],
     )
     assert result_all.exit_code == 0
     assert "Paused 2 torrents successfully" in result_all.output
@@ -603,7 +554,7 @@ def test_resume_by_name_and_query(cli):
     # Resume single by name
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "resume", "file1.txt"],
+        ["resume", "file1.txt"],
     )
     assert result.exit_code == 0
     assert "resumed successfully" in result.output
@@ -611,7 +562,7 @@ def test_resume_by_name_and_query(cli):
     # Resume by query
     result_q = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "resume", "-q", "name=file.*"],
+        ["resume", "-q", "name=file.*"],
     )
     assert result_q.exit_code == 0
     assert "Resumed 2 torrents successfully" in result_q.output
@@ -619,7 +570,7 @@ def test_resume_by_name_and_query(cli):
     # Resume by --all
     result_all = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "resume", "--all"],
+        ["resume", "--all"],
     )
     assert result_all.exit_code == 0
     assert "Resumed 2 torrents successfully" in result_all.output
@@ -639,7 +590,7 @@ def test_remove_by_name_and_query(cli):
     # Remove single by name
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "remove", "file1.txt"],
+        ["remove", "file1.txt"],
     )
     assert result.exit_code == 0
     assert "removed successfully" in result.output
@@ -650,7 +601,7 @@ def test_remove_by_name_and_query(cli):
     # Remove remaining by --all
     result_all = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "remove", "--all"],
+        ["remove", "--all"],
     )
     assert result_all.exit_code == 0
     assert "Removed 1 torrents successfully" in result_all.output
@@ -669,7 +620,7 @@ def test_flags_by_name_and_query(cli):
     # Show flags by name
     res_show = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt"],
+        ["flags", "file1.txt"],
     )
     assert res_show.exit_code == 0
     assert "auto_managed" in res_show.output
@@ -677,14 +628,14 @@ def test_flags_by_name_and_query(cli):
     # Set flags by name
     res_set = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "-s", "auto_managed"],
+        ["flags", "file1.txt", "-s", "auto_managed"],
     )
     assert res_set.exit_code == 0
 
     # Set flags by query
     res_query = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "flags", "-q", "name=file1.*", "-u", "auto_managed"],
+        ["flags", "-q", "name=file1.*", "-u", "auto_managed"],
     )
     assert res_query.exit_code == 0
 
@@ -701,12 +652,7 @@ def test_move_storage_by_name(cli):
     runner = CliRunner()
     res = runner.invoke(
         spritzle_cli,
-        [
-            "--port",
-            str(cli.server.port),
-            "--token",
-            "test-token",
-            "move-storage",
+        ["move-storage",
             "file1.txt",
             "/tmp/moved_storage",
         ],
@@ -780,7 +726,7 @@ def test_list_json_output(cli):
     runner = CliRunner()
     res = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "list", "--json"],
+        ["list", "--json"],
     )
     assert res.exit_code == 0
     data = json.loads(res.output)
@@ -803,7 +749,7 @@ def test_list_plain_and_color_flags(cli):
     # Plain mode
     res_plain = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "list", "--plain"],
+        ["list", "--plain"],
     )
     assert res_plain.exit_code == 0
     assert "file1.txt" in res_plain.output
@@ -811,7 +757,7 @@ def test_list_plain_and_color_flags(cli):
     # Color enabled mode
     res_color = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "--color", "list"],
+        ["--color", "list"],
     )
     assert res_color.exit_code == 0
     assert "file1.txt" in res_color.output
@@ -830,7 +776,7 @@ def test_flags_json_and_plain(cli):
     # JSON mode
     res_json = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "--json"],
+        ["flags", "file1.txt", "--json"],
     )
     assert res_json.exit_code == 0
     flags_dict = json.loads(res_json.output)
@@ -840,7 +786,7 @@ def test_flags_json_and_plain(cli):
     # Plain mode
     res_plain = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "flags", "file1.txt", "--plain"],
+        ["flags", "file1.txt", "--plain"],
     )
     assert res_plain.exit_code == 0
     assert "auto_managed" in res_plain.output
@@ -853,7 +799,7 @@ def test_stats_and_settings_json(cli):
     # Stats JSON
     res_stats = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "stats", "--json"],
+        ["stats", "--json"],
     )
     assert res_stats.exit_code == 0
     stats_data = json.loads(res_stats.output)
@@ -862,7 +808,7 @@ def test_stats_and_settings_json(cli):
     # Settings JSON
     res_settings = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--json"],
+        ["settings", "--json"],
     )
     assert res_settings.exit_code == 0
     settings_data = json.loads(res_settings.output)
@@ -876,13 +822,13 @@ def test_settings_defaults_and_modified_flags(cli):
     # Reset all first to ensure clean state
     runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+        ["settings", "--reset-all"],
     )
 
     # Defaults flag
     res_def = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--defaults", "--json"],
+        ["settings", "--defaults", "--json"],
     )
     assert res_def.exit_code == 0
     defaults = json.loads(res_def.output)
@@ -891,7 +837,7 @@ def test_settings_defaults_and_modified_flags(cli):
     # Modified flag when nothing modified
     res_mod_none = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+        ["settings", "--modified"],
     )
     assert res_mod_none.exit_code == 0
     assert "No settings have been modified" in res_mod_none.output
@@ -899,14 +845,14 @@ def test_settings_defaults_and_modified_flags(cli):
     # Modify a setting
     res_set = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "500000"],
+        ["settings", "-s", "download_rate_limit", "500000"],
     )
     assert res_set.exit_code == 0
 
     # Modified flag should now show only the modified setting
     res_mod = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified", "--json"],
+        ["settings", "--modified", "--json"],
     )
     assert res_mod.exit_code == 0
     mod_data = json.loads(res_mod.output)
@@ -916,7 +862,7 @@ def test_settings_defaults_and_modified_flags(cli):
     # Clean up
     runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset", "download_rate_limit"],
+        ["settings", "--reset", "download_rate_limit"],
     )
 
 
@@ -926,11 +872,11 @@ def test_settings_reset_commands(cli):
     # Reset specific key
     runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "999999"],
+        ["settings", "-s", "download_rate_limit", "999999"],
     )
     res_reset = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset", "download_rate_limit"],
+        ["settings", "--reset", "download_rate_limit"],
     )
     assert res_reset.exit_code == 0
     assert "download_rate_limit" in res_reset.output
@@ -938,18 +884,18 @@ def test_settings_reset_commands(cli):
     # Verify download_rate_limit was reset
     res_check = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+        ["settings", "--modified"],
     )
     assert "download_rate_limit" not in res_check.output
 
     # Reset all
     runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "1111", "-s", "upload_rate_limit", "2222"],
+        ["settings", "-s", "download_rate_limit", "1111", "-s", "upload_rate_limit", "2222"],
     )
     res_reset_all = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+        ["settings", "--reset-all"],
     )
     assert res_reset_all.exit_code == 0
     assert "Reset all" in res_reset_all.output
@@ -957,7 +903,7 @@ def test_settings_reset_commands(cli):
     # After reset all, nothing is modified from baseline
     res_after_all = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--modified"],
+        ["settings", "--modified"],
     )
     assert "No settings have been modified" in res_after_all.output
 
@@ -968,14 +914,14 @@ def test_settings_visual_modified_indicator(cli):
     # Modify download_rate_limit
     res_set = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "-s", "download_rate_limit", "777777"],
+        ["settings", "-s", "download_rate_limit", "777777"],
     )
     assert res_set.exit_code == 0, res_set.output
 
     # Invoke with color
     res = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "--color", "settings"],
+        ["--color", "settings"],
     )
     assert res.exit_code == 0
     assert "* download_rate_limit" in res.output or "* download_rate_" in res.output
@@ -984,7 +930,7 @@ def test_settings_visual_modified_indicator(cli):
     # Clean up
     runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "settings", "--reset-all"],
+        ["settings", "--reset-all"],
     )
 
 
@@ -1001,7 +947,7 @@ def test_quiet_action_commands(cli):
     # Pause with --quiet
     res_pause = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "pause", "-Q", "file1.txt"],
+        ["pause", "-Q", "file1.txt"],
     )
     assert res_pause.exit_code == 0
     assert res_pause.output.strip() == info_hash
@@ -1009,7 +955,7 @@ def test_quiet_action_commands(cli):
     # Resume with --quiet
     res_resume = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "resume", "--quiet", "file1.txt"],
+        ["resume", "--quiet", "file1.txt"],
     )
     assert res_resume.exit_code == 0
     assert res_resume.output.strip() == info_hash
@@ -1017,7 +963,7 @@ def test_quiet_action_commands(cli):
     # Remove with --quiet
     res_remove = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "remove", "-Q", "file1.txt"],
+        ["remove", "-Q", "file1.txt"],
     )
     assert res_remove.exit_code == 0
     assert res_remove.output.strip() == info_hash
@@ -1070,7 +1016,7 @@ def test_daemon_config_json_and_plain(cli):
     # JSON mode
     res_json = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "daemon-config", "--json"],
+        ["daemon-config", "--json"],
     )
     assert res_json.exit_code == 0
     data = json.loads(res_json.output)
@@ -1081,7 +1027,7 @@ def test_daemon_config_json_and_plain(cli):
     # Plain mode
     res_plain = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "daemon-config", "--plain"],
+        ["daemon-config", "--plain"],
     )
     assert res_plain.exit_code == 0
     assert "save_resume_data_interval" in res_plain.output
@@ -1090,7 +1036,7 @@ def test_daemon_config_json_and_plain(cli):
     # Color mode
     res_color = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "--color", "daemon-config"],
+        ["--color", "daemon-config"],
     )
     assert res_color.exit_code == 0
     assert "Spritzle Daemon Configuration" in res_color.output
@@ -1103,7 +1049,7 @@ def test_add_quiet(cli):
     runner = CliRunner()
     result = runner.invoke(
         spritzle_cli,
-        ["--port", str(cli.server.port), "--token", "test-token", "add", "-Q", t_file],
+        ["add", "-Q", t_file],
     )
     assert result.exit_code == 0
     added_hash = result.output.strip()
@@ -1139,9 +1085,14 @@ def test_help_command():
     assert "Examples:" in res_color.output
 
 
-def test_offline_daemon_connection_error():
+def test_offline_daemon_connection_error(tmp_path):
+    from spritzle.cli.config import RemotesConfig
+
+    RemotesConfig(config_dir=tmp_path).set_remote(
+        "offline", "http://127.0.0.1:59999", "spz_d_off", "key"
+    )
     runner = CliRunner()
-    result = runner.invoke(spritzle_cli, ["--port", "59999", "list"])
+    result = runner.invoke(spritzle_cli, ["-c", str(tmp_path), "-r", "offline", "list"])
     assert result.exit_code == 1
     assert "Could not connect to spritzled" in result.output
     assert "Is the daemon running?" in result.output
@@ -1149,24 +1100,23 @@ def test_offline_daemon_connection_error():
 
 def test_daemon_config_positional_arguments(cli):
     runner = CliRunner()
-    port = str(cli.server.port)
 
     # Set key via positional arguments
     res_set = runner.invoke(
-        spritzle_cli, ["--port", port, "daemon-config", "auth_timeout", "240"]
+        spritzle_cli, ["daemon-config", "auth_timeout", "240"]
     )
     assert res_set.exit_code == 0
 
     # Get single key via positional argument
     res_get = runner.invoke(
-        spritzle_cli, ["--port", port, "daemon-config", "auth_timeout"]
+        spritzle_cli, ["daemon-config", "auth_timeout"]
     )
     assert res_get.exit_code == 0
     assert "240" in res_get.output
 
     # JSON get single key
     res_json = runner.invoke(
-        spritzle_cli, ["--port", port, "daemon-config", "auth_timeout", "--json"]
+        spritzle_cli, ["daemon-config", "auth_timeout", "--json"]
     )
     assert res_json.exit_code == 0
     d = json.loads(res_json.output)
@@ -1175,7 +1125,6 @@ def test_daemon_config_positional_arguments(cli):
 
 def test_info_command(cli):
     runner = CliRunner()
-    port = str(cli.server.port)
 
     # Add a torrent to core
     from spritzle.daemon.keys import APP_KEY_CORE
@@ -1190,7 +1139,7 @@ def test_info_command(cli):
 
     # Plain output
     res_info = runner.invoke(
-        spritzle_cli, ["--port", port, "info", ih, "--plain"]
+        spritzle_cli, ["info", ih, "--plain"]
     )
     assert res_info.exit_code == 0
     assert ih in res_info.output
@@ -1198,7 +1147,7 @@ def test_info_command(cli):
 
     # JSON output
     res_json = runner.invoke(
-        spritzle_cli, ["--port", port, "info", ih, "--json"]
+        spritzle_cli, ["info", ih, "--json"]
     )
     assert res_json.exit_code == 0
     data = json.loads(res_json.output)
@@ -1206,7 +1155,7 @@ def test_info_command(cli):
 
     # Color output (ensure markup tags like [green] are not leaked as raw text)
     res_color = runner.invoke(
-        spritzle_cli, ["--color", "--port", port, "info", ih]
+        spritzle_cli, ["--color", "info", ih]
     )
     assert res_color.exit_code == 0
     assert "[green]" not in res_color.output
@@ -1216,11 +1165,10 @@ def test_info_command(cli):
 
 def test_add_magnet_command(cli):
     runner = CliRunner()
-    port = str(cli.server.port)
 
     magnet = "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&dn=test_arch"
     res = runner.invoke(
-        spritzle_cli, ["--port", port, "add", "-t", "linux", magnet]
+        spritzle_cli, ["add", "-t", "linux", magnet]
     )
     assert res.exit_code == 0
     assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
@@ -1244,8 +1192,7 @@ def test_cli_config_offline(tmp_path):
     # Non-interactive / non-color (tablefmt="plain")
     res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config"])
     assert res.exit_code == 0
-    assert "127.0.0.1" in res.output
-    assert "8080" in res.output
+    assert "plain" in res.output
 
     # Color mode
     res_color = runner.invoke(spritzle_cli, ["--color", "--config", cfg_dir, "config"])
@@ -1259,18 +1206,18 @@ def test_cli_config_crud(tmp_path):
     cfg_dir = str(tmp_path / "cfg")
 
     # Set positional
-    res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "host", "192.168.1.50"])
+    res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "plain", "true"])
     assert res.exit_code == 0
 
     # Get single
-    res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "host"])
+    res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "plain"])
     assert res.exit_code == 0
-    assert "192.168.1.50" in res.output
+    assert "True" in res.output or "true" in res.output or "on" in res.output
 
-    # Set multiple with flags (including int and bool coercion)
+    # Set multiple with flags
     res = runner.invoke(
         spritzle_cli,
-        ["--config", cfg_dir, "config", "-s", "port", "9090", "-s", "plain", "true"],
+        ["--config", cfg_dir, "config", "-s", "color", "false", "-s", "plain", "false"],
     )
     assert res.exit_code == 0
 
@@ -1278,23 +1225,22 @@ def test_cli_config_crud(tmp_path):
     res_json = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "--json"])
     assert res_json.exit_code == 0
     data = json.loads(res_json.output)
-    assert data["host"] == "192.168.1.50"
-    assert data["port"] == 9090
-    assert data["plain"] is True
+    assert data["color"] is False
+    assert data["plain"] is False
 
-    # Unset port
-    res_unset = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "-u", "port"])
+    # Unset color
+    res_unset = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "-u", "color"])
     assert res_unset.exit_code == 0
     res_json2 = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "--json"])
     data2 = json.loads(res_json2.output)
-    assert data2["port"] == 8080  # Reverted to default
+    assert data2["color"] is None  # Reverted to default
 
     # Reset
     res_reset = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "--reset"])
     assert res_reset.exit_code == 0
     res_json3 = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "--json"])
     data3 = json.loads(res_json3.output)
-    assert data3["host"] == "127.0.0.1"
+    assert data3["plain"] is False
 
 
 def test_cli_config_json_and_plain(tmp_path):
@@ -1305,25 +1251,19 @@ def test_cli_config_json_and_plain(tmp_path):
     # Plain output
     res_plain = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "--plain"])
     assert res_plain.exit_code == 0
-    assert "host" in res_plain.output
-    assert "127.0.0.1" in res_plain.output
+    assert "plain" in res_plain.output
 
     # Single key json
     res_single_json = runner.invoke(
-        spritzle_cli, ["--config", cfg_dir, "config", "port", "--json"]
+        spritzle_cli, ["--config", cfg_dir, "config", "plain", "--json"]
     )
     assert res_single_json.exit_code == 0
-    assert json.loads(res_single_json.output) == {"port": 8080}
+    assert json.loads(res_single_json.output) == {"plain": False}
 
     # Nonexistent key error
     res_err = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "nonexistent"])
     assert res_err.exit_code == 1
     assert "not found" in res_err.output
-
-    # Unknown key error
-    res_res = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "remotes"])
-    assert res_res.exit_code == 1
-    assert "not found" in res_res.output
 
 
 def test_cli_config_ignores_and_preserves_remotes(tmp_path):
@@ -1336,7 +1276,7 @@ def test_cli_config_ignores_and_preserves_remotes(tmp_path):
     remotes_cfg.set_default_remote("seedbox")
 
     cli_cfg = CLIConfig(config_dir=cfg_dir)
-    cli_cfg["host"] = "192.168.1.100"
+    cli_cfg["plain"] = True
 
     runner = CliRunner()
     res = runner.invoke(spritzle_cli, ["--config", str(cfg_dir), "config", "--json"])
@@ -1344,7 +1284,7 @@ def test_cli_config_ignores_and_preserves_remotes(tmp_path):
     data = json.loads(res.output)
     assert "remotes" not in data
     assert "default_remote" not in data
-    assert data["host"] == "192.168.1.100"
+    assert data["plain"] is True
 
     # Reset config overrides
     res_reset = runner.invoke(spritzle_cli, ["--config", str(cfg_dir), "config", "--reset"])
@@ -1355,7 +1295,7 @@ def test_cli_config_ignores_and_preserves_remotes(tmp_path):
     assert remotes_reloaded.get_default_remote() == "seedbox"
     assert "seedbox" in remotes_reloaded.get_remotes()
     cli_reloaded = CLIConfig(config_dir=cfg_dir)
-    assert cli_reloaded["host"] == "127.0.0.1"  # reset to default
+    assert cli_reloaded["plain"] is False  # reset to default
 
 
 def test_cli_config_preserves_toml_comments(tmp_path):
@@ -1364,42 +1304,38 @@ def test_cli_config_preserves_toml_comments(tmp_path):
     cfg_dir.mkdir(parents=True, exist_ok=True)
     toml_file = cfg_dir / "cli.toml"
     toml_file.write_text(
-        "# Custom home server comment\nhost = \"10.0.0.10\"\n# Port setting\nport = 8080\n",
+        "# Custom display comment\nplain = true\n",
         encoding="utf-8",
     )
 
     runner = CliRunner()
-    # Modify port via CLI
     res = runner.invoke(
-        spritzle_cli, ["--config", str(cfg_dir), "config", "port", "9999"]
+        spritzle_cli, ["--config", str(cfg_dir), "config", "plain", "false"]
     )
     assert res.exit_code == 0
 
-    # Check updated file content
     content = toml_file.read_text(encoding="utf-8")
-    assert "# Custom home server comment" in content
-    assert "# Port setting" in content
-    assert "9999" in content
+    assert "# Custom display comment" in content
+    assert "plain = false" in content
 
 
-def test_cli_config_precedence(tmp_path, monkeypatch):
-    """Test precedence: CLI flag > env var > cli.toml > hardcoded defaults."""
+def test_cli_config_precedence(tmp_path):
+    """Test precedence: CLI flag > cli.toml > hardcoded defaults."""
     from spritzle.cli.main import Client
 
     cfg_dir = tmp_path / "cfg"
     cfg_dir.mkdir(parents=True, exist_ok=True)
     toml_file = cfg_dir / "cli.toml"
-    toml_file.write_text('host = "10.0.0.5"\nport = 7777\n', encoding="utf-8")
+    toml_file.write_text('plain = true\ncolor = false\n', encoding="utf-8")
 
     # 1. Defaults to values in cli.toml
     c1 = Client(config=str(cfg_dir))
-    assert c1.host == "10.0.0.5"
-    assert c1.port == 7777
+    assert c1.plain is True
+    assert c1.color is False
 
     # 2. CLI arguments take highest precedence
-    c2 = Client(host="192.168.1.1", port=9999, config=str(cfg_dir))
-    assert c2.host == "192.168.1.1"
-    assert c2.port == 9999
+    c2 = Client(color=True, config=str(cfg_dir))
+    assert c2.color is True
 
 
 def test_no_underscore_aliases():

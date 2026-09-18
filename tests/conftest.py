@@ -19,8 +19,10 @@ pytest_plugins = "aiohttp.pytest_plugin"
 @pytest.fixture(scope="function")
 def core(loop, monkeypatch):
     config = Config(in_memory=True, config_dir="/tmp")
-    state_dir = Path(tempfile.mkdtemp(prefix="spritzle-test"))
+    state_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-state"))
+    config_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-config"))
     monkeypatch.setenv("SPRITZLE_STATE_DIR", str(state_dir))
+    monkeypatch.setenv("SPRITZLE_CONFIG", str(config_dir))
     core = Core(config, state_dir)
     settings = {
         "enable_upnp": False,
@@ -35,7 +37,8 @@ def core(loop, monkeypatch):
         yield core
     if core.session is not None:
         loop.run_until_complete(core.stop())
-    shutil.rmtree(str(state_dir))
+    shutil.rmtree(str(state_dir), ignore_errors=True)
+    shutil.rmtree(str(config_dir), ignore_errors=True)
 
 
 @pytest.fixture
@@ -49,7 +52,11 @@ def app(core):
 
 
 @pytest.fixture
-def cli(loop, app, aiohttp_client):
-    return loop.run_until_complete(
+def cli(loop, app, core, aiohttp_client):
+    client = loop.run_until_complete(
         aiohttp_client(app, server_kwargs={"host": "127.0.0.1", "port": 0})
     )
+    core.key_manager.ensure_local_client_remote(
+        f"http://127.0.0.1:{client.server.port}", core.identity.daemon_id
+    )
+    return client
