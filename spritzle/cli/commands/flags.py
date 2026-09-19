@@ -46,12 +46,15 @@ async def setter(client, torrent, header, sets, unsets, query, all_torrents, **k
     for k in unsets:
         d[k] = False
 
+    sem = asyncio.Semaphore(32)
+
     async def _set_flags(ih):
-        async with client.session.put(
-            client.url(f"torrent/{ih}/flags"), json=d
-        ) as resp:
-            err = "" if resp.status == 200 else await get_response_error(resp)
-            return ih, resp.status == 200, err
+        async with sem:
+            async with client.session.put(
+                client.url(f"torrent/{ih}/flags"), json=d
+            ) as resp:
+                err = "" if resp.status == 200 else await get_response_error(resp)
+                return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_set_flags(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]

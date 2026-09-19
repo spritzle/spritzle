@@ -167,7 +167,7 @@ async def test_get_torrent_query_by_tags(cli):
     assert (await resp.json()) == [info_hash]
 
     # Query with in
-    resp = await cli.get("/torrent?spritzle.tags.in=linux,ubuntu")
+    resp = await cli.get("/torrent?spritzle.tags.in=linux,archlinux")
     assert resp.status == 200
     assert (await resp.json()) == [info_hash]
 

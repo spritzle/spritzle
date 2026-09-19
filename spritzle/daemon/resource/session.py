@@ -90,6 +90,10 @@ async def put_session_settings(request):
     # libtorrent expects.
     for key, value in current.items():
         if key in settings and type(settings[key]) is not type(value):
+            if settings[key] is None:
+                raise web.HTTPBadRequest(
+                    reason=f"Setting '{key}' does not allow null values."
+                )
             if isinstance(value, bool):
                 val_str = str(settings[key]).strip().lower()
                 if val_str in ("true", "1", "yes", "on"):

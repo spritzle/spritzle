@@ -154,12 +154,28 @@ _spritzle() {
                 fi
             else
                 case "${subcmd}" in
-                    use|remove|show|status|set-key)
-                        COMPREPLY=($(compgen -W "$(_spritzle_remotes)" -- "${cur}"))
+                    status)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=($(compgen -W "-t --timeout --json --plain --help" -- "${cur}"))
+                        else
+                            COMPREPLY=($(compgen -W "$(_spritzle_remotes)" -- "${cur}"))
+                        fi
+                        ;;
+                    list)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=($(compgen -W "--json --plain --help" -- "${cur}"))
+                        fi
+                        ;;
+                    use|remove|show|set-key)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=($(compgen -W "--help" -- "${cur}"))
+                        else
+                            COMPREPLY=($(compgen -W "$(_spritzle_remotes)" -- "${cur}"))
+                        fi
                         ;;
                     add)
                         if [[ "${cur}" == -* ]]; then
-                            COMPREPLY=($(compgen -W "--key --force --insecure --ca-cert --fingerprint --help" -- "${cur}"))
+                            COMPREPLY=($(compgen -W "-k --key -f --force --insecure --ca-cert --fingerprint --help" -- "${cur}"))
                         fi
                         ;;
                 esac

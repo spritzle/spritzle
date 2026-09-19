@@ -4,7 +4,6 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 
-import aiohttp
 from aiohttp import test_utils, web
 import libtorrent as lt
 import pytest
@@ -179,3 +178,89 @@ async def test_save_session_state_atomic(tmp_path):
     assert state_file.is_file()
     assert state_file.read_bytes() == b"test_state_data"
     assert not (tmp_path / ".session.state.tmp").exists()
+
+
+async def test_post_torrent_method_invalid_utf8_payload(cli):
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    resp = await cli.post("/torrent", json={"url": torrent_address})
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # Send non-utf8 binary data to POST /torrent/{tid}/pause
+    raw_bytes = b"\xff\xfe\xfd\x80"
+    resp = await cli.post(
+        f"/torrent/{info_hash}/pause",
+        data=raw_bytes,
+        headers={"Content-Type": "application/json"},
+    )
+    # Must return 400 Bad Request, NOT 500 Internal Server Error
+    assert resp.status == 400
+    data = await resp.json()
+    assert "Invalid payload encoding" in data.get("message", "")
+
+
+async def test_delete_torrent_bulk_with_keys_query(cli):
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    resp = await cli.post("/torrent", json={"url": torrent_address})
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # DELETE /torrent with keys=name should not fail with TypeError
+    resp = await cli.delete("/torrent?keys=name")
+    assert resp.status == 200
+
+    # Verify torrent is deleted
+    resp = await cli.get(f"/torrent/{info_hash}")
+    assert resp.status == 404
+
+
+async def test_put_session_settings_rejects_null_for_string(cli):
+    resp = await cli.put("/session/settings", json={"user_agent": None})
+    assert resp.status == 400
+    data = await resp.json()
+    assert "does not allow null values" in data.get("message", "")
+
+
+def test_core_state_dir_from_environment(monkeypatch, tmp_path):
+    env_dir = tmp_path / "custom_state"
+    monkeypatch.setenv("SPRITZLE_STATE_DIR", str(env_dir))
+    config = MagicMock()
+    core = Core(config, state_dir=None)
+    assert core.state_dir == env_dir
+
+
+def test_corrupt_config_backup_created(tmp_path):
+    from spritzle.daemon.config import Config
+    cfg_file = tmp_path / "daemon.toml"
+    cfg_file.write_text("invalid [ toml syntax {[[")
+    config = Config(config_dir=tmp_path)
+    assert config._unparseable is True
+    config["save_resume_data_interval"] = 120
+    bak_file = tmp_path / "daemon.toml.bak"
+    assert bak_file.exists()
+    assert bak_file.read_text() == "invalid [ toml syntax {[["
+    assert config["save_resume_data_interval"] == 120
+
+
+def test_ipv6_host_bracketed_in_url(tmp_path):
+    from spritzle.daemon.api_keys import KeyManager
+    km = KeyManager(tmp_path)
+    host = "::1"
+    port = 17382
+    bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
+    data = km.ensure_local_client_remote(f"http://{bracketed_host}:{port}", "test_daemon_id")
+    assert data["url"] == "http://[::1]:17382"
+
+
+def test_lookup_extract_hashes_handles_dicts():
+    from spritzle.cli.lookup import _extract_hashes
+    input_data = [
+        {"info_hash": "44a040be6d74d8d290cd20128788864cbf770719", "name": "arch"},
+        "d3b07384d113edec49eaa6238ad5ff00fc7b0553",
+    ]
+    extracted = _extract_hashes(input_data)
+    assert extracted == [
+        "44a040be6d74d8d290cd20128788864cbf770719",
+        "d3b07384d113edec49eaa6238ad5ff00fc7b0553",
+    ]
+

@@ -508,8 +508,10 @@ async def post_torrent(request):
     if info_hash not in core.torrent_data:
         core.torrent_data[info_hash] = {}
     core.torrent_data[info_hash]["spritzle.tags"] = tags
-
-    await core.resume_data.save_torrent(torrent_handle)
+    try:
+        await asyncio.wait_for(core.resume_data.save_torrent(torrent_handle), timeout=15.0)
+    except asyncio.TimeoutError:
+        log.warning(f"Timed out waiting for initial resume data save for {info_hash}")
 
     st = common.struct_to_dict(torrent_handle.status())
     name = st.get("name", "")
@@ -634,13 +636,16 @@ async def delete_torrent(request):
         return web.Response()
 
     # Bulk deletion
+    query_params.pop("keys", None)
+    query_params.pop("fields", None)
     tids = get_torrent_list(core, query=query_params if query_params else None)
     sem = asyncio.Semaphore(64)
 
-    async def _remove_one(t: str):
+    async def _remove_one(t: Any):
         async with sem:
+            tid = t["info_hash"] if isinstance(t, dict) else t
             try:
-                handle = get_valid_handle(core, t)
+                handle = get_valid_handle(core, tid)
                 info_hash = str(handle.info_hash())
                 try:
                     await core.torrent.remove(handle, options)
@@ -650,11 +655,11 @@ async def delete_torrent(request):
                 core.resume_data.delete(info_hash)
                 core.torrent_data.pop(info_hash, None)
             except web.HTTPException:
-                log.warning(f"Skipping missing torrent {t} during bulk removal")
+                log.warning(f"Skipping missing torrent {tid} during bulk removal")
             except asyncio.TimeoutError:
-                log.error(f"Timed out removing torrent {t}")
+                log.error(f"Timed out removing torrent {tid}")
             except Exception as e:
-                log.error(f"Error removing torrent {t}: {e}")
+                log.error(f"Error removing torrent {tid}: {e}")
 
     if tids:
         await asyncio.gather(*[_remove_one(t) for t in tids])
@@ -699,7 +704,10 @@ async def post_torrent_method(request):
         raise web.HTTPBadRequest(reason=f"Invalid method '{method_name}'")
 
 
-    body = await request.text()
+    try:
+        body = await request.text()
+    except UnicodeDecodeError as ex:
+        raise web.HTTPBadRequest(reason=f"Invalid payload encoding: {ex}")
     if body:
         try:
             args = json.loads(body)

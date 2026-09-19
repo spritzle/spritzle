@@ -50,7 +50,11 @@ class Core(object):
 
         self.hooks = Hooks(Path(self.config.path, "hooks"))
         if state_dir is None:
-            self.state_dir = Path(Path.home(), ".local", "share", "spritzle", "state")
+            env_state_dir = os.environ.get("SPRITZLE_STATE_DIR")
+            if env_state_dir:
+                self.state_dir = Path(env_state_dir)
+            else:
+                self.state_dir = Path(Path.home(), ".local", "share", "spritzle", "state")
         else:
             self.state_dir = state_dir
         # TODO check dir for rw, etc

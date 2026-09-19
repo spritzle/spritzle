@@ -21,13 +21,17 @@
 #
 
 import collections.abc
+import logging
 import os
 from pathlib import Path
+import shutil
 from typing import Any, Dict, Iterator, Optional, Union
 
 import tomlkit
 from tomlkit.items import Table
 from tomlkit.toml_document import TOMLDocument
+
+log = logging.getLogger("spritzle")
 
 def get_default_save_path() -> str:
     env_path = os.environ.get("SPRITZLE_SAVE_PATH") or os.environ.get("SPRITZLE_DOWNLOAD_DIR")
@@ -103,6 +107,7 @@ class Config(collections.abc.MutableMapping[str, Any]):
             self.config_file = None
 
         self._doc: TOMLDocument = tomlkit.document()
+        self._unparseable = False
         if not self.in_memory and self.config_file is not None:
             if self.config_file.exists():
                 self.load()
@@ -116,16 +121,31 @@ class Config(collections.abc.MutableMapping[str, Any]):
                 with self.config_file.open("r", encoding="utf-8") as f:
                     content = f.read()
                     self._doc = tomlkit.parse(content)
-            except Exception:
+                self._unparseable = False
+            except Exception as e:
+                log.error(f"Failed to parse config file '{self.config_file}': {e}")
                 self._doc = tomlkit.document()
+                self._unparseable = True
         else:
             self._doc = tomlkit.document()
+            self._unparseable = False
 
     def save(self) -> None:
         """Atomically persist current configuration to disk."""
         if self.in_memory or self.config_file is None:
             return
         self.config_dir.mkdir(parents=True, exist_ok=True)
+        if self._unparseable and self.config_file.exists():
+            backup_file = self.config_file.with_suffix(f"{self.config_file.suffix}.bak")
+            try:
+                shutil.copy2(self.config_file, backup_file)
+                log.warning(
+                    f"Created backup of unparseable config file '{self.config_file}' -> '{backup_file}'"
+                )
+            except OSError as e:
+                log.error(f"Failed to create backup of unparseable config '{self.config_file}': {e}")
+            self._unparseable = False
+
         temp_file = self.config_file.with_name(f".{self.filename}.tmp")
         with temp_file.open("w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(self._doc))

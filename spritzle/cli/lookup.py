@@ -1,6 +1,6 @@
 import re
 import sys
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import click
 from tabulate import tabulate
@@ -21,6 +21,15 @@ def parse_query_params(query: Optional[Sequence[str]]) -> Dict[str, str]:
         else:
             params[q] = ""
     return params
+
+
+def _extract_hashes(data: Any) -> List[str]:
+    if not isinstance(data, list):
+        return []
+    return [
+        item["info_hash"] if isinstance(item, dict) and "info_hash" in item else str(item)
+        for item in data
+    ]
 
 
 async def resolve_target_torrents(
@@ -45,7 +54,7 @@ async def resolve_target_torrents(
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            return await resp.json()
+            return _extract_hashes(await resp.json())
 
     if query:
         params = parse_query_params(query)
@@ -56,7 +65,7 @@ async def resolve_target_torrents(
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            return await resp.json()
+            return _extract_hashes(await resp.json())
 
     if not torrent:
         click.echo("Error: Specify a torrent, --query, or --all.", file=sys.stderr)

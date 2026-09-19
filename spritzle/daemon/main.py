@@ -130,9 +130,6 @@ def create_app(core, log) -> aiohttp.web.Application:
     return new_app
 
 
-app = aiohttp.web.Application()
-
-
 def setup_app(app, core, log):
     config = core.config
 
@@ -222,7 +219,8 @@ def run_daemon(
         sys.exit(1)
 
     core = Core(config)
-    core.key_manager.ensure_local_client_remote(f"http://{host}:{port}", core.identity.daemon_id)
+    bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
+    core.key_manager.ensure_local_client_remote(f"http://{bracketed_host}:{port}", core.identity.daemon_id)
     daemon_app = create_app(core, log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
     daemon_app.middlewares.append(auth_middleware)
