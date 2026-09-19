@@ -285,6 +285,29 @@ $ http GET http://localhost:17382/torrent?spritzle.tags=linux
 $ http GET http://localhost:17382/torrent?spritzle.tags.all=linux,iso
 ```
 
+##### Bulk Field Selection (`keys` / `fields`)
+By default, `GET /torrent` returns a list of info-hash strings. To avoid $N+1$ query round-trips when fetching torrent status details, pass `keys=<field1,field2,...>` (or `keys=all` / `keys=*` for all attributes). When `keys` is supplied, the endpoint returns a list of JSON objects containing only the requested fields (along with `info_hash`):
+
+**Examples:**
+```shell
+$ http GET http://localhost:17382/torrent?keys=name,state,progress,download_rate
+$ http GET http://localhost:17382/torrent?keys=all
+$ http GET "http://localhost:17382/torrent?keys=name,state&state=downloading"
+```
+
+**Example Response:**
+```json
+[
+    {
+        "download_rate": 1048576,
+        "info_hash": "44a040be6d74d8d290cd20128788864cbf770719",
+        "name": "archlinux-x86_64.iso",
+        "progress": 0.5,
+        "state": "downloading"
+    }
+]
+```
+
 **Example Response:**
 
 ```shell

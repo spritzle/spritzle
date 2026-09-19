@@ -66,6 +66,49 @@ async def test_get_torrent(cli):
     assert response.status == 404
 
 
+async def test_get_torrent_bulk_keys(cli):
+    info_hash = await test_post_torrent(cli)
+
+    # 1. Specific keys
+    resp = await cli.get("/torrent?keys=name,state,spritzle.tags")
+    assert resp.status == 200
+    torrents = await resp.json()
+    assert isinstance(torrents, list)
+    assert len(torrents) == 1
+    t = torrents[0]
+    assert isinstance(t, dict)
+    assert t["info_hash"] == info_hash
+    assert "name" in t
+    assert "state" in t
+    assert t["spritzle.tags"] == ["foo"]
+    assert "block_size" not in t  # Not requested
+
+    # 2. Filter query + keys combined
+    resp = await cli.get("/torrent?keys=name&info_hash=^44a0.*$")
+    assert resp.status == 200
+    torrents = await resp.json()
+    assert len(torrents) == 1
+    assert "name" in torrents[0]
+    assert "info_hash" in torrents[0]
+
+    resp = await cli.get("/torrent?keys=name&info_hash=^nonexistent.*$")
+    assert resp.status == 200
+    torrents = await resp.json()
+    assert len(torrents) == 0
+
+    # 3. All keys
+    resp = await cli.get("/torrent?keys=all")
+    assert resp.status == 200
+    torrents = await resp.json()
+    assert len(torrents) == 1
+    assert "block_size" in torrents[0]
+
+    # 4. Invalid field in keys
+    resp = await cli.get("/torrent?keys=name,invalid_status_field_xyz")
+    assert resp.status == 400
+
+
+
 async def test_get_torrent_query(cli):
     info_hash = await test_post_torrent(cli)
 

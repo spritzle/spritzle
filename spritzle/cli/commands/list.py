@@ -86,30 +86,59 @@ async def f(
         else:
             params[q] = ""
     field_list: List[str] = [f.strip() for f in fields.split(",") if f.strip()]
-    async with client.session.get(client.url("torrent"), params=params) as resp:
-        if resp.status != 200:
-            err_msg = resp.reason
-            try:
-                err_json = await resp.json()
-                err_msg = err_json.get("message") or err_json.get("reason") or err_msg
-            except Exception:
-                pass
-            print_error(
-                f"Error listing torrents: HTTP {resp.status} ({err_msg})",
-                color_opt=getattr(client, "color", None),
-            )
-            sys.exit(1)
-        torrents = await resp.json()
+    needed_keys = set(field_list)
+    if "state" in needed_keys:
+        needed_keys.update(["errc", "num_peers"])
+
+    params_with_keys = dict(params)
+    params_with_keys["keys"] = ",".join(sorted(needed_keys))
 
     raw_items: List[Dict[str, Any]] = []
-    for torrent in torrents:
-        async with client.session.get(client.url(f"torrent/{torrent}")) as resp:
+    use_fallback = False
+
+    try:
+        async with client.session.get(client.url("torrent"), params=params_with_keys) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, list):
+                    if data and isinstance(data[0], dict):
+                        raw_items = data
+                    elif not data:
+                        raw_items = []
+                    else:
+                        use_fallback = True
+                else:
+                    use_fallback = True
+            else:
+                use_fallback = True
+    except Exception:
+        use_fallback = True
+
+    if use_fallback:
+        async with client.session.get(client.url("torrent"), params=params) as resp:
             if resp.status != 200:
-                continue
-            t = await resp.json()
-            if not isinstance(t, dict):
-                continue
-            raw_items.append(t)
+                err_msg = resp.reason
+                try:
+                    err_json = await resp.json()
+                    err_msg = err_json.get("message") or err_json.get("reason") or err_msg
+                except Exception:
+                    pass
+                print_error(
+                    f"Error listing torrents: HTTP {resp.status} ({err_msg})",
+                    color_opt=getattr(client, "color", None),
+                )
+                sys.exit(1)
+            torrents = await resp.json()
+
+        raw_items = []
+        for torrent in torrents:
+            async with client.session.get(client.url(f"torrent/{torrent}")) as resp:
+                if resp.status != 200:
+                    continue
+                t = await resp.json()
+                if not isinstance(t, dict):
+                    continue
+                raw_items.append(t)
 
     if json_output:
         json_data = []

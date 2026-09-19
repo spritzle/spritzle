@@ -95,32 +95,84 @@ VALID_QUERY_OPS = {"eq", "lt", "gt", "ne", "ge", "le", "all", "any", "in"}
 VALID_LT_STATUS_KEYS = {x for x in dir(lt.torrent_status) if not x.startswith("_")}
 
 
-def get_torrent_list(core, query=None) -> List[str]:
-    if not query:
-        # No query string was provided, so just return a list of all
-        # the torrents.
-        return [str(th.info_hash()) for th in core.session.get_torrents()]
+def get_torrent_list(core, query=None) -> List[Any]:
+    query_dict = dict(query) if query else {}
+    keys_raw = query_dict.pop("keys", None)
+    if keys_raw is None:
+        keys_raw = query_dict.pop("fields", None)
 
-    keys = {"info_hash"}
-    for k in query.keys():
-        if "." in k and k.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
-            keys.add(k.rsplit(".", 1)[0])
-        else:
-            keys.add(k)
-    
-    statuses: List[Dict[str, Any]] = []
+    if keys_raw is None:
+        if not query_dict:
+            # No query string was provided, so just return a list of all
+            # the torrents.
+            return [str(th.info_hash()) for th in core.session.get_torrents()]
+
+        keys = {"info_hash"}
+        for k in query_dict.keys():
+            if "." in k and k.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
+                keys.add(k.rsplit(".", 1)[0])
+            else:
+                keys.add(k)
+
+        statuses: List[Dict[str, Any]] = []
+        for handle in core.session.get_torrents():
+            info_hash = str(handle.info_hash())
+            st = common.struct_to_dict(handle.status(), only_keys=list(keys))
+            if info_hash in core.torrent_data:
+                st.update(core.torrent_data[info_hash])
+            statuses.append(st)
+
+        return get_torrent_list_by_query(query_dict, statuses)
+
+    # 'keys' or 'fields' parameter was specified for bulk status retrieval
+    keys_list = [k.strip() for k in str(keys_raw).split(",") if k.strip()]
+    if "all" in keys_list or "*" in keys_list:
+        requested_keys = None
+    else:
+        requested_keys = keys_list
+        for k in requested_keys:
+            if (
+                k not in VALID_LT_STATUS_KEYS
+                and not k.startswith("spritzle.")
+                and k != "info_hash"
+            ):
+                raise web.HTTPBadRequest(reason=f"Field {k} is not valid.")
+
+    fetch_keys = None
+    if requested_keys is not None:
+        fetch_keys = set(requested_keys) | {"info_hash"}
+        for k in query_dict.keys():
+            if "." in k and k.rsplit(".", 1)[-1] in VALID_QUERY_OPS:
+                fetch_keys.add(k.rsplit(".", 1)[0])
+            else:
+                fetch_keys.add(k)
+
+    statuses = []
     for handle in core.session.get_torrents():
         info_hash = str(handle.info_hash())
-        st = common.struct_to_dict(handle.status(), only_keys=list(keys))
+        st = common.struct_to_dict(
+            handle.status(),
+            only_keys=list(fetch_keys) if fetch_keys is not None else None,
+        )
         if info_hash in core.torrent_data:
             st.update(core.torrent_data[info_hash])
+        if "info_hash" not in st:
+            st["info_hash"] = info_hash
         statuses.append(st)
 
-    return get_torrent_list_by_query(query, statuses)
+    if query_dict:
+        matched = get_torrent_list_by_query(query_dict, statuses, return_statuses=True)
+    else:
+        matched = statuses
+
+    if requested_keys is not None:
+        keep_keys = set(requested_keys) | {"info_hash"}
+        return [{k: v for k, v in item.items() if k in keep_keys} for item in matched]
+    return matched
 
 
-def get_torrent_list_by_query(query, statuses) -> List[str]:
-    torrents: List[str] = []
+def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) -> List[Any]:
+    torrents: List[Any] = []
 
     all_status_keys = set()
     for s in statuses:
@@ -240,7 +292,10 @@ def get_torrent_list_by_query(query, statuses) -> List[str]:
                 break
 
         else:
-            torrents.append(status["info_hash"])
+            if return_statuses:
+                torrents.append(status)
+            else:
+                torrents.append(status["info_hash"])
 
     return torrents
 

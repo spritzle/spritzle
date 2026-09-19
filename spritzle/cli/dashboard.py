@@ -54,6 +54,23 @@ async def fetch_torrents_with_status(client, query: Optional[Sequence[str]] = No
                 params[k] = v
             else:
                 params[q] = ""
+
+    dash_keys = "name,info_hash,state,progress,download_rate,upload_rate,total_wanted,total_done,num_peers,num_seeds"
+    params_with_keys = dict(params)
+    params_with_keys["keys"] = dash_keys
+
+    try:
+        async with client.session.get(client.url("torrent"), params=params_with_keys) as resp:
+            if resp.status == 200:
+                torrents = await resp.json()
+                if isinstance(torrents, list):
+                    if torrents and isinstance(torrents[0], dict):
+                        return torrents
+                    elif not torrents:
+                        return []
+    except Exception:
+        pass
+
     try:
         async with client.session.get(client.url("torrent"), params=params) as resp:
             if resp.status != 200:
