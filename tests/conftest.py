@@ -26,6 +26,7 @@ def core(loop, monkeypatch):
     monkeypatch.setenv("SPRITZLE_STATE_DIR", str(state_dir))
     monkeypatch.setenv("SPRITZLE_CONFIG", str(config_dir))
     monkeypatch.setenv("SPRITZLE_SAVE_PATH", str(downloads_dir))
+    monkeypatch.setenv("SPRITZLE_ALLOW_LOOPBACK_URL", "1")
     core = Core(config, state_dir)
     settings = {
         "enable_upnp": False,

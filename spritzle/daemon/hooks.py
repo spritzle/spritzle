@@ -80,3 +80,18 @@ class Hooks:
             task = loop.create_task(self.run_hook(hook, *args))
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
+
+    async def stop(self, timeout: float = 5.0):
+        if not self._tasks:
+            return
+        log.debug(f"Waiting for {len(self._tasks)} running hook tasks...")
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self._tasks, return_exceptions=True),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            log.warning("Timed out waiting for hook tasks to finish, cancelling...")
+            for task in list(self._tasks):
+                if not task.done():
+                    task.cancel()

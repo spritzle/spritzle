@@ -89,10 +89,28 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
         ("Tags", tags_str),
     ]
 
-    err = data.get("error")
-    if err:
-        err_val: Union[str, Text] = Text(str(err), style="red") if use_color else str(err)
-        items.append(("Error", err_val))
+    err_str = None
+    if data.get("last_error"):
+        err_str = str(data["last_error"])
+    elif data.get("error"):
+        err_val = data["error"]
+        if isinstance(err_val, dict):
+            if err_val.get("value", 0) != 0 or err_val.get("message"):
+                err_str = err_val.get("message") or str(err_val)
+        elif err_val:
+            err_str = str(err_val)
+    elif data.get("errc"):
+        errc = data["errc"]
+        if isinstance(errc, dict) and (errc.get("value", 0) != 0 or errc.get("message")):
+            err_str = errc.get("message") or str(errc)
+        elif isinstance(errc, (int, str)) and errc != 0 and errc != "":
+            err_str = str(errc)
+
+    if err_str:
+        err_val_rendered: Union[str, Text] = (
+            Text(str(err_str), style="red") if use_color else str(err_str)
+        )
+        items.append(("Error", err_val_rendered))
 
     if use_color:
         console = get_console(getattr(client, "color", None))

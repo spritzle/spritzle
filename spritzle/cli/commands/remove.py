@@ -30,11 +30,14 @@ async def f(client, torrent, delete_files, query, all_torrents, quiet=False):
     if delete_files:
         params["delete_files"] = ""
 
+    sem = asyncio.Semaphore(32)
+
     async def _remove(ih):
-        url = client.url(f"torrent/{ih}")
-        async with client.session.delete(url, params=params) as resp:
-            err = "" if resp.status == 200 else await get_response_error(resp)
-            return ih, resp.status == 200, err
+        async with sem:
+            url = client.url(f"torrent/{ih}")
+            async with client.session.delete(url, params=params) as resp:
+                err = "" if resp.status == 200 else await get_response_error(resp)
+                return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_remove(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]

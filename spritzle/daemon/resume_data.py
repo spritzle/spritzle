@@ -246,11 +246,15 @@ class ResumeData(object):
             if torrent.need_save_resume_data():
                 futs.append(self.save_torrent(torrent))
 
+        already_added = set(futs)
         for val in list(self.resume_data_futures.values()):
             if isinstance(val, set):
-                futs.extend(list(val))
+                for f in val:
+                    if f not in already_added:
+                        futs.append(f)
             elif isinstance(val, asyncio.Future):
-                futs.append(val)
+                if val not in already_added:
+                    futs.append(val)
 
         try:
             await asyncio.wait_for(
@@ -277,14 +281,12 @@ class ResumeData(object):
         p = Path(self.core.state_dir, info_hash + ".resume")
         p.unlink(missing_ok=True)
 
-        if self.core.state_dir.is_dir():
-            for tmp in self.core.state_dir.glob(f"*.{info_hash}.*.tmp"):
-                tmp.unlink(missing_ok=True)
-
-
     async def load(self):
         log.info(f"Loading resume data from {self.core.state_dir}")
         for f in self.core.state_dir.iterdir():
+            if f.name.startswith(".") and f.name.endswith(".tmp"):
+                f.unlink(missing_ok=True)
+                continue
             if f.suffix == ".resume" and not f.name.startswith("."):
                 log.info(f"Found {f.name}, attempting add..")
                 try:

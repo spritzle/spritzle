@@ -113,35 +113,46 @@ async def resetter(client, reset_keys, reset_all):
 
 
 async def show(client, modified=False, defaults=False, json_output=False, plain=False):
-    async with client.session.get(client.url("session/settings")) as resp:
-        if resp.status != 200:
-            err_msg = await get_response_error(resp)
-            print_error(f"Error getting settings: {err_msg}", getattr(client, "color", None))
-            sys.exit(1)
-        settings = await resp.json()
-
-    async with client.session.get(client.url("session/settings/defaults")) as resp:
-        if resp.status != 200:
-            err_msg = await get_response_error(resp)
-            print_error(f"Error getting default settings: {err_msg}", getattr(client, "color", None))
-            sys.exit(1)
-        default_settings = await resp.json()
-
-    modified_keys = {
-        k
-        for k, v in settings.items()
-        if k in default_settings and v != default_settings[k]
-    }
-
     if defaults:
-        display_data = default_settings
+        async with client.session.get(client.url("session/settings/defaults")) as resp:
+            if resp.status != 200:
+                err_msg = await get_response_error(resp)
+                print_error(f"Error getting default settings: {err_msg}", getattr(client, "color", None))
+                sys.exit(1)
+            display_data = await resp.json()
         title = "Session Settings (Defaults)"
         mod_keys = set()
     elif modified:
-        display_data = {k: settings[k] for k in sorted(modified_keys)}
+        async with client.session.get(
+            client.url("session/settings"), params={"modified": "true"}
+        ) as resp:
+            if resp.status != 200:
+                err_msg = await get_response_error(resp)
+                print_error(f"Error getting settings: {err_msg}", getattr(client, "color", None))
+                sys.exit(1)
+            display_data = await resp.json()
         title = "Session Settings (Modified)"
-        mod_keys = modified_keys
+        mod_keys = set(display_data.keys())
     else:
+        async with client.session.get(client.url("session/settings")) as resp:
+            if resp.status != 200:
+                err_msg = await get_response_error(resp)
+                print_error(f"Error getting settings: {err_msg}", getattr(client, "color", None))
+                sys.exit(1)
+            settings = await resp.json()
+
+        async with client.session.get(client.url("session/settings/defaults")) as resp:
+            if resp.status != 200:
+                err_msg = await get_response_error(resp)
+                print_error(f"Error getting default settings: {err_msg}", getattr(client, "color", None))
+                sys.exit(1)
+            default_settings = await resp.json()
+
+        modified_keys = {
+            k
+            for k, v in settings.items()
+            if k in default_settings and v != default_settings[k]
+        }
         display_data = settings
         title = "Session Settings"
         mod_keys = modified_keys

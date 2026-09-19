@@ -25,11 +25,14 @@ async def f(client, torrent, query, all_torrents, quiet=False):
         click.echo("No matching torrents found.")
         return
 
+    sem = asyncio.Semaphore(32)
+
     async def _resume(ih):
-        url = client.url(f"torrent/{ih}/resume")
-        async with client.session.post(url, json=[]) as resp:
-            err = "" if resp.status == 200 else await get_response_error(resp)
-            return ih, resp.status == 200, err
+        async with sem:
+            url = client.url(f"torrent/{ih}/resume")
+            async with client.session.post(url, json=[]) as resp:
+                err = "" if resp.status == 200 else await get_response_error(resp)
+                return ih, resp.status == 200, err
 
     results = await asyncio.gather(*[_resume(ih) for ih in targets])
     errors = [(ih, reason) for ih, ok, reason in results if not ok]

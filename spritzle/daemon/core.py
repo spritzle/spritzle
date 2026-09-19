@@ -74,8 +74,17 @@ class Core(object):
         self.alert.register_handler("state_changed_alert", self.on_state_changed_alert)
         self.alert.register_handler("file_error_alert", self.on_file_error_alert)
         self.alert.register_handler("torrent_error_alert", self.on_torrent_error_alert)
+        self.alert.register_handler("storage_moved_alert", self.on_storage_moved_alert)
+        self.alert.register_handler(
+            "storage_moved_failed_alert", self.on_storage_moved_failed_alert
+        )
 
     def get_default_settings(self) -> Dict[str, Any]:
+        try:
+            version_str = importlib.metadata.version("spritzle")
+        except Exception:
+            version_str = "1.0.0"
+
         return {
             "alert_mask": (
                 int(lt.alert.category_t.error_notification)
@@ -91,8 +100,7 @@ class Core(object):
                 | int(lt.alert.category_t.torrent_log_notification)
                 | int(lt.alert.category_t.peer_log_notification)
             ),
-            "user_agent": "Spritzle/%s libtorrent/%s"
-            % (importlib.metadata.version("spritzle"), lt.__version__),
+            "user_agent": f"Spritzle/{version_str} libtorrent/{lt.__version__}",
             "alert_queue_size": 20000,
         }
 
@@ -138,6 +146,7 @@ class Core(object):
             info_hash = str(handle.info_hash())
             if info_hash not in self.torrent_data:
                 log.warning(f"Restoring missing metadata for ghost torrent {info_hash}")
+                self.torrent_data[info_hash] = {}
         default_save_path = self.config.get("add_torrent_params.save_path")
         if default_save_path:
             p = Path(os.path.expanduser(str(default_save_path)))
@@ -156,6 +165,7 @@ class Core(object):
         log.debug("Core stopping..")
         if self.session is None:
             return
+        await self.hooks.stop()
         await self.resume_data.stop()
         await self.save_session_state()
         self.session.pause()
@@ -171,7 +181,12 @@ class Core(object):
             None, functools.partial(self.session.save_state)
         )
         f = Path(self.state_dir, "session.state")
-        f.write_bytes(lt.bencode(state))
+        data = lt.bencode(state)
+        tmp = f.with_name(f".{f.name}.tmp")
+        def _write_atomic():
+            tmp.write_bytes(data)
+            tmp.replace(f)
+        await asyncio.get_running_loop().run_in_executor(None, _write_atomic)
 
     async def load_session_state(self):
         f = Path(self.state_dir, "session.state")
@@ -254,4 +269,23 @@ class Core(object):
             self.torrent_data.setdefault(info_hash, {})["last_error"] = alert.message()
             self.hooks.run_hooks(
                 "torrent_error_alert", info_hash, ",".join(self.get_torrent_tags(info_hash))
+            )
+
+    async def on_storage_moved_alert(self, alert):
+        info_hash = str(alert.handle.info_hash()) if alert.handle.is_valid() else ""
+        if info_hash:
+            if alert.handle.is_valid():
+                self.resume_data.save_torrent(alert.handle)
+            self.hooks.run_hooks(
+                "storage_moved_alert", info_hash, ",".join(self.get_torrent_tags(info_hash))
+            )
+
+    async def on_storage_moved_failed_alert(self, alert):
+        info_hash = str(alert.handle.info_hash()) if alert.handle.is_valid() else ""
+        msg = f"Storage move failed for torrent {info_hash}: {alert.message()}"
+        log.error(msg)
+        if info_hash:
+            self.torrent_data.setdefault(info_hash, {})["last_error"] = alert.message()
+            self.hooks.run_hooks(
+                "storage_moved_failed_alert", info_hash, ",".join(self.get_torrent_tags(info_hash))
             )

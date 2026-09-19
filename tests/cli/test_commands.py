@@ -1164,6 +1164,12 @@ def test_info_command(cli):
     assert "[/green]" not in res_color.output
     assert "State" in res_color.output
 
+    # Error visibility
+    core.torrent_data.setdefault(ih, {})["last_error"] = "Storage device write failure"
+    res_err = runner.invoke(spritzle_cli, ["info", ih, "--plain"])
+    assert res_err.exit_code == 0
+    assert "Storage device write failure" in res_err.output
+
 
 def test_add_magnet_command(cli):
     runner = CliRunner()

@@ -68,7 +68,7 @@ async def debug_middleware(request, handler):
     log.debug(f"URL: {request.rel_url}")
     log.debug(f"METHOD: {request.method}")
     safe_headers = {
-        k: ("***REDACTED***" if k.lower() == "authorization" else v)
+        k: ("***REDACTED***" if k.lower() in ("authorization", "x-api-key") else v)
         for k, v in request.headers.items()
     }
     log.debug(f"HEADERS: {safe_headers}")
@@ -106,7 +106,10 @@ async def error_middleware(request, handler):
         for k, v in response.headers.items()
         if k.lower() not in ("content-type", "content-length")
     }
-    safe_msg = response.text.rstrip("\r\n") if response.text else response.reason
+    if response.text and not response.text.startswith(f"{response.status}: "):
+        safe_msg = response.text.rstrip("\r\n")
+    else:
+        safe_msg = response.reason or "Error"
     return aiohttp.web.json_response(
         {
             "status": response.status,
@@ -119,6 +122,12 @@ async def error_middleware(request, handler):
     )
 
 
+
+
+def create_app(core, log) -> aiohttp.web.Application:
+    new_app = aiohttp.web.Application()
+    setup_app(new_app, core, log)
+    return new_app
 
 
 app = aiohttp.web.Application()
@@ -214,11 +223,11 @@ def run_daemon(
 
     core = Core(config)
     core.key_manager.ensure_local_client_remote(f"http://{host}:{port}", core.identity.daemon_id)
-    setup_app(app, core, log)
+    daemon_app = create_app(core, log)
     # Auth middleware is outside setup_app because we don't want it for unit tests
-    app.middlewares.append(auth_middleware)
+    daemon_app.middlewares.append(auth_middleware)
     try:
-        aiohttp.web.run_app(app, host=host, port=port, loop=loop)
+        aiohttp.web.run_app(daemon_app, host=host, port=port, loop=loop)
     except OSError as e:
         log.error(f"Failed to bind to {host}:{port}: {e}")
         log.error(f"Check for conflicting services with: ss -tulpn | grep ':{port}'")

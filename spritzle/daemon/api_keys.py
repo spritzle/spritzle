@@ -144,12 +144,14 @@ class KeyManager:
                     and self.verify_key(data.get("api_key", "")) is not None
                 ):
                     data["url"] = daemon_url
-                    with self.local_remote_file.open("w", encoding="utf-8") as f:
+                    temp_file = self.local_remote_file.with_suffix(".tmp")
+                    with temp_file.open("w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2)
                     try:
-                        os.chmod(self.local_remote_file, 0o600)
+                        os.chmod(temp_file, 0o600)
                     except OSError:
                         pass
+                    temp_file.replace(self.local_remote_file)
                     return data
             except (json.JSONDecodeError, OSError):
                 pass

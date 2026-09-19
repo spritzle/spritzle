@@ -31,6 +31,7 @@ import operator
 import os
 from pathlib import Path
 import re
+import socket
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
@@ -48,7 +49,7 @@ log = logging.getLogger("spritzle")
 routes = web.RouteTableDef()
 
 
-def validate_torrent_url(url_str: str) -> str:
+def validate_torrent_url(url_str: str, allow_loopback: bool = False) -> str:
     parsed = urlparse(url_str)
     if parsed.scheme == "magnet":
         return url_str
@@ -59,12 +60,28 @@ def validate_torrent_url(url_str: str) -> str:
     if not parsed.hostname:
         raise web.HTTPBadRequest(reason="Invalid URL: missing hostname.")
 
+    hostname = parsed.hostname.lower()
+    if not allow_loopback and hostname in ("localhost", "localhost.localdomain"):
+        raise web.HTTPBadRequest(reason=f"URL host '{parsed.hostname}' is not allowed.")
+
     try:
-        ip = ipaddress.ip_address(parsed.hostname)
+        ip = ipaddress.ip_address(hostname)
         if ip.is_link_local or ip.is_multicast:
             raise web.HTTPBadRequest(reason=f"URL host '{parsed.hostname}' is not allowed.")
+        if not allow_loopback and (ip.is_loopback or ip.is_private):
+            raise web.HTTPBadRequest(reason=f"URL host '{parsed.hostname}' is not allowed.")
     except ValueError:
-        pass
+        if not allow_loopback:
+            try:
+                addr_info = socket.getaddrinfo(hostname, None)
+                for family, _, _, _, sockaddr in addr_info:
+                    ip = ipaddress.ip_address(sockaddr[0])
+                    if ip.is_link_local or ip.is_multicast or ip.is_loopback or ip.is_private:
+                        raise web.HTTPBadRequest(
+                            reason=f"URL host '{parsed.hostname}' resolves to a disallowed address."
+                        )
+            except socket.gaierror:
+                pass
 
     return url_str
 
@@ -204,6 +221,18 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
     if len(statuses) == 0:
         return []
 
+    regex_cache: Dict[str, re.Pattern] = {}
+
+    def get_pattern(pattern_str: str) -> re.Pattern:
+        if pattern_str not in regex_cache:
+            try:
+                regex_cache[pattern_str] = re.compile(pattern_str)
+            except re.error as ex:
+                raise web.HTTPBadRequest(
+                    reason=f"Invalid regular expression '{pattern_str}': {ex}"
+                )
+        return regex_cache[pattern_str]
+
     for status in statuses:
         for key, op, value in parsed_queries:
             if key not in status:
@@ -217,10 +246,8 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
                     raise web.HTTPBadRequest(
                         reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
                     )
-                try:
-                    matched = bool(re.match(value, status[key]))
-                except re.error as ex:
-                    raise web.HTTPBadRequest(reason=f"Invalid regular expression '{value}': {ex}")
+                pat = get_pattern(value)
+                matched = bool(pat.match(status[key]))
                 if op == "ne" and matched:
                     break
                 elif op in ("", "eq") and not matched:
@@ -265,7 +292,7 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
                 if not ops[op](status[key], num_val):
                     break
             elif isinstance(status[key], list):
-                ops = {"", "all", "any", "in"}
+                ops = {"", "all", "any", "in", "ne"}
                 if op not in ops:
                     raise web.HTTPBadRequest(
                         reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
@@ -273,11 +300,13 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
 
                 items = [str(x) for x in status[key]]
                 if op in ("", "any"):
-                    try:
-                        if not any(re.match(value, item) for item in items):
-                            break
-                    except re.error as ex:
-                        raise web.HTTPBadRequest(reason=f"Invalid regular expression '{value}': {ex}")
+                    pat = get_pattern(value)
+                    if not any(pat.match(item) for item in items):
+                        break
+                elif op == "ne":
+                    pat = get_pattern(value)
+                    if any(pat.match(item) for item in items):
+                        break
                 elif op == "in":
                     targets = [v.strip() for v in value.split(",")]
                     if not any(item in targets for item in items):
@@ -373,7 +402,11 @@ async def post_torrent(request):
     # See: https://github.com/arvidn/libtorrent/issues/481
     elif "url" in post:
         raw_url = post.pop("url")
-        validated_url = validate_torrent_url(raw_url)
+        allow_loopback = bool(
+            config.get("allow_loopback_urls", False)
+            or os.environ.get("SPRITZLE_ALLOW_LOOPBACK_URL")
+        )
+        validated_url = validate_torrent_url(raw_url, allow_loopback=allow_loopback)
         if validated_url.startswith("magnet:"):
             try:
                 magnet_params = lt.parse_magnet_uri(validated_url)
@@ -467,6 +500,8 @@ async def post_torrent(request):
     except (KeyError, TypeError, ValueError) as e:
         raise web.HTTPBadRequest(reason=str(e))
     except RuntimeError as e:
+        if "duplicate" in str(e).lower():
+            raise web.HTTPConflict(reason=f"Duplicate torrent: {e}")
         raise web.HTTPInternalServerError(reason=f"Error in session.add_torrent(): {e}")
 
     info_hash = str(torrent_handle.info_hash())
@@ -583,37 +618,46 @@ async def delete_torrent(request):
         else:
             query_params[key] = val
 
-    if tid is None:
-        # If tid is None, we remove all torrents matching the query (or all if no query)
-        tids = get_torrent_list(core, query=query_params if query_params else None)
-    else:
-        tids = [tid]
-
-    for t in tids:
+    if tid is not None:
+        handle = get_valid_handle(core, tid)
+        info_hash = str(handle.info_hash())
         try:
-            handle = get_valid_handle(core, t)
-            info_hash = str(handle.info_hash())
-            try:
-                await core.torrent.remove(handle, options)
-            except AlertException as ex:
-                msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
-                log.error(f"Error deleting files for torrent {info_hash}: {msg}")
-            core.resume_data.delete(info_hash)
-            core.torrent_data.pop(info_hash, None)
-        except web.HTTPException:
-            if tid is not None:
-                raise
-            log.warning(f"Skipping missing torrent {t} during bulk removal")
+            await core.torrent.remove(handle, options)
+        except AlertException as ex:
+            msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
+            log.error(f"Error deleting files for torrent {info_hash}: {msg}")
         except asyncio.TimeoutError:
-            log.error(f"Timed out removing torrent {t}")
-            if tid is not None:
-                raise web.HTTPGatewayTimeout(text=f"Timed out removing torrent {t}")
-            continue
-        except Exception as e:
-            log.error(f"Error removing torrent {t}: {e}")
-            if tid is not None:
-                raise
-            continue
+            log.error(f"Timed out removing torrent {tid}")
+            raise web.HTTPGatewayTimeout(text=f"Timed out removing torrent {tid}")
+        core.resume_data.delete(info_hash)
+        core.torrent_data.pop(info_hash, None)
+        return web.Response()
+
+    # Bulk deletion
+    tids = get_torrent_list(core, query=query_params if query_params else None)
+    sem = asyncio.Semaphore(64)
+
+    async def _remove_one(t: str):
+        async with sem:
+            try:
+                handle = get_valid_handle(core, t)
+                info_hash = str(handle.info_hash())
+                try:
+                    await core.torrent.remove(handle, options)
+                except AlertException as ex:
+                    msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
+                    log.error(f"Error deleting files for torrent {info_hash}: {msg}")
+                core.resume_data.delete(info_hash)
+                core.torrent_data.pop(info_hash, None)
+            except web.HTTPException:
+                log.warning(f"Skipping missing torrent {t} during bulk removal")
+            except asyncio.TimeoutError:
+                log.error(f"Timed out removing torrent {t}")
+            except Exception as e:
+                log.error(f"Error removing torrent {t}: {e}")
+
+    if tids:
+        await asyncio.gather(*[_remove_one(t) for t in tids])
 
     return web.Response()
 
