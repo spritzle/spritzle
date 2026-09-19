@@ -61,6 +61,9 @@ Arguments:
 * `URL_OR_FILE`: Local torrent file path, HTTP/HTTPS URL, magnet link, 40-char info-hash, or `-` to read from stdin.
 
 Options:
+* `-w, --watch`: Stream live progress until completion or `Ctrl+C`.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled output.
 * `-t, --tag TEXT`: Assign tags to the torrent (can be specified multiple times).
 * `-o, --option TEXT`: Key=value option passed to add_torrent parameters (can be specified multiple times).
 * `-Q, --quiet`: Print only the added info-hash.
@@ -68,6 +71,12 @@ Options:
 **Examples:**
 
 ```shell
+# Add from a local file (displays summary card with size, path, status, and track instructions)
+spritzle add archlinux-x86_64.iso.torrent
+
+# Add and stream live progress until complete
+spritzle add --watch archlinux-x86_64.iso.torrent
+
 # Add from a local file with tags
 spritzle add -t linux -t iso archlinux-x86_64.iso.torrent
 
@@ -86,13 +95,15 @@ echo "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719" | spritzle a
 
 ### `list` - List Torrents
 
-Displays torrents in a table with customizable fields and filtering.
+Displays torrents in a table with customizable fields and filtering. When DHT nodes are under 10, an indicator notifies that DHT is bootstrapping.
 
 ```shell
 spritzle list [OPTIONS]
 ```
 
 Options:
+* `-w, --watch`: Run interactive, updating dashboard showing active torrents, throughput, ETA, and connected peers.
+* `-i, --interval FLOAT`: Refresh interval in seconds when in watch mode (default: `1.0`).
 * `-f, --fields TEXT`: Comma-separated list of torrent status fields to print (default: `name,state,progress,download_rate,upload_rate,spritzle.tags`).
 * `-q, --query TEXT`: Filter query expression in the format `<field[.(op)]>=<value>` (e.g. `state=seeding`, `progress.ge=0.5`, `spritzle.tags.in=linux,iso`). Can be specified multiple times.
 * `--header / --no-header`: Toggle table headers.
@@ -124,6 +135,32 @@ spritzle list -f info_hash,name,progress --json
 
 # Plain table without borders
 spritzle list -f info_hash,name --no-header --plain
+
+# Run interactive watch mode
+spritzle list --watch
+```
+
+### `top` - Live Dashboard
+
+Displays an interactive, continuously updating terminal dashboard showing overall transfer speeds, active torrents, connected peers, ETA, and DHT status.
+
+```shell
+spritzle top [OPTIONS]
+```
+
+Options:
+* `-i, --interval FLOAT`: Refresh interval in seconds (default: `1.0`).
+* `-q, --query TEXT`: Filter torrents (e.g. `state=downloading`).
+* `--plain`: Force plain unstyled output.
+
+**Examples:**
+
+```shell
+# Launch live dashboard
+spritzle top
+
+# Update every 0.5 seconds for downloading torrents only
+spritzle top -i 0.5 -q state=downloading
 ```
 
 ### `info` - Show Detailed Torrent Information

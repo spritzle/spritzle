@@ -3,11 +3,19 @@ import os
 from pathlib import Path
 import re
 import sys
+from typing import Sequence
 from urllib.parse import parse_qs, urlparse
 
 import click
 
-from spritzle.cli.display import get_response_error, print_error, print_success, print_warning
+from spritzle.cli.display import (
+    get_console,
+    get_response_error,
+    print_error,
+    print_json,
+    print_warning,
+    render_post_add_card,
+)
 
 
 @click.command("add", short_help="Add a torrent to the session.")
@@ -30,12 +38,30 @@ from spritzle.cli.display import get_response_error, print_error, print_success,
     help=("Tag to apply to the torrent. Can be specified multiple times."),
 )
 @click.option("--quiet", "-Q", is_flag=True, default=False, help="Print only added info-hash.")
+@click.option(
+    "--watch",
+    "-w",
+    is_flag=True,
+    default=False,
+    help="Stream live progress until completion or Ctrl+C.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
+@click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
-def command(client, path, option, tag, quiet):
-    client.do_command(f, path, option, tag, quiet)
+def command(client, path, option, tag, quiet, watch, json_output, plain):
+    client.do_command(f, path, option, tag, quiet, watch, json_output, plain)
 
 
-async def f(client, path, option, tag, quiet=False):
+async def f(
+    client,
+    path: str,
+    option: Sequence[str],
+    tag: Sequence[str],
+    quiet: bool = False,
+    watch: bool = False,
+    json_output: bool = False,
+    plain: bool = False,
+):
     data = {}
     for o in option:
         if "=" in o:
@@ -129,14 +155,65 @@ async def f(client, path, option, tag, quiet=False):
                 color_opt=color_opt,
             )
             sys.exit(1)
+
+        resp_data = {}
+        try:
+            resp_data = await resp.json()
+        except Exception:
+            pass
+
         location = resp.headers.get("Location")
         if location:
             hash = location.split("/")[-1]
         else:
-            resp_data = await resp.json()
             hash = resp_data.get("info_hash", "")
+
+        resp_data["info_hash"] = hash
+
+        # If name or size wasn't in resp_data (e.g. from an older daemon), fetch it
+        if "name" not in resp_data or "size" not in resp_data:
+            try:
+                async with client.session.get(client.url(f"torrent/{hash}")) as sresp:
+                    if sresp.status == 200:
+                        sdata = await sresp.json()
+                        resp_data.setdefault("name", sdata.get("name", ""))
+                        resp_data.setdefault(
+                            "size", sdata.get("total_wanted", 0) or sdata.get("total_size", 0)
+                        )
+                        resp_data.setdefault("save_path", sdata.get("save_path", ""))
+                        resp_data.setdefault("state", sdata.get("state", "downloading"))
+                        resp_data.setdefault("num_peers", sdata.get("num_peers", 0))
+            except Exception:
+                pass
+
+        if not resp_data.get("name"):
+            if path.startswith("magnet:"):
+                qs = parse_qs(urlparse(path).query)
+                if "dn" in qs and qs["dn"]:
+                    resp_data["name"] = qs["dn"][0]
+            elif not path.startswith(("http://", "https://")) and len(path) not in (40, 64):
+                try:
+                    resp_data["name"] = Path(path).stem
+                except Exception:
+                    pass
+            if not resp_data.get("name"):
+                resp_data["name"] = hash
 
         if quiet:
             click.echo(hash)
-        else:
-            print_success(f"{hash} added successfully.", color_opt=color_opt)
+            return
+
+        if json_output:
+            print_json(resp_data)
+            return
+
+        effective_color = color_opt if not plain else False
+        console = get_console(effective_color)
+        render_post_add_card(console, resp_data, color_opt=effective_color)
+
+        if watch:
+            from spritzle.cli.dashboard import watch_single_torrent
+
+            if effective_color is None or effective_color:
+                console.print("")
+            await watch_single_torrent(client, hash, color_opt=effective_color)

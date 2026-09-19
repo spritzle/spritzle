@@ -38,9 +38,24 @@ from spritzle.cli.display import (
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--raw", is_flag=True, default=False, help="Print raw unformatted values.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
+@click.option(
+    "--watch",
+    "-w",
+    is_flag=True,
+    default=False,
+    help="Live updating dashboard.",
+)
+@click.option(
+    "-i",
+    "--interval",
+    type=float,
+    default=1.0,
+    show_default=True,
+    help="Refresh interval in seconds when in watch mode.",
+)
 @click.pass_obj
-def command(client, fields, header, query, json_output, raw, plain):
-    client.do_command(f, fields, header, query, json_output, raw, plain)
+def command(client, fields, header, query, json_output, raw, plain, watch, interval):
+    client.do_command(f, fields, header, query, json_output, raw, plain, watch, interval)
 
 
 async def f(
@@ -51,7 +66,16 @@ async def f(
     json_output: bool = False,
     raw: bool = False,
     plain: bool = False,
+    watch: bool = False,
+    interval: float = 1.0,
 ):
+    if watch:
+        from spritzle.cli.dashboard import run_dashboard
+
+        color_opt = getattr(client, "color", None)
+        await run_dashboard(client, query=query, interval=interval, color_opt=color_opt, plain=plain)
+        return
+
     type_formatters = {list: list_formatter}
 
     params = {}
@@ -96,6 +120,17 @@ async def f(
 
     is_interactive = should_use_color(getattr(client, "color", None)) and not plain and not raw
 
+    dht_nodes = None
+    if is_interactive:
+        try:
+            async with client.session.get(client.url("session/stats")) as sresp:
+                if sresp.status == 200:
+                    sstats = await sresp.json()
+                    if isinstance(sstats, dict) and "dht.dht_nodes" in sstats:
+                        dht_nodes = int(sstats["dht.dht_nodes"])
+        except Exception:
+            pass
+
     if not raw_items:
         if is_interactive:
             console = get_console(getattr(client, "color", None))
@@ -110,6 +145,8 @@ async def f(
                     "  spritzle add archlinux-x86_64.iso.torrent\n"
                     "  spritzle add \"magnet:?xt=urn:btih:...\""
                 )
+            if dht_nodes is not None and dht_nodes < 10:
+                console.print("\n[yellow]bootstrapping DHT...[/yellow]")
             return
         else:
             if header:
@@ -140,7 +177,11 @@ async def f(
                     if has_error:
                         formatted_val = "[bold red]error[/bold red]"
                     else:
-                        formatted_val = format_state(str(val), use_color=True)
+                        state_str = str(val)
+                        if state_str.lower() == "downloading" and int(item.get("num_peers", 0)) == 0:
+                            formatted_val = "[green]downloading[/green] [yellow](finding peers...)[/yellow]"
+                        else:
+                            formatted_val = format_state(state_str, use_color=True)
                 elif isinstance(val, bool):
                     formatted_val = format_bool(val, human=True, use_color=True)
                 elif isinstance(val, list):
@@ -167,7 +208,8 @@ async def f(
     if is_interactive:
         console = get_console(getattr(client, "color", None))
         headers = field_list if header else []
-        render_rich_table(console, headers, table)
+        caption = "[yellow]bootstrapping DHT...[/yellow]" if (dht_nodes is not None and dht_nodes < 10) else None
+        render_rich_table(console, headers, table, caption=caption)
     else:
         tablefmt = "simple" if header else "plain"
         headers = field_list if header else []

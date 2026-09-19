@@ -421,8 +421,19 @@ async def post_torrent(request):
 
     await core.resume_data.save_torrent(torrent_handle)
 
+    st = common.struct_to_dict(torrent_handle.status())
+    name = st.get("name", "")
+    size = st.get("total_wanted", 0) or st.get("total_size", 0)
+
     return web.json_response(
-        {"info_hash": info_hash},
+        {
+            "info_hash": info_hash,
+            "name": name,
+            "size": size,
+            "save_path": canonical_save_path,
+            "state": st.get("state", "downloading"),
+            "num_peers": st.get("num_peers", 0),
+        },
         status=201,
         headers={"Location": f"{request.scheme}://{request.host}/torrent/{info_hash}"},
     )

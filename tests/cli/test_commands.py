@@ -285,7 +285,8 @@ def test_add_command_info_hash(cli):
         ],
     )
     assert result.exit_code == 0
-    assert "added successfully" in result.output
+    assert "Added" in result.output
+    assert valid_hash[:8] in result.output
 
 
 def test_cli_daemon_config_and_flags_send_json_content_type(cli):
@@ -383,7 +384,8 @@ def test_add_command_missing_location_header(cli, monkeypatch):
         ],
     )
     assert result.exit_code == 0
-    assert "added successfully" in result.output
+    assert "Added" in result.output
+    assert valid_hash[:8] in result.output
 
 
 def test_pause_command(cli):
@@ -1171,7 +1173,8 @@ def test_add_magnet_command(cli):
         spritzle_cli, ["add", "-t", "linux", magnet]
     )
     assert res.exit_code == 0
-    assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
+    assert "Added test_arch" in res.output
+    assert "44a040be" in res.output
 
 
 def test_spritzled_help():
@@ -1416,7 +1419,8 @@ def test_add_command_stdin(cli):
 
     res = runner.invoke(spritzle_cli, ["add", "-"], input=magnet)
     assert res.exit_code == 0, res.output
-    assert "44a040be6d74d8d290cd20128788864cbf770719" in res.output
+    assert "Added test_stdin" in res.output
+    assert "44a040be" in res.output
 
 
 def test_add_command_invalid_magnet_preflight():
@@ -1426,6 +1430,133 @@ def test_add_command_invalid_magnet_preflight():
     res = runner.invoke(spritzle_cli, ["add", "magnet:?dn=test"])
     assert res.exit_code != 0
     assert "missing 'xt' parameter" in res.output
+
+
+def test_format_eta():
+    from spritzle.cli.display import format_eta
+    assert format_eta(None) == "--"
+    assert format_eta(-5) == "--"
+    assert format_eta(0) == "0s"
+    assert format_eta(45) == "45s"
+    assert format_eta(65) == "1m 05s"
+    assert format_eta(3665) == "1h 01m"
+    assert format_eta(90000) == "1d 01h"
+    assert format_eta(45, human=False) == "45"
+    assert format_eta(None, human=False) == "-1"
+
+
+def test_add_command_rich_card(cli):
+    runner = CliRunner()
+    from tests.daemon.common import torrent_dir
+    t_file = str(torrent_dir / "random_one_file.torrent")
+
+    res = runner.invoke(spritzle_cli, ["add", t_file])
+    assert res.exit_code == 0
+    assert "Added" in res.output
+    assert "Size:" in res.output
+    assert "Save Path:" in res.output
+    assert "Status:" in res.output
+    assert "Track progress:" in res.output
+    assert "spritzle list" in res.output
+    assert "spritzle info" in res.output
+
+
+def test_add_command_json_and_plain(cli):
+    runner = CliRunner()
+    from tests.daemon.common import torrent_dir
+    t_file = str(torrent_dir / "random_one_file.torrent")
+
+    # JSON output
+    res_json = runner.invoke(spritzle_cli, ["add", "--json", t_file])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert "info_hash" in data
+    assert "name" in data
+    assert "save_path" in data
+
+    # Plain output
+    res_plain = runner.invoke(spritzle_cli, ["add", "--plain", t_file])
+    assert res_plain.exit_code == 0
+    assert "Added" in res_plain.output
+    assert "Size:" in res_plain.output
+    assert "Save Path:" in res_plain.output
+
+
+def test_add_command_quiet(cli):
+    runner = CliRunner()
+    from tests.daemon.common import torrent_dir
+    t_file = str(torrent_dir / "random_one_file.torrent")
+
+    res = runner.invoke(spritzle_cli, ["add", "-Q", t_file])
+    assert res.exit_code == 0
+    # Must contain only the 40-char info_hash followed by newline
+    output = res.output.strip()
+    assert len(output) == 40
+    assert int(output, 16)
+
+
+def test_add_command_watch(cli):
+    from unittest.mock import patch
+    import asyncio
+    runner = CliRunner()
+    from tests.daemon.common import torrent_dir
+    t_file = str(torrent_dir / "random_one_file.torrent")
+
+    async def mock_sleep(*args, **kwargs):
+        raise KeyboardInterrupt()
+
+    with patch.object(asyncio, "sleep", side_effect=mock_sleep):
+        res = runner.invoke(spritzle_cli, ["add", "--watch", t_file])
+        assert res.exit_code == 0
+        assert "Added" in res.output
+        assert "Watching stopped" in res.output
+
+
+def test_top_command(cli):
+    from unittest.mock import patch
+    import asyncio
+    runner = CliRunner()
+
+    async def mock_sleep(*args, **kwargs):
+        raise KeyboardInterrupt()
+
+    with patch.object(asyncio, "sleep", side_effect=mock_sleep):
+        res = runner.invoke(spritzle_cli, ["top", "--plain"])
+        assert res.exit_code == 0
+        assert "Spritzle Monitor" in res.output
+        assert "Dashboard stopped" in res.output
+
+
+def test_list_command_watch(cli):
+    from unittest.mock import patch
+    import asyncio
+    runner = CliRunner()
+
+    async def mock_sleep(*args, **kwargs):
+        raise KeyboardInterrupt()
+
+    with patch.object(asyncio, "sleep", side_effect=mock_sleep):
+        res = runner.invoke(spritzle_cli, ["list", "--watch", "--plain"])
+        assert res.exit_code == 0
+        assert "Spritzle Monitor" in res.output
+        assert "Dashboard stopped" in res.output
+
+
+def test_dht_bootstrap_indicator_stats(cli):
+    runner = CliRunner()
+
+    # In stats --json, bootstrapping indicator
+    res_stats_json = runner.invoke(spritzle_cli, ["stats", "--json"])
+    assert res_stats_json.exit_code == 0
+    stats_data = json.loads(res_stats_json.output)
+    assert "dht" in stats_data
+    assert "bootstrapping" in stats_data["dht"]
+
+    # In stats plain / summary
+    res_stats = runner.invoke(spritzle_cli, ["stats"])
+    assert res_stats.exit_code == 0
+    assert "bootstrapping DHT..." in res_stats.output
+
 
 
 

@@ -8,6 +8,7 @@ from spritzle.cli.display import get_console, print_error, should_use_color
 EXAMPLES: Dict[str, List[str]] = {
     "add": [
         "spritzle add /path/to/file.torrent",
+        "spritzle add --watch archlinux-x86_64.iso.torrent",
         "spritzle add http://example.com/file.torrent",
         "spritzle add 'magnet:?xt=urn:btih:...'",
         "spritzle add <info-hash>",
@@ -18,6 +19,7 @@ EXAMPLES: Dict[str, List[str]] = {
     ],
     "list": [
         "spritzle list",
+        "spritzle list --watch",
         "spritzle list -q name=archlinux.*",
         "spritzle list -q state=downloading",
         "spritzle list -f name,state,progress,download_rate",
@@ -114,6 +116,12 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle remote set-key seedbox",
         "spritzle remote remove seedbox",
         "spritzle remote status --json",
+    ],
+    "top": [
+        "spritzle top",
+        "spritzle top -i 0.5",
+        "spritzle top -q state=downloading",
+        "spritzle top --plain",
     ],
 }
 

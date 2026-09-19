@@ -99,16 +99,42 @@ def format_bool(val: bool, human: bool = True, use_color: bool = True) -> str:
     return f"[dim]{escape('[off]')}[/dim]"
 
 
+def format_eta(seconds: Union[int, float, None], human: bool = True) -> str:
+    """Format ETA in seconds to human readable string."""
+    if seconds is None or seconds < 0 or seconds == float("inf"):
+        return "--" if human else "-1"
+    if not human:
+        return str(int(seconds))
+    sec = int(round(seconds))
+    if sec == 0:
+        return "0s"
+    if sec < 60:
+        return f"{sec}s"
+    if sec < 3600:
+        m, s = divmod(sec, 60)
+        return f"{m}m {s:02d}s"
+    if sec < 86400:
+        h, rem = divmod(sec, 3600)
+        m, _ = divmod(rem, 60)
+        return f"{h}h {m:02d}m"
+    d, rem = divmod(sec, 86400)
+    h, _ = divmod(rem, 3600)
+    return f"{d}d {h:02d}h"
+
+
 def render_rich_table(
     console: Console,
     headers: Sequence[str],
     rows: Sequence[Sequence[Any]],
     title: Optional[str] = None,
     box_style: box.Box = box.ROUNDED,
+    caption: Optional[str] = None,
 ) -> None:
     """Render a modern table using Rich."""
     table = Table(
         title=title,
+        caption=caption,
+        caption_style="dim italic",
         box=box_style,
         header_style="bold cyan",
         show_header=bool(headers),
@@ -118,6 +144,61 @@ def render_rich_table(
     for r in rows:
         table.add_row(*[str(cell) for cell in r])
     console.print(table)
+
+
+def render_post_add_card(
+    console: Console,
+    torrent: Dict[str, Any],
+    color_opt: Optional[bool] = None,
+) -> None:
+    """Render informative summary card after adding a torrent."""
+    name = torrent.get("name") or torrent.get("info_hash", "torrent")
+    info_hash = torrent.get("info_hash", "")
+    short_hash = f"{info_hash[:8]}..." if len(info_hash) >= 8 else info_hash
+    size_bytes = torrent.get("size") or torrent.get("total_wanted") or torrent.get("total_size") or 0
+    size_str = format_bytes(size_bytes) if size_bytes > 0 else "unknown (fetching metadata...)"
+    save_path = torrent.get("save_path", "")
+    state = torrent.get("state", "downloading")
+    peers = torrent.get("num_peers", 0)
+
+    if state.lower() == "downloading" and peers == 0:
+        status_text = "downloading (finding peers...)"
+    elif state.lower() == "downloading" and peers > 0:
+        status_text = f"downloading ({peers} peers)"
+    else:
+        status_text = state
+
+    is_color = should_use_color(color_opt)
+    display_name = name if name and name != info_hash else short_hash
+
+    if is_color:
+        console.print(
+            f"[bold green]✔[/bold green] Added [bold]{escape(display_name)}[/bold] ([cyan]{escape(short_hash)}[/cyan])"
+        )
+        console.print(f"  [dim]Size:[/dim]      {size_str}")
+        console.print(f"  [dim]Save Path:[/dim] {escape(save_path)}")
+        if state.lower() == "downloading" and peers == 0:
+            status_colored = "[green]downloading[/green] [yellow](finding peers...)[/yellow]"
+        elif state.lower() == "downloading" and peers > 0:
+            status_colored = f"[green]downloading[/green] ({peers} peers)"
+        else:
+            status_colored = format_state(state, use_color=True)
+        console.print(f"  [dim]Status:[/dim]    {status_colored}")
+        console.print("")
+        console.print("Track progress:")
+        console.print("  [cyan]spritzle list[/cyan]")
+        lookup_ref = name if name and name != info_hash else info_hash
+        console.print(f"  [cyan]spritzle info {escape(lookup_ref)}[/cyan]")
+    else:
+        print(f"Added {display_name} ({short_hash})")
+        print(f"  Size:      {size_str}")
+        print(f"  Save Path: {save_path}")
+        print(f"  Status:    {status_text}")
+        print("")
+        print("Track progress:")
+        print("  spritzle list")
+        lookup_ref = name if name and name != info_hash else info_hash
+        print(f"  spritzle info {lookup_ref}")
 
 
 def render_kv_table(

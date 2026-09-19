@@ -1,0 +1,337 @@
+import asyncio
+from typing import Any, Dict, List, Optional, Sequence
+
+from rich.console import Group
+from rich.live import Live
+from rich.markup import escape
+from rich.panel import Panel
+from rich.table import Table
+
+from spritzle.cli.display import (
+    format_bytes,
+    format_eta,
+    format_progress,
+    format_speed,
+    format_state,
+    get_console,
+    should_use_color,
+)
+
+
+async def fetch_torrent_data(client, info_hash: str) -> Optional[Dict[str, Any]]:
+    """Fetch status dict for a specific torrent."""
+    try:
+        async with client.session.get(client.url(f"torrent/{info_hash}")) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return None
+
+
+async def fetch_session_stats(client) -> Dict[str, Any]:
+    """Fetch session stats dict."""
+    try:
+        async with client.session.get(client.url("session/stats")) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {}
+
+
+async def fetch_torrents_with_status(client, query: Optional[Sequence[str]] = None) -> List[Dict[str, Any]]:
+    """Fetch list of torrent statuses matching query."""
+    params = {}
+    if query:
+        for q in query:
+            if "=" in q:
+                k, v = q.split("=", 1)
+                params[k] = v
+            else:
+                params[q] = ""
+    try:
+        async with client.session.get(client.url("torrent"), params=params) as resp:
+            if resp.status != 200:
+                return []
+            torrents = await resp.json()
+            if not isinstance(torrents, list):
+                return []
+    except Exception:
+        return []
+
+    items = []
+    for ih in torrents:
+        data = await fetch_torrent_data(client, ih)
+        if data:
+            items.append(data)
+    return items
+
+
+def render_single_watch_panel(data: Dict[str, Any], is_color: bool = True) -> Panel:
+    """Build a rich Panel representation of a single torrent's progress."""
+    name = data.get("name") or data.get("info_hash", "torrent")
+    info_hash = data.get("info_hash", "")
+    short_hash = f"{info_hash[:8]}..." if len(info_hash) >= 8 else info_hash
+    state = str(data.get("state", "downloading"))
+    progress = float(data.get("progress", 0.0))
+    dl_rate = float(data.get("download_rate", 0))
+    ul_rate = float(data.get("upload_rate", 0))
+    total_wanted = float(data.get("total_wanted", 0) or data.get("total_size", 0))
+    total_done = float(data.get("total_done", 0))
+    num_peers = int(data.get("num_peers", 0))
+    num_seeds = int(data.get("num_seeds", 0))
+
+    if dl_rate > 0 and total_wanted > total_done:
+        eta_sec = (total_wanted - total_done) / dl_rate
+    else:
+        eta_sec = None
+
+    if state.lower() == "downloading" and num_peers == 0:
+        status_disp = "[yellow]downloading (finding peers...)[/yellow]" if is_color else "downloading (finding peers...)"
+    elif state.lower() == "downloading" and num_peers > 0:
+        status_disp = f"[green]downloading[/green] ({num_peers} peers)" if is_color else f"downloading ({num_peers} peers)"
+    else:
+        status_disp = format_state(state, use_color=is_color)
+
+    prog_bar = format_progress(progress, human=True, width=20)
+    size_disp = f"{format_bytes(total_done)} / {format_bytes(total_wanted)}" if total_wanted > 0 else format_bytes(total_done)
+    speed_disp = f"▼ {format_speed(dl_rate)}   ▲ {format_speed(ul_rate)}"
+    peers_disp = f"{num_peers} connected ({num_seeds} seeds)"
+    eta_disp = format_eta(eta_sec)
+
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style="bold cyan", no_wrap=True)
+    table.add_column()
+
+    table.add_row("Status:", status_disp)
+    table.add_row("Progress:", f"{prog_bar}  ({size_disp})")
+    table.add_row("Speed:", speed_disp)
+    table.add_row("Peers:", peers_disp)
+    table.add_row("ETA:", eta_disp)
+
+    title = f"[bold]{escape(name)}[/bold] ([dim]{escape(short_hash)}[/dim])" if is_color else f"{name} ({short_hash})"
+    return Panel(table, title=title, subtitle="[dim]Press Ctrl+C to stop watching[/dim]")
+
+
+async def watch_single_torrent(
+    client,
+    info_hash: str,
+    interval: float = 1.0,
+    color_opt: Optional[bool] = None,
+    once: bool = False,
+) -> None:
+    """Stream live progress of a single torrent until completion or Ctrl+C."""
+    is_interactive = should_use_color(color_opt)
+    console = get_console(color_opt)
+
+    try:
+        if is_interactive:
+            with Live(console=console, refresh_per_second=4, transient=False) as live:
+                while True:
+                    data = await fetch_torrent_data(client, info_hash)
+                    if not data:
+                        console.print(f"[red]Torrent {info_hash} not found.[/red]")
+                        break
+
+                    live.update(render_single_watch_panel(data, is_color=True))
+
+                    progress = float(data.get("progress", 0.0))
+                    state = str(data.get("state", "")).lower()
+                    if progress >= 1.0 or state in ("seeding", "finished"):
+                        name = data.get("name") or info_hash
+                        size = format_bytes(data.get("total_size") or data.get("total_wanted") or 0)
+                        live.stop()
+                        console.print(f"[bold green]✔[/bold green] Download complete: [bold]{escape(name)}[/bold] ({size})")
+                        break
+
+                    if once:
+                        break
+                    await asyncio.sleep(interval)
+        else:
+            while True:
+                data = await fetch_torrent_data(client, info_hash)
+                if not data:
+                    print(f"Torrent {info_hash} not found.")
+                    break
+
+                name = data.get("name") or info_hash
+                progress = float(data.get("progress", 0.0))
+                dl_rate = float(data.get("download_rate", 0))
+                ul_rate = float(data.get("upload_rate", 0))
+                num_peers = int(data.get("num_peers", 0))
+                total_wanted = float(data.get("total_wanted", 0) or data.get("total_size", 0))
+                total_done = float(data.get("total_done", 0))
+                eta_sec = (total_wanted - total_done) / dl_rate if dl_rate > 0 and total_wanted > total_done else None
+                eta_str = format_eta(eta_sec)
+
+                pct = f"{progress * 100:.1f}%"
+                print(f"{name}: {pct} | DL: {format_speed(dl_rate)} | UL: {format_speed(ul_rate)} | Peers: {num_peers} | ETA: {eta_str}")
+
+                state = str(data.get("state", "")).lower()
+                if progress >= 1.0 or state in ("seeding", "finished"):
+                    size = format_bytes(total_wanted)
+                    print(f"Download complete: {name} ({size})")
+                    break
+
+                if once:
+                    break
+                await asyncio.sleep(interval)
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        if is_interactive:
+            console.print("\n[dim]Watching stopped.[/dim]")
+        else:
+            print("\nWatching stopped.")
+
+
+def build_dashboard_renderable(
+    items: List[Dict[str, Any]],
+    stats: Dict[str, Any],
+    is_color: bool = True,
+) -> Any:
+    """Build the Rich renderable for spritzle top / list --watch."""
+    dht_nodes = int(stats.get("dht.dht_nodes", 0))
+    connected_peers = int(stats.get("peer.num_peers_connected", 0))
+    total_dl = sum(float(t.get("download_rate", 0)) for t in items)
+    total_ul = sum(float(t.get("upload_rate", 0)) for t in items)
+
+    num_dl = sum(1 for t in items if str(t.get("state", "")).lower() == "downloading")
+    num_seed = sum(1 for t in items if str(t.get("state", "")).lower() == "seeding")
+
+    if dht_nodes < 10:
+        dht_disp = f"{dht_nodes} [yellow](bootstrapping DHT...)[/yellow]" if is_color else f"{dht_nodes} (bootstrapping DHT...)"
+    else:
+        dht_disp = f"{dht_nodes}"
+
+    header_text = (
+        f"▼ DL: [bold]{format_speed(total_dl)}[/bold]  ▲ UL: [bold]{format_speed(total_ul)}[/bold]  |  "
+        f"Peers: [bold]{connected_peers}[/bold]  |  "
+        f"Torrents: [green]{num_dl} downloading[/green], [blue]{num_seed} seeding[/blue]  |  "
+        f"DHT: {dht_disp}"
+    ) if is_color else (
+        f"DL: {format_speed(total_dl)}  UL: {format_speed(total_ul)}  |  "
+        f"Peers: {connected_peers}  |  "
+        f"Torrents: {num_dl} downloading, {num_seed} seeding  |  "
+        f"DHT: {dht_disp}"
+    )
+
+    table = Table(
+        box=None if not is_color else Table.grid().box,
+        header_style="bold cyan",
+        show_header=True,
+        expand=True,
+    )
+    table.add_column("Name", ratio=3, no_wrap=True)
+    table.add_column("Status", ratio=2)
+    table.add_column("Progress", ratio=2)
+    table.add_column("Size", justify="right", ratio=1)
+    table.add_column("Down Speed", justify="right", ratio=1)
+    table.add_column("Up Speed", justify="right", ratio=1)
+    table.add_column("Peers", justify="right", ratio=1)
+    table.add_column("ETA", justify="right", ratio=1)
+
+    if not items:
+        table.add_row("[dim]No active torrents[/dim]" if is_color else "No active torrents", "", "", "", "", "", "", "")
+    else:
+        for t in items:
+            name = t.get("name") or t.get("info_hash", "torrent")
+            state = str(t.get("state", "downloading"))
+            progress = float(t.get("progress", 0.0))
+            dl_rate = float(t.get("download_rate", 0))
+            ul_rate = float(t.get("upload_rate", 0))
+            total_wanted = float(t.get("total_wanted", 0) or t.get("total_size", 0))
+            total_done = float(t.get("total_done", 0))
+            num_peers = int(t.get("num_peers", 0))
+            num_seeds = int(t.get("num_seeds", 0))
+
+            if dl_rate > 0 and total_wanted > total_done:
+                eta_sec = (total_wanted - total_done) / dl_rate
+            else:
+                eta_sec = None
+
+            if state.lower() == "downloading" and num_peers == 0:
+                status_str = "[yellow]finding peers...[/yellow]" if is_color else "finding peers..."
+            elif state.lower() == "downloading":
+                status_str = "[green]downloading[/green]" if is_color else "downloading"
+            else:
+                status_str = format_state(state, use_color=is_color)
+
+            table.add_row(
+                escape(str(name)),
+                status_str,
+                format_progress(progress, human=True),
+                format_bytes(total_wanted),
+                format_speed(dl_rate),
+                format_speed(ul_rate),
+                f"{num_peers} ({num_seeds})",
+                format_eta(eta_sec),
+            )
+
+    panel = Panel(
+        Group(
+            header_text if isinstance(header_text, str) else str(header_text),
+            "",
+            table,
+        ),
+        title="[bold]Spritzle Torrent Monitor[/bold]" if is_color else "Spritzle Torrent Monitor",
+        subtitle="[dim]Press Ctrl+C to exit[/dim]" if is_color else "Press Ctrl+C to exit",
+    )
+    return panel
+
+
+async def run_dashboard(
+    client,
+    query: Optional[Sequence[str]] = None,
+    interval: float = 1.0,
+    color_opt: Optional[bool] = None,
+    plain: bool = False,
+    once: bool = False,
+) -> None:
+    """Run an interactive updating Rich dashboard (spritzle top / list --watch)."""
+    is_interactive = should_use_color(color_opt) and not plain
+    console = get_console(color_opt)
+
+    try:
+        if is_interactive:
+            with Live(console=console, refresh_per_second=4, transient=False) as live:
+                while True:
+                    items = await fetch_torrents_with_status(client, query)
+                    stats = await fetch_session_stats(client)
+                    live.update(build_dashboard_renderable(items, stats, is_color=True))
+
+                    if once:
+                        break
+                    await asyncio.sleep(interval)
+        else:
+            while True:
+                items = await fetch_torrents_with_status(client, query)
+                stats = await fetch_session_stats(client)
+                dht_nodes = int(stats.get("dht.dht_nodes", 0))
+                dht_str = f"{dht_nodes} (bootstrapping DHT...)" if dht_nodes < 10 else f"{dht_nodes}"
+                total_dl = sum(float(t.get("download_rate", 0)) for t in items)
+                total_ul = sum(float(t.get("upload_rate", 0)) for t in items)
+                print(f"--- Spritzle Monitor | DL: {format_speed(total_dl)} | UL: {format_speed(total_ul)} | DHT: {dht_str} ---")
+                if not items:
+                    print("No active torrents.")
+                else:
+                    for t in items:
+                        name = t.get("name") or t.get("info_hash", "torrent")
+                        pct = f"{float(t.get('progress', 0.0)) * 100:.1f}%"
+                        st = t.get("state", "")
+                        dl = format_speed(t.get("download_rate", 0))
+                        ul = format_speed(t.get("upload_rate", 0))
+                        peers = t.get("num_peers", 0)
+                        print(f"{name}\t{st}\t{pct}\t{dl}\t{ul}\t{peers}")
+
+                if once:
+                    break
+                await asyncio.sleep(interval)
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        if is_interactive:
+            console.print("\n[dim]Dashboard stopped.[/dim]")
+        else:
+            print("\nDashboard stopped.")

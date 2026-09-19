@@ -116,12 +116,20 @@ async def f(client, all_stats: bool = False, raw: bool = False, json_output: boo
         "dht": {
             "nodes": int(status.get("dht.dht_nodes", 0)),
             "torrents": int(status.get("dht.dht_torrents", 0)),
+            "bootstrapping": int(status.get("dht.dht_nodes", 0)) < 10,
         },
     }
 
     if json_output:
         print_json(summary_data)
         return
+
+    dht_nodes_count: int = int(summary_data["dht"]["nodes"])
+    dht_nodes_disp = (
+        f"{dht_nodes_count} (bootstrapping DHT...)"
+        if dht_nodes_count < 10 and not raw
+        else str(dht_nodes_count)
+    )
 
     plain_rows = [
         ["Torrents: Downloading", summary_data["torrents"]["downloading"]],
@@ -140,7 +148,7 @@ async def f(client, all_stats: bool = False, raw: bool = False, json_output: boo
         ["Peers: Half-Open", summary_data["peers"]["half_open"]],
         ["Peers: Attempts", summary_data["peers"]["connection_attempts"]],
         ["Peers: Incoming", summary_data["peers"]["incoming_connections"]],
-        ["DHT: Nodes", summary_data["dht"]["nodes"]],
+        ["DHT: Nodes", dht_nodes_disp],
         ["DHT: Torrents", summary_data["dht"]["torrents"]],
     ]
 
@@ -174,7 +182,11 @@ async def f(client, all_stats: bool = False, raw: bool = False, json_output: boo
     table.add_row("Peers", "Connected / Half-Open", f"{summary_data['peers']['connected']} / {summary_data['peers']['half_open']}")
     table.add_row("", "Attempts / Incoming", f"{summary_data['peers']['connection_attempts']} / {summary_data['peers']['incoming_connections']}")
     table.add_section()
-    table.add_row("DHT", "Nodes / Torrents", f"{summary_data['dht']['nodes']} / {summary_data['dht']['torrents']}")
+    if dht_nodes_count < 10:
+        dht_val = f"{dht_nodes_count} [yellow](bootstrapping DHT...)[/yellow] / {summary_data['dht']['torrents']}"
+    else:
+        dht_val = f"{dht_nodes_count} / {summary_data['dht']['torrents']}"
+    table.add_row("DHT", "Nodes / Torrents", dht_val)
 
     console.print(table)
     console.print("[dim]Use 'spritzle stats --all' to view all 100+ raw internal counters.[/dim]")

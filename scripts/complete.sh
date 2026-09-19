@@ -20,7 +20,7 @@ _spritzle() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     local global_opts="-c --config -r --remote --color --no-color --help"
-    local commands="add completion config daemon-config flags help info list move-storage pause remote remove resume settings stats status"
+    local commands="add completion config daemon-config flags help info list move-storage pause remote remove resume settings stats status top"
 
     # Find the subcommand if already provided
     cmd=""
@@ -97,14 +97,19 @@ _spritzle() {
             ;;
         add)
             if [[ "${cur}" == -* ]]; then
-                COMPREPLY=($(compgen -W "-t --tag -o --option -Q --quiet --help" -- "${cur}"))
+                COMPREPLY=($(compgen -W "-t --tag -o --option -Q --quiet -w --watch --json --plain --help" -- "${cur}"))
             else
                 COMPREPLY=($(compgen -f -- "${cur}"))
             fi
             ;;
         list)
             if [[ "${cur}" == -* ]]; then
-                COMPREPLY=($(compgen -W "-q --query -f --fields --header --no-header --json --plain --raw --help" -- "${cur}"))
+                COMPREPLY=($(compgen -W "-q --query -f --fields --header --no-header --json --plain --raw -w --watch -i --interval --help" -- "${cur}"))
+            fi
+            ;;
+        top)
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=($(compgen -W "-i --interval -q --query --plain --help" -- "${cur}"))
             fi
             ;;
         settings)

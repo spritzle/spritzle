@@ -310,8 +310,7 @@ https://libtorrent.org/reference-Core.html#add_torrent_params for reference.
 
 The **spritzle.tags** key can also be passed as a list, containing spritzle tags which should apply to this torrent.
 
-Upon success, you will receive a 201 response and a dictionary with the info_hash in the body. The LOCATION
-header will also be set in the response for the new torrent resource.
+Upon success, you will receive a 201 response and a dictionary containing `info_hash`, `name`, `size`, `save_path`, `state`, and `num_peers` in the body. The `Location` header will also be set in the response for the new torrent resource.
 
 ##### File Upload
 
@@ -322,12 +321,17 @@ Adding a torrent by uploading a torrent file requires the use of a multipart/for
 ```shell
 $ http POST http://localhost:17382/torrent "Authorization: Bearer $TOKEN" file="$(base64 random_one_file.torrent)" save_path=/tmp
 HTTP/1.1 201 Created
-Content-Length: 57
+Content-Length: 154
 Content-Type: application/json; charset=utf-8
 Location: http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719
 
 {
-    "info_hash": "44a040be6d74d8d290cd20128788864cbf770719"
+    "info_hash": "44a040be6d74d8d290cd20128788864cbf770719",
+    "name": "random_one_file",
+    "size": 1048576,
+    "save_path": "/tmp",
+    "state": "downloading",
+    "num_peers": 0
 }
 ```
 
