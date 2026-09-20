@@ -164,6 +164,15 @@ class Config(collections.abc.MutableMapping[str, Any]):
             except OSError:
                 self.save()
 
+    def snapshot(self) -> TOMLDocument:
+        """Return a deep copy of the explicit configuration document."""
+        return tomlkit.parse(tomlkit.dumps(self._doc))
+
+    def restore(self, snapshot: TOMLDocument) -> None:
+        """Restore configuration from a snapshot and persist to disk."""
+        self._doc = snapshot
+        self.save()
+
     def as_dict(self) -> Dict[str, Any]:
         """Return merged configuration dictionary containing all keys and defaults."""
         return {k: self[k] for k in self}

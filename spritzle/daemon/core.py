@@ -252,7 +252,7 @@ class Core(object):
             )
 
     async def on_state_changed_alert(self, alert):
-        if alert.handle.need_save_resume_data():
+        if alert.handle.is_valid() and alert.handle.need_save_resume_data():
             self.resume_data.save_torrent(alert.handle)
 
     async def on_file_error_alert(self, alert):

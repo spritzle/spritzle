@@ -283,3 +283,46 @@ def test_remote_add_tls_flags(cli, core, tmp_path):
     assert remote["ca_cert"] == str(ca_file)
     assert remote["fingerprint"] == "aa:bb:cc:dd"
 
+
+def test_remote_set_key_preserves_tls_flags(cli, core, tmp_path):
+    from spritzle.cli.config import RemotesConfig
+
+    runner = CliRunner()
+    raw_key, _ = core.key_manager.create_key(name="laptop")
+    daemon_url = f"http://127.0.0.1:{cli.server.port}"
+    ca_file = tmp_path / "ca.crt"
+    ca_file.write_text("dummy ca")
+
+    cfg = RemotesConfig(config_dir=tmp_path)
+    cfg.set_remote(
+        "tlsbox",
+        daemon_url,
+        core.identity.daemon_id,
+        raw_key,
+        insecure=True,
+        ca_cert=str(ca_file),
+        fingerprint="aa:bb:cc:dd",
+    )
+
+    new_key, _ = core.key_manager.create_key(name="new_key")
+    res = runner.invoke(
+        spritzle_cli,
+        [
+            "-c",
+            str(tmp_path),
+            "remote",
+            "set-key",
+            "tlsbox",
+            new_key,
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    cfg.load()
+    updated_remote = cfg.get_remote("tlsbox")
+    assert updated_remote is not None
+    assert updated_remote["key"] == new_key
+    assert updated_remote["insecure"] is True
+    assert updated_remote["ca_cert"] == str(ca_file)
+    assert updated_remote["fingerprint"] == "aa:bb:cc:dd"
+
+

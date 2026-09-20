@@ -110,6 +110,13 @@ def get_valid_handle(core, tid):
 
 VALID_QUERY_OPS = {"eq", "lt", "gt", "ne", "ge", "le", "all", "any", "in"}
 VALID_LT_STATUS_KEYS = {x for x in dir(lt.torrent_status) if not x.startswith("_")}
+VALID_STATUS_KEYS = VALID_LT_STATUS_KEYS | {"last_error", "info_hash"}
+
+
+def _to_bool(val: Any) -> bool:
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes", "on")
+    return bool(val)
 
 
 def get_torrent_list(core, query=None) -> List[Any]:
@@ -149,9 +156,8 @@ def get_torrent_list(core, query=None) -> List[Any]:
         requested_keys = keys_list
         for k in requested_keys:
             if (
-                k not in VALID_LT_STATUS_KEYS
+                k not in VALID_STATUS_KEYS
                 and not k.startswith("spritzle.")
-                and k != "info_hash"
             ):
                 raise web.HTTPBadRequest(reason=f"Field {k} is not valid.")
 
@@ -211,7 +217,7 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
 
         if (
             key not in all_status_keys
-            and key not in VALID_LT_STATUS_KEYS
+            and key not in VALID_STATUS_KEYS
             and not key.startswith("spritzle.")
         ):
             raise web.HTTPBadRequest(reason=f"Field {key} is not valid.")
@@ -402,10 +408,9 @@ async def post_torrent(request):
     # See: https://github.com/arvidn/libtorrent/issues/481
     elif "url" in post:
         raw_url = post.pop("url")
-        allow_loopback = bool(
+        allow_loopback = _to_bool(
             config.get("allow_loopback_urls", False)
-            or os.environ.get("SPRITZLE_ALLOW_LOOPBACK_URL")
-        )
+        ) or _to_bool(os.environ.get("SPRITZLE_ALLOW_LOOPBACK_URL", False))
         validated_url = validate_torrent_url(raw_url, allow_loopback=allow_loopback)
         if validated_url.startswith("magnet:"):
             try:
@@ -624,15 +629,17 @@ async def delete_torrent(request):
         handle = get_valid_handle(core, tid)
         info_hash = str(handle.info_hash())
         try:
-            await core.torrent.remove(handle, options)
-        except AlertException as ex:
-            msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
-            log.error(f"Error deleting files for torrent {info_hash}: {msg}")
-        except asyncio.TimeoutError:
-            log.error(f"Timed out removing torrent {tid}")
-            raise web.HTTPGatewayTimeout(text=f"Timed out removing torrent {tid}")
-        core.resume_data.delete(info_hash)
-        core.torrent_data.pop(info_hash, None)
+            try:
+                await core.torrent.remove(handle, options)
+            except AlertException as ex:
+                msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
+                log.error(f"Error deleting files for torrent {info_hash}: {msg}")
+            except asyncio.TimeoutError:
+                log.error(f"Timed out removing torrent {tid}")
+                raise web.HTTPGatewayTimeout(text=f"Timed out removing torrent {tid}")
+        finally:
+            core.resume_data.delete(info_hash)
+            core.torrent_data.pop(info_hash, None)
         return web.Response()
 
     # Bulk deletion
@@ -648,18 +655,20 @@ async def delete_torrent(request):
                 handle = get_valid_handle(core, tid)
                 info_hash = str(handle.info_hash())
                 try:
-                    await core.torrent.remove(handle, options)
-                except AlertException as ex:
-                    msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
-                    log.error(f"Error deleting files for torrent {info_hash}: {msg}")
-                core.resume_data.delete(info_hash)
-                core.torrent_data.pop(info_hash, None)
+                    try:
+                        await core.torrent.remove(handle, options)
+                    except AlertException as ex:
+                        msg = ex.alert.message() if hasattr(ex.alert, "message") else str(ex)
+                        log.error(f"Error deleting files for torrent {info_hash}: {msg}")
+                    except asyncio.TimeoutError:
+                        log.error(f"Timed out removing torrent {tid}")
+                    except Exception as e:
+                        log.error(f"Error removing torrent {tid}: {e}")
+                finally:
+                    core.resume_data.delete(info_hash)
+                    core.torrent_data.pop(info_hash, None)
             except web.HTTPException:
                 log.warning(f"Skipping missing torrent {tid} during bulk removal")
-            except asyncio.TimeoutError:
-                log.error(f"Timed out removing torrent {tid}")
-            except Exception as e:
-                log.error(f"Error removing torrent {tid}: {e}")
 
     if tids:
         await asyncio.gather(*[_remove_one(t) for t in tids])
@@ -722,5 +731,10 @@ async def post_torrent_method(request):
         result = method(*args)
     except Exception as ex:
         raise web.HTTPBadRequest(text=f"Something went wrong: {ex}")
+
+    if method_name == "clear_error":
+        info_hash = str(handle.info_hash())
+        if info_hash in core.torrent_data:
+            core.torrent_data[info_hash].pop("last_error", None)
 
     return web.json_response(result)

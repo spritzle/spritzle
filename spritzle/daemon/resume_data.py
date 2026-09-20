@@ -177,6 +177,7 @@ class ResumeData(object):
         info_hash: str,
         waiters: Optional[Union[Set[asyncio.Future], asyncio.Future]] = None,
     ):
+        success = False
         try:
             if info_hash in self.deleted_hashes:
                 return
@@ -190,6 +191,8 @@ class ResumeData(object):
             )
             if info_hash in self.deleted_hashes:
                 path.unlink(missing_ok=True)
+            else:
+                success = True
         except Exception as e:
             log.error(f"Failed to write resume data for {info_hash}: {e}")
         finally:
@@ -200,7 +203,7 @@ class ResumeData(object):
                 futs = {waiters}
             for fut in futs:
                 if not fut.done():
-                    fut.set_result(True)
+                    fut.set_result(success)
 
     async def on_save_resume_data_failed_alert(self, alert):
         log.error(
@@ -211,7 +214,7 @@ class ResumeData(object):
         waiters = self._pop_waiters(info_hash)
         for fut in waiters:
             if not fut.done():
-                fut.set_result(True)
+                fut.set_result(False)
 
     def save_torrent(self, torrent_handle):
         info_hash = str(torrent_handle.info_hash())

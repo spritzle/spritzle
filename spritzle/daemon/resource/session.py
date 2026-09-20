@@ -56,7 +56,12 @@ async def post_session_settings_reset(request):
     if not isinstance(data, dict):
         raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
 
-    reset_all = bool(data.get("all", False))
+    all_val = data.get("all", False)
+    reset_all = (
+        all_val.strip().lower() in ("true", "1", "yes", "on")
+        if isinstance(all_val, str)
+        else bool(all_val)
+    )
     keys = data.get("keys")
 
     if not reset_all and not keys:

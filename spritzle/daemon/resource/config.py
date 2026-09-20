@@ -50,15 +50,14 @@ async def put_config(request):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
     saved_secrets = {k: config[k] for k in SECRET_KEYS if k in config}
-    backup_items = dict(config.items())
+    snapshot = config.snapshot()
     config.reset()
     try:
         config.update(saved_secrets)
         config.update(new_values)
     except Exception as e:
-        config.reset()
         try:
-            config.update(backup_items)
+            config.restore(snapshot)
         except Exception:
             pass
         raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
@@ -76,19 +75,12 @@ async def patch_config(request):
     if not isinstance(new_values, dict):
         raise web.HTTPBadRequest(text="Request body must be a JSON object.")
 
-    backup_items = {k: config[k] for k in new_values if k in config}
-    new_keys = [k for k in new_values if k not in config]
+    snapshot = config.snapshot()
     try:
         config.update(new_values)
     except Exception as e:
-        for k in new_keys:
-            if k in config:
-                try:
-                    del config[k]
-                except Exception:
-                    pass
         try:
-            config.update(backup_items)
+            config.restore(snapshot)
         except Exception:
             pass
         raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")

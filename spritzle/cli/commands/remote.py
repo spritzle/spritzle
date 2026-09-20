@@ -282,9 +282,20 @@ def remote_set_key(client, name: str, key: Optional[str]):
 
     url = remote_data["url"]
     expected_daemon_id = remote_data.get("daemon_id")
+    insecure = bool(remote_data.get("insecure", False))
+    ca_cert = remote_data.get("ca_cert")
+    fingerprint = remote_data.get("fingerprint")
 
     try:
-        status_data = run_coroutine(query_daemon_status(url, api_key))
+        status_data = run_coroutine(
+            query_daemon_status(
+                url,
+                api_key,
+                insecure=insecure,
+                ca_cert=ca_cert,
+                fingerprint=fingerprint,
+            )
+        )
     except click.ClickException as e:
         print_error(str(e), color_opt=client.color)
         sys.exit(1)
@@ -297,7 +308,15 @@ def remote_set_key(client, name: str, key: Optional[str]):
         )
         sys.exit(1)
 
-    client.remotes.set_remote(name, url, actual_daemon_id, api_key)
+    client.remotes.set_remote(
+        name,
+        url,
+        actual_daemon_id,
+        api_key,
+        insecure=insecure,
+        ca_cert=ca_cert,
+        fingerprint=fingerprint,
+    )
     print_success(f"Updated API key for remote '{name}'.", color_opt=client.color)
 
 

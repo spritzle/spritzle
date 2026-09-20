@@ -264,3 +264,150 @@ def test_lookup_extract_hashes_handles_dicts():
         "d3b07384d113edec49eaa6238ad5ff00fc7b0553",
     ]
 
+
+def test_to_bool_ssrf_normalization():
+    from spritzle.daemon.resource.torrent import _to_bool
+    assert _to_bool("false") is False
+    assert _to_bool("False") is False
+    assert _to_bool("0") is False
+    assert _to_bool("no") is False
+    assert _to_bool("off") is False
+    assert _to_bool(False) is False
+    assert _to_bool("true") is True
+    assert _to_bool("True") is True
+    assert _to_bool("1") is True
+    assert _to_bool("yes") is True
+    assert _to_bool("on") is True
+    assert _to_bool(True) is True
+
+
+async def test_session_reset_all_string_boolean(cli):
+    # Passing "all": "false" without keys should fail with HTTP 400
+    resp = await cli.post("/session/settings/reset", json={"all": "false"})
+    assert resp.status == 400
+    data = await resp.json()
+    assert "Must specify 'keys' list or 'all: true'" in data.get("message", "")
+
+
+async def test_clear_error_clears_torrent_data(cli, core):
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    resp = await cli.post("/torrent", json={"url": torrent_address})
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # Artificially simulate an error recorded in core.torrent_data
+    core.torrent_data[info_hash]["last_error"] = "Fatal error writing piece"
+
+    # Verify GET /torrent/{tid} reports last_error
+    resp = await cli.get(f"/torrent/{info_hash}")
+    assert resp.status == 200
+    assert (await resp.json()).get("last_error") == "Fatal error writing piece"
+
+    # Call POST /torrent/{tid}/clear_error
+    resp = await cli.post(f"/torrent/{info_hash}/clear_error")
+    assert resp.status == 200
+
+    # Verify last_error is cleared from core.torrent_data and GET response
+    assert "last_error" not in core.torrent_data.get(info_hash, {})
+    resp = await cli.get(f"/torrent/{info_hash}")
+    assert resp.status == 200
+    assert "last_error" not in await resp.json()
+
+
+async def test_query_and_projection_supports_last_error(cli, core):
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    resp = await cli.post("/torrent", json={"url": torrent_address})
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    core.torrent_data[info_hash]["last_error"] = "Network timeout"
+
+    # Requesting last_error in keys should succeed without HTTP 400
+    resp = await cli.get("/torrent?keys=name,last_error")
+    assert resp.status == 200
+    items = await resp.json()
+    assert len(items) >= 1
+    matched = next((item for item in items if item.get("info_hash") == info_hash), None)
+    assert matched is not None
+    assert matched.get("last_error") == "Network timeout"
+
+    # Filtering by last_error should succeed without 400
+    resp = await cli.get("/torrent?last_error=Network timeout")
+    assert resp.status == 200
+    assert info_hash in await resp.json()
+
+
+async def test_on_state_changed_alert_invalid_handle(core):
+    alert = MagicMock()
+    handle = MagicMock()
+    handle.is_valid.return_value = False
+    handle.need_save_resume_data.side_effect = RuntimeError("torrent_handle is invalid")
+    alert.handle = handle
+
+    # Must not raise RuntimeError when handle is invalid
+    await core.on_state_changed_alert(alert)
+    handle.need_save_resume_data.assert_not_called()
+
+
+async def test_resume_data_write_failure_resolves_false(core, tmp_path):
+    info_hash = "44a040be6d74d8d290cd20128788864cbf770719"
+    fut = asyncio.get_running_loop().create_future()
+
+    # Pass an invalid/unwritable path to simulate disk write failure
+    bad_path = tmp_path / "nonexistent_subfolder" / "unwritable" / "file.resume"
+    await core.resume_data._write_data(bad_path, b"dummy data", info_hash, {fut})
+    assert fut.done()
+    assert fut.result() is False
+
+    # Also test on_save_resume_data_failed_alert resolves future to False
+    fut2 = asyncio.get_running_loop().create_future()
+    core.resume_data.resume_data_futures[info_hash] = {fut2}
+
+    alert = MagicMock()
+    alert.torrent_name = "test_torrent"
+    alert.error.message.return_value = "disk error"
+    alert.handle.info_hash.return_value = info_hash
+    await core.resume_data.on_save_resume_data_failed_alert(alert)
+    assert fut2.done()
+    assert fut2.result() is False
+
+
+def test_config_snapshot_and_restore_no_default_pollution(tmp_path):
+    from spritzle.daemon.config import Config
+    cfg_file = tmp_path / "daemon.toml"
+    cfg_file.write_text('my_custom_option = "abc"\n')
+    config = Config(config_dir=tmp_path)
+
+    # Verify initial state: default key not in doc
+    assert "save_resume_data_interval" not in config._doc
+    snapshot = config.snapshot()
+
+    # Apply changes
+    config["save_resume_data_interval"] = 120
+    config["my_custom_option"] = "xyz"
+    assert "save_resume_data_interval" in config._doc
+
+    # Restore snapshot on simulated rollback
+    config.restore(snapshot)
+    assert config["my_custom_option"] == "abc"
+    # The default key must NOT be serialized to the document or disk file
+    assert "save_resume_data_interval" not in config._doc
+    saved_text = cfg_file.read_text()
+    assert "save_resume_data_interval" not in saved_text
+    assert 'my_custom_option = "abc"' in saved_text
+
+
+async def test_delete_torrent_timeout_cleans_state(cli, core):
+    torrent_address = str(cli.make_url("/test_torrents/random_one_file.torrent"))
+    resp = await cli.post("/torrent", json={"url": torrent_address})
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    core.resume_data.delete = MagicMock()
+    with patch.object(core.torrent, "remove", side_effect=asyncio.TimeoutError()):
+        resp = await cli.delete(f"/torrent/{info_hash}")
+        assert resp.status == 504
+        core.resume_data.delete.assert_called_once_with(info_hash)
+        assert info_hash not in core.torrent_data
+
+

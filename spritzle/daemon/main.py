@@ -179,7 +179,6 @@ def check_libtorrent() -> None:
             "     uv tool install 'spritzle[daemon]'\n\n"
             "  2. Install via your Linux distribution package manager:\n"
             "     Arch Linux: sudo pacman -S python-libtorrent\n"
-            "     Debian/Ubuntu: sudo apt install python3-libtorrent\n"
             "     (Note: Ensure virtual environment is created with --system-site-packages)\n\n"
             "Note: The 'spritzle' CLI is pure-Python and does not require libtorrent.",
             file=sys.stderr,

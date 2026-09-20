@@ -156,7 +156,7 @@ _spritzle() {
                 case "${subcmd}" in
                     status)
                         if [[ "${cur}" == -* ]]; then
-                            COMPREPLY=($(compgen -W "-t --timeout --json --plain --help" -- "${cur}"))
+                            COMPREPLY=($(compgen -W "--json --plain --help" -- "${cur}"))
                         else
                             COMPREPLY=($(compgen -W "$(_spritzle_remotes)" -- "${cur}"))
                         fi
@@ -166,7 +166,14 @@ _spritzle() {
                             COMPREPLY=($(compgen -W "--json --plain --help" -- "${cur}"))
                         fi
                         ;;
-                    use|remove|show|set-key)
+                    show)
+                        if [[ "${cur}" == -* ]]; then
+                            COMPREPLY=($(compgen -W "--json --plain --help" -- "${cur}"))
+                        else
+                            COMPREPLY=($(compgen -W "$(_spritzle_remotes)" -- "${cur}"))
+                        fi
+                        ;;
+                    use|remove|set-key)
                         if [[ "${cur}" == -* ]]; then
                             COMPREPLY=($(compgen -W "--help" -- "${cur}"))
                         else
