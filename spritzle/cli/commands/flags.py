@@ -93,6 +93,7 @@ async def show(client, torrent, header, json_output=False, plain=False, **kwargs
             title=f"Torrent Flags ({info_hash})",
             key_header="Flag",
             value_header="Value",
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         table = []

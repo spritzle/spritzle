@@ -12,7 +12,7 @@ from spritzle.cli.display import (
     format_eta,
     format_progress,
     format_speed,
-    format_state,
+    format_state_pill,
     get_console,
     should_use_color,
 )
@@ -108,31 +108,39 @@ def render_single_watch_panel(data: Dict[str, Any], is_color: bool = True) -> Pa
     else:
         eta_sec = None
 
-    if state.lower() == "downloading" and num_peers == 0:
-        status_disp = "[yellow]downloading (finding peers...)[/yellow]" if is_color else "downloading (finding peers...)"
-    elif state.lower() == "downloading" and num_peers > 0:
-        status_disp = f"[green]downloading[/green] ({num_peers} peers)" if is_color else f"downloading ({num_peers} peers)"
+    status_disp = format_state_pill(state, use_color=is_color, peers=num_peers)
+    prog_bar = format_progress(
+        progress, human=True, width=20, style="smooth" if is_color else "blocks", use_color=is_color
+    )
+    size_disp = (
+        f"{format_bytes(total_done)} / {format_bytes(total_wanted)}"
+        if total_wanted > 0
+        else format_bytes(total_done)
+    )
+    if is_color:
+        speed_disp = f"{format_speed(dl_rate, use_color=True)}   {format_speed(ul_rate, use_color=True, is_upload=True)}"
     else:
-        status_disp = format_state(state, use_color=is_color)
-
-    prog_bar = format_progress(progress, human=True, width=20)
-    size_disp = f"{format_bytes(total_done)} / {format_bytes(total_wanted)}" if total_wanted > 0 else format_bytes(total_done)
-    speed_disp = f"▼ {format_speed(dl_rate)}   ▲ {format_speed(ul_rate)}"
+        speed_disp = f"▼ {format_speed(dl_rate)}   ▲ {format_speed(ul_rate)}"
     peers_disp = f"{num_peers} connected ({num_seeds} seeds)"
     eta_disp = format_eta(eta_sec)
 
     table = Table.grid(padding=(0, 2))
-    table.add_column(style="bold cyan", no_wrap=True)
+    table.add_column(style="dim", no_wrap=True)
     table.add_column()
 
     table.add_row("Status:", status_disp)
-    table.add_row("Progress:", f"{prog_bar}  ({size_disp})")
+    table.add_row("Progress:", f"{prog_bar}  [dim]({size_disp})[/dim]" if is_color else f"{prog_bar}  ({size_disp})")
     table.add_row("Speed:", speed_disp)
     table.add_row("Peers:", peers_disp)
     table.add_row("ETA:", eta_disp)
 
-    title = f"[bold]{escape(name)}[/bold] ([dim]{escape(short_hash)}[/dim])" if is_color else f"{name} ({short_hash})"
-    return Panel(table, title=title, subtitle="[dim]Press Ctrl+C to stop watching[/dim]")
+    title = f"[bold]{escape(name)}[/bold] ([cyan]{escape(short_hash)}[/cyan])" if is_color else f"{name} ({short_hash})"
+    return Panel(
+        table,
+        title=title,
+        subtitle="[dim]Press Ctrl+C to stop watching[/dim]",
+        border_style="dim" if is_color else "none",
+    )
 
 
 async def watch_single_torrent(
@@ -220,14 +228,19 @@ def build_dashboard_renderable(
     num_seed = sum(1 for t in items if str(t.get("state", "")).lower() == "seeding")
 
     if dht_nodes < 10:
-        dht_disp = f"{dht_nodes} [yellow](bootstrapping DHT...)[/yellow]" if is_color else f"{dht_nodes} (bootstrapping DHT...)"
+        dht_disp = (
+            f"[yellow]●[/yellow] {dht_nodes} (bootstrapping DHT...)"
+            if is_color
+            else f"{dht_nodes} (bootstrapping DHT...)"
+        )
     else:
-        dht_disp = f"{dht_nodes}"
+        dht_disp = f"[green]● {dht_nodes} nodes[/green]" if is_color else f"{dht_nodes}"
 
     header_text = (
-        f"▼ DL: [bold]{format_speed(total_dl)}[/bold]  ▲ UL: [bold]{format_speed(total_ul)}[/bold]  |  "
-        f"Peers: [bold]{connected_peers}[/bold]  |  "
-        f"Torrents: [green]{num_dl} downloading[/green], [blue]{num_seed} seeding[/blue]  |  "
+        f"▼ DL: [bold green]{format_speed(total_dl)}[/bold green]  "
+        f"▲ UL: [bold cyan]{format_speed(total_ul)}[/bold cyan]  │  "
+        f"Peers: [bold]{connected_peers}[/bold]  │  "
+        f"Torrents: [green]● {num_dl} downloading[/green], [blue]● {num_seed} seeding[/blue]  │  "
         f"DHT: {dht_disp}"
     ) if is_color else (
         f"DL: {format_speed(total_dl)}  UL: {format_speed(total_ul)}  |  "
@@ -270,20 +283,17 @@ def build_dashboard_renderable(
             else:
                 eta_sec = None
 
-            if state.lower() == "downloading" and num_peers == 0:
-                status_str = "[yellow]finding peers...[/yellow]" if is_color else "finding peers..."
-            elif state.lower() == "downloading":
-                status_str = "[green]downloading[/green]" if is_color else "downloading"
-            else:
-                status_str = format_state(state, use_color=is_color)
+            status_str = format_state_pill(state, use_color=is_color, peers=num_peers)
 
             table.add_row(
                 escape(str(name)),
                 status_str,
-                format_progress(progress, human=True),
+                format_progress(
+                    progress, human=True, width=14, style="smooth" if is_color else "blocks", use_color=is_color
+                ),
                 format_bytes(total_wanted),
-                format_speed(dl_rate),
-                format_speed(ul_rate),
+                format_speed(dl_rate, use_color=is_color),
+                format_speed(ul_rate, use_color=is_color, is_upload=True),
                 f"{num_peers} ({num_seeds})",
                 format_eta(eta_sec),
             )
@@ -296,6 +306,7 @@ def build_dashboard_renderable(
         ),
         title="[bold]Spritzle Torrent Monitor[/bold]" if is_color else "Spritzle Torrent Monitor",
         subtitle="[dim]Press Ctrl+C to exit[/dim]" if is_color else "Press Ctrl+C to exit",
+        border_style="dim" if is_color else "none",
     )
     return panel
 

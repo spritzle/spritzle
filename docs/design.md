@@ -71,3 +71,22 @@ Core Architecture & Subsystems
   * Daemon-level settings reside in `daemon.toml` (`Config`).
   * Libtorrent session settings are preserved in binary `session.state`.
 
+CLI Visual Presentation Architecture
+-------------------------------------
+
+* **Decoupled Client Runtime:** The CLI is a pure-Python HTTP client without native dependencies or `libtorrent` imports.
+* **Dual-Mode Output Pipeline:**
+  * **Interactive TTY Mode:** Emits modern Rich-formatted output with muted dim borders, semantic status pills (`● downloading`, `● seeding`, `⏸ paused`, `✖ error`), transfer rate color differentiation (bright green download, cyan upload, dim idle), and high-resolution smooth Unicode progress bars (`━`).
+  * **Script & Machine Mode:** Automatically suppresses ANSI escape sequences, colors, and progress bars when piped, redirected, run without a TTY, or when `NO_COLOR` / `--plain` / `--json` is provided. Delivers deterministic, delimiter-friendly tabular data or JSON.
+* **Theme System:**
+  * Configured via `spritzle config theme <modern|minimal|ascii>`.
+  * `modern`: Rounded borders (`box.ROUNDED`), dim frame styling, status pills, smooth progress bars.
+  * `minimal`: Horizontal boundary dividers (`box.HORIZONTALS`), dim accents.
+  * `ascii`: Strict ASCII framing (`box.ASCII`), unstyled borders for terminal environments without Unicode support.
+* **Multi-Section Cards & Views:**
+  * Detailed single-torrent inspector (`spritzle info`) organized into Transfer, Swarm, Storage, and Configuration panels.
+  * Session metrics (`spritzle stats`) rendered as a balanced multi-panel grid (Torrents, Transfer, Swarm, DHT).
+  * Daemon status (`spritzle status`) and remote management (`spritzle remote status`) structured with latency indicators and connection cards.
+  * Action feedback cards for torrent ingestion (`spritzle add`) and helpful empty states (`spritzle list`).
+
+

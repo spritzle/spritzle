@@ -26,8 +26,6 @@ from typing import Any, Dict
 
 import aiohttp
 import click
-from rich import box
-from rich.table import Table
 
 from spritzle.cli.display import (
     get_console,
@@ -35,7 +33,7 @@ from spritzle.cli.display import (
     print_error,
     print_json,
     render_plain_table,
-    should_use_color,
+    render_status_card,
 )
 
 
@@ -133,23 +131,16 @@ async def f(client, json_output: bool = False, plain: bool = False):
         return
 
     console = get_console(color_opt)
-    table = Table(
-        box=box.ROUNDED,
-        show_header=False,
-        title="Spritzle Daemon Status",
-        title_style="bold",
+    theme = getattr(client, "theme", "modern")
+    render_status_card(
+        console=console,
+        remote_name=remote_name,
+        url=client.url(""),
+        daemon_id=daemon_id,
+        version=version,
+        latency_ms=latency_ms,
+        uptime_str=uptime_str,
+        num_torrents=num_torrents,
+        color_opt=color_opt,
+        theme=theme,
     )
-    table.add_column("Key", style="bold cyan", no_wrap=True)
-    table.add_column("Value")
-
-    table.add_row("Remote", remote_name)
-    status_str = "[bold green]online[/bold green]" if should_use_color(color_opt) else "online"
-    table.add_row("Status", status_str)
-    table.add_row("URL", client.url(""))
-    table.add_row("Daemon ID", daemon_id)
-    table.add_row("Version", version)
-    table.add_row("Latency", f"{latency_ms} ms")
-    table.add_row("Uptime", uptime_str)
-    table.add_row("Torrents", str(num_torrents))
-
-    console.print(table)

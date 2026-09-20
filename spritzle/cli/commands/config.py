@@ -121,6 +121,7 @@ def show_single(client, key: str, json_output: bool = False, plain: bool = False
             key_header="Option",
             value_header="Value",
             modified_keys=is_mod,
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         print(tabulate([[key, val]], tablefmt="plain"))
@@ -147,6 +148,7 @@ def show(client, json_output=False, plain=False):
             key_header="Option",
             value_header="Value",
             modified_keys=modified_keys,
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         print(tabulate(table, tablefmt="plain"))

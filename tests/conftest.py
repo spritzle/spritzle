@@ -20,7 +20,7 @@ pytest_plugins = "aiohttp.pytest_plugin"
 def core(loop, monkeypatch):
     downloads_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-downloads"))
     config = Config(in_memory=True, config_dir="/tmp")
-    config["add_torrent_params.save_path"] = str(downloads_dir)
+    config["default_save_path"] = str(downloads_dir)
     state_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-state"))
     config_dir = Path(tempfile.mkdtemp(prefix="spritzle-test-config"))
     monkeypatch.setenv("SPRITZLE_STATE_DIR", str(state_dir))

@@ -44,7 +44,7 @@ def get_default_save_path() -> str:
 
 
 DEFAULTS = {
-    "add_torrent_params.save_path": get_default_save_path(),
+    "default_save_path": get_default_save_path(),
     "save_resume_data_interval": 60,
 }
 

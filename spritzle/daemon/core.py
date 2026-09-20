@@ -151,7 +151,7 @@ class Core(object):
             if info_hash not in self.torrent_data:
                 log.warning(f"Restoring missing metadata for ghost torrent {info_hash}")
                 self.torrent_data[info_hash] = {}
-        default_save_path = self.config.get("add_torrent_params.save_path")
+        default_save_path = self.config.get("default_save_path")
         if default_save_path:
             p = Path(os.path.expanduser(str(default_save_path)))
             if not p.exists():

@@ -70,7 +70,7 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `add_torrent_params.save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. Defaults to `$SPRITZLE_SAVE_PATH`, `$SPRITZLE_DOWNLOAD_DIR`, or `~/Downloads`. Spritzled auto-creates the directory on startup and validates write permissions. |
+| `default_save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. Defaults to `$SPRITZLE_SAVE_PATH`, `$SPRITZLE_DOWNLOAD_DIR`, or `~/Downloads`. Spritzled auto-creates the directory on startup and validates write permissions. |
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
 
 > [!NOTE]

@@ -120,6 +120,7 @@ async def show_single(client, key: str, json_output: bool = False, plain: bool =
             title="Spritzle Daemon Configuration",
             key_header="Option",
             value_header="Value",
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         print(tabulate([[key, val]], tablefmt="plain"))
@@ -156,6 +157,7 @@ async def show(client, json_output=False, plain=False):
             title="Spritzle Daemon Configuration",
             key_header="Option",
             value_header="Value",
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         print(tabulate(table, tablefmt="plain"))

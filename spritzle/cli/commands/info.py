@@ -1,10 +1,8 @@
 import sys
-from typing import Union
 
 import click
 from tabulate import tabulate
 
-from rich.text import Text
 
 from spritzle.cli.display import (
     format_bytes,
@@ -14,7 +12,7 @@ from spritzle.cli.display import (
     get_console,
     print_error,
     print_json,
-    render_kv_table,
+    render_info_card,
     should_use_color,
 )
 from spritzle.cli.lookup import resolve_single_torrent
@@ -51,6 +49,16 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
         print_json(data)
         return
 
+    use_color = should_use_color(getattr(client, "color", None)) and not plain
+    color_opt = getattr(client, "color", None)
+    theme = getattr(client, "theme", "modern")
+
+    if use_color:
+        console = get_console(color_opt)
+        render_info_card(console, data, info_hash, color_opt=color_opt, theme=theme)
+        return
+
+    # Plain output mode
     name = data.get("name", "<unknown>")
     state = data.get("state", "")
     progress = data.get("progress", 0.0)
@@ -69,20 +77,18 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
     else:
         tags_str = str(tags)
 
-    use_color = should_use_color(getattr(client, "color", None)) and not plain
-    state_str = format_state(state, use_color=use_color)
-    state_val: Union[str, Text] = Text.from_markup(state_str) if use_color else state_str
+    state_str = format_state(state, use_color=False)
 
     items = [
         ("Name", name),
         ("Info Hash", info_hash),
-        ("State", state_val),
-        ("Progress", format_progress(progress, human=use_color)),
-        ("Download Rate", format_speed(dl_rate, human=use_color)),
-        ("Upload Rate", format_speed(ul_rate, human=use_color)),
-        ("Total Size", format_bytes(total_size, human=use_color)),
-        ("Downloaded", format_bytes(total_done, human=use_color)),
-        ("Wanted Size", format_bytes(total_wanted, human=use_color)),
+        ("State", state_str),
+        ("Progress", format_progress(progress, human=False)),
+        ("Download Rate", format_speed(dl_rate, human=False)),
+        ("Upload Rate", format_speed(ul_rate, human=False)),
+        ("Total Size", format_bytes(total_size, human=False)),
+        ("Downloaded", format_bytes(total_done, human=False)),
+        ("Wanted Size", format_bytes(total_wanted, human=False)),
         ("Peers", f"{num_peers} (seeds: {num_seeds})"),
         ("Pieces", num_pieces),
         ("Save Path", save_path),
@@ -95,32 +101,18 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
     elif data.get("error"):
         err_val = data["error"]
         if isinstance(err_val, dict):
-            if err_val.get("value", 0) != 0 or err_val.get("message"):
+            if err_val.get("value", 0) != 0:
                 err_str = err_val.get("message") or str(err_val)
         elif err_val:
             err_str = str(err_val)
     elif data.get("errc"):
         errc = data["errc"]
-        if isinstance(errc, dict) and (errc.get("value", 0) != 0 or errc.get("message")):
+        if isinstance(errc, dict) and errc.get("value", 0) != 0:
             err_str = errc.get("message") or str(errc)
-        elif isinstance(errc, (int, str)) and errc != 0 and errc != "":
+        elif isinstance(errc, int) and errc != 0:
             err_str = str(errc)
 
     if err_str:
-        err_val_rendered: Union[str, Text] = (
-            Text(str(err_str), style="red") if use_color else str(err_str)
-        )
-        items.append(("Error", err_val_rendered))
+        items.append(("Error", str(err_str)))
 
-    if use_color:
-        console = get_console(getattr(client, "color", None))
-        render_kv_table(
-            console,
-            items,
-            title=f"Torrent Info: {name}",
-            key_header="Field",
-            value_header="Value",
-            num_columns=1,
-        )
-    else:
-        print(tabulate(items, tablefmt="plain"))
+    print(tabulate(items, tablefmt="plain"))

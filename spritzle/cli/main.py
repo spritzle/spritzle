@@ -41,6 +41,7 @@ class Client(object):
 
         self.color = color if color is not None else self.cli_config.get("color", None)
         self.plain = bool(self.cli_config.get("plain", False))
+        self.theme = str(self.cli_config.get("theme", "modern") or "modern")
 
         self.remote_name = remote or self.remotes.get_default_remote()
         remote_data = self.remotes.get_remote(self.remote_name) if self.remote_name else None

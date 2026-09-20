@@ -370,7 +370,7 @@ async def post_torrent(request):
     core = request.app[APP_KEY_CORE]
     config = request.app[APP_KEY_CONFIG]
 
-    atp_dict: Dict[str, Any] = {"save_path": config.get("add_torrent_params.save_path", "")}
+    atp_dict: Dict[str, Any] = {"save_path": config.get("default_save_path", "")}
     magnet_params: Optional[lt.add_torrent_params] = None
 
     try:
@@ -456,7 +456,7 @@ async def post_torrent(request):
         post.get("save_path")
         or (getattr(magnet_params, "save_path", None) if magnet_params is not None else None)
         or atp_dict.get("save_path")
-        or config.get("add_torrent_params.save_path", "")
+        or config.get("default_save_path", "")
     )
 
     def prepare_save_path(sp: str) -> str:

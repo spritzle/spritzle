@@ -36,6 +36,7 @@ log = logging.getLogger("spritzle.cli")
 CLI_DEFAULTS: Dict[str, Any] = {
     "color": None,
     "plain": False,
+    "theme": "modern",
 }
 
 

@@ -178,6 +178,7 @@ async def show(client, modified=False, defaults=False, json_output=False, plain=
             key_header="Setting",
             value_header="Value",
             modified_keys=mod_keys,
+            theme=getattr(client, "theme", "modern"),
         )
     else:
         print(tabulate(table, tablefmt="plain"))

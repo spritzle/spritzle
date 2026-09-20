@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 
 import click
 
+from rich.table import Table
+
 from spritzle.cli.display import get_console, print_error, should_use_color
 
 EXAMPLES: Dict[str, List[str]] = {
@@ -90,6 +92,8 @@ EXAMPLES: Dict[str, List[str]] = {
     ],
     "config": [
         "spritzle config",
+        "spritzle config theme",
+        "spritzle config theme modern",
         "spritzle config plain",
         "spritzle config plain true",
         "spritzle config -s color false",
@@ -133,11 +137,42 @@ def command(ctx, command_name: Optional[str] = None):
     """Show help and usage examples for Spritzle commands."""
     root_ctx = ctx.parent or ctx
     root_cmd = root_ctx.command
+    is_color = should_use_color(getattr(root_ctx.obj, "color", None))
 
     if not command_name:
-        click.echo(root_cmd.get_help(root_ctx))
-        click.echo("\nTip: Run 'spritzle help <command>' for command-specific options and examples.")
-        return
+        if is_color:
+            console = get_console(getattr(root_ctx.obj, "color", None))
+            console.print("[bold cyan]Spritzle[/bold cyan] [dim]- Modern BitTorrent Client[/dim]\n")
+            console.print("[bold]Usage:[/bold] [cyan]spritzle[/cyan] [dim][OPTIONS][/dim] [bold cyan]COMMAND[/bold cyan] [dim][ARGS]...[/dim]\n")
+
+            opt_table = Table(box=None, padding=(0, 2), show_header=False)
+            opt_table.add_column(style="green", no_wrap=True)
+            opt_table.add_column(style="default")
+            for param in root_cmd.params:
+                opts = ", ".join(param.opts)
+                if param.secondary_opts:
+                    opts += " / " + ", ".join(param.secondary_opts)
+                opt_table.add_row(opts, param.help or "")
+            opt_table.add_row("--help", "Show this message and exit.")
+            console.print("[bold cyan]Options:[/bold cyan]")
+            console.print(opt_table)
+            console.print("")
+
+            cmd_table = Table(box=None, padding=(0, 2), show_header=False)
+            cmd_table.add_column(style="bold cyan", no_wrap=True)
+            cmd_table.add_column(style="default")
+            for name in sorted(root_cmd.list_commands(root_ctx)):
+                sc = root_cmd.get_command(root_ctx, name)
+                if sc and not sc.hidden:
+                    cmd_table.add_row(name, sc.short_help or "")
+            console.print("[bold cyan]Commands:[/bold cyan]")
+            console.print(cmd_table)
+            console.print("\n[dim]Tip: Run 'spritzle help <command>' for command-specific options and examples.[/dim]")
+            return
+        else:
+            click.echo(root_cmd.get_help(root_ctx))
+            click.echo("\nTip: Run 'spritzle help <command>' for command-specific options and examples.")
+            return
 
     sub_cmd = getattr(root_cmd, "get_command", lambda c, n: None)(root_ctx, command_name)
     if not sub_cmd:
@@ -146,12 +181,35 @@ def command(ctx, command_name: Optional[str] = None):
         sys.exit(1)
 
     sub_ctx = click.Context(sub_cmd, info_name=command_name, parent=root_ctx)
-    help_text = sub_cmd.get_help(sub_ctx)
-    click.echo(help_text)
+
+    if is_color:
+        console = get_console(getattr(root_ctx.obj, "color", None))
+        args_str = " ".join(f"[{p.name.upper()}]" if not p.required else p.name.upper() for p in sub_cmd.params if isinstance(p, click.Argument))
+        console.print(f"[bold]Usage:[/bold] [cyan]spritzle {command_name}[/cyan] [dim][OPTIONS][/dim] {args_str}".strip())
+        if sub_cmd.help:
+            console.print(f"\n  {sub_cmd.help.strip()}\n")
+        elif sub_cmd.short_help:
+            console.print(f"\n  {sub_cmd.short_help.strip()}\n")
+
+        opts = [p for p in sub_cmd.params if isinstance(p, click.Option)]
+        if opts:
+            opt_table = Table(box=None, padding=(0, 2), show_header=False)
+            opt_table.add_column(style="green", no_wrap=True)
+            opt_table.add_column(style="default")
+            for param in opts:
+                o_str = ", ".join(param.opts)
+                if param.secondary_opts:
+                    o_str += " / " + ", ".join(param.secondary_opts)
+                opt_table.add_row(o_str, param.help or "")
+            opt_table.add_row("--help", "Show this message and exit.")
+            console.print("[bold cyan]Options:[/bold cyan]")
+            console.print(opt_table)
+    else:
+        help_text = sub_cmd.get_help(sub_ctx)
+        click.echo(help_text)
 
     examples = EXAMPLES.get(command_name)
     if examples:
-        is_color = should_use_color(getattr(root_ctx.obj, "color", None))
         if is_color:
             console = get_console(getattr(root_ctx.obj, "color", None))
             console.print("\n[bold cyan]Examples:[/bold cyan]")

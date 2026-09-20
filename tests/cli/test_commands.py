@@ -716,6 +716,138 @@ def test_display_formatters():
     assert should_use_color(color_opt=False) is False
 
 
+def test_modern_display_formatters():
+    import io
+    from rich import box
+    from rich.console import Console as TestConsole
+    from spritzle.cli.display import (
+        format_latency,
+        format_progress,
+        format_speed,
+        format_state_pill,
+        get_border_style,
+        get_box_style,
+        render_empty_list_card,
+        render_info_card,
+        render_kv_table,
+        render_rich_table,
+        render_stats_cards,
+        render_status_card,
+    )
+
+    # Speed color highlights
+    assert "4.2 MB/s" in format_speed(1048576 * 4.2, human=True, use_color=True, is_upload=False)
+    assert "[dim]0 B/s[/dim]" in format_speed(0, human=True, use_color=True)
+    assert "▲" in format_speed(1024, human=True, use_color=True, is_upload=True)
+    assert "▼" in format_speed(1024, human=True, use_color=True, is_upload=False)
+
+    # Smooth progress
+    smooth_bar = format_progress(0.5, human=True, width=10, style="smooth", use_color=True)
+    assert "50.0%" in smooth_bar
+    assert "━" in smooth_bar
+
+    # State pills
+    assert "● downloading" in format_state_pill("downloading", use_color=True)
+    assert "● seeding" in format_state_pill("seeding", use_color=True)
+    assert "⏸ paused" in format_state_pill("paused", use_color=True)
+    assert "✖ error" in format_state_pill("error", use_color=True)
+    assert "● downloading" in format_state_pill("downloading", use_color=False)
+
+    # Latency tiers
+    assert "12.5 ms" in format_latency(12.5, use_color=True)
+    assert "●" in format_latency(12.5, use_color=True)
+    assert "12.5 ms" in format_latency(12.5, use_color=False)
+    assert format_latency(None, use_color=False) == "-"
+
+    # Themes
+    assert get_box_style("modern") == box.ROUNDED
+    assert get_box_style("minimal") == box.HORIZONTALS
+    assert get_box_style("ascii") == box.ASCII
+    assert get_border_style("modern") == "dim"
+    assert get_border_style("ascii") == "none"
+
+    # Card rendering
+    buf = io.StringIO()
+    c = TestConsole(file=buf, force_terminal=True, width=100)
+
+    # Status card
+    render_status_card(c, "local", "http://127.0.0.1:17382", "spz_123", "1.0", 1.5, "1d 2h", 3)
+    out = buf.getvalue()
+    assert "Spritzle Daemon Status" in out
+    assert "online" in out
+    assert "spz_123" in out
+
+    # Info card
+    buf.seek(0)
+    buf.truncate(0)
+    torrent_data = {
+        "name": "archlinux-x86_64.iso",
+        "state": "downloading",
+        "progress": 0.45,
+        "download_rate": 2048000,
+        "upload_rate": 512000,
+        "total_size": 2500000000,
+        "total_done": 1125000000,
+        "total_wanted": 2500000000,
+        "num_peers": 24,
+        "num_seeds": 10,
+        "num_pieces": 600,
+        "save_path": "/home/user/downloads",
+        "spritzle.tags": ["linux", "iso"],
+    }
+    render_info_card(c, torrent_data, "d3b07384d113edec49eaa6238ad5ff00fc7b0553")
+    out_info = buf.getvalue()
+    assert "archlinux-x86_64.iso" in out_info
+    assert "Transfer" in out_info
+    assert "Swarm" in out_info
+    assert "Storage" in out_info
+
+    # Stats cards
+    buf.seek(0)
+    buf.truncate(0)
+    summary_data = {
+        "torrents": {"downloading": 2, "seeding": 1, "checking": 0, "stopped": 0, "queued_download": 0, "queued_seed": 0},
+        "transfer": {"downloaded": "1.2 GB", "uploaded": "400 MB", "total_received": "1.3 GB", "total_sent": "420 MB", "ratio": 0.33, "wasted": "0 B"},
+        "peers": {"connected": 15, "half_open": 2, "connection_attempts": 120, "incoming_connections": 5},
+        "dht": {"nodes": 350, "torrents": 3, "bootstrapping": False},
+    }
+    render_stats_cards(c, summary_data)
+    out_stats = buf.getvalue()
+    assert "Session Statistics Summary" in out_stats
+    assert "Transfer & Bandwidth" in out_stats
+
+    # Empty list card
+    buf.seek(0)
+    buf.truncate(0)
+    render_empty_list_card(c, dht_nodes=5)
+    out_empty = buf.getvalue()
+    assert "Spritzle Session" in out_empty
+    assert "spritzle add" in out_empty
+    assert "bootstrapping DHT..." in out_empty
+
+    # Caption contrast & legibility (no dim in caption)
+    buf.seek(0)
+    buf.truncate(0)
+    render_kv_table(c, [("download_rate_limit", 1048576)], modified_keys={"download_rate_limit"})
+    out_kv = buf.getvalue()
+    assert "modified from default" in out_kv
+    assert "\x1b[3m" not in out_kv  # Ensure 'italic' (which renders as inverse video white bar in some terminals) is not used
+    assert "\x1b[2m" not in out_kv  # Ensure 'dim' is not used
+
+    buf.seek(0)
+    buf.truncate(0)
+    render_rich_table(
+        c,
+        ["Name", "State"],
+        [["archlinux-x86_64.iso", "downloading"]],
+        caption="[yellow]●[/yellow] bootstrapping DHT...",
+    )
+    out_rich = buf.getvalue()
+    assert "bootstrapping DHT..." in out_rich
+    assert "\x1b[3m" not in out_rich  # Ensure 'italic' is not used
+    assert "\x1b[2m" not in out_rich  # Ensure 'dim' is not used
+
+
 def test_list_json_output(cli):
     import json
     import libtorrent as lt

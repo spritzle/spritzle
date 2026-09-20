@@ -92,7 +92,7 @@ HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
 {
-    "add_torrent_params.save_path": "/home/user/Downloads",
+    "default_save_path": "/home/user/Downloads",
     "save_resume_data_interval": 60
 }
 ```
@@ -115,7 +115,7 @@ Partially updates specified keys in the daemon configuration.
 **Example**
 
 ```shell
-$ http PATCH http://localhost:17382/config "Authorization: Bearer $TOKEN" add_torrent_params.save_path="/mnt/storage/downloads"
+$ http PATCH http://localhost:17382/config "Authorization: Bearer $TOKEN" default_save_path="/mnt/storage/downloads"
 HTTP/1.1 200 OK
 ```
 

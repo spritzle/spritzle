@@ -209,7 +209,8 @@ async def f(
 
         effective_color = color_opt if not plain else False
         console = get_console(effective_color)
-        render_post_add_card(console, resp_data, color_opt=effective_color)
+        theme = getattr(client, "theme", "modern")
+        render_post_add_card(console, resp_data, color_opt=effective_color, theme=theme)
 
         if watch:
             from spritzle.cli.dashboard import watch_single_torrent

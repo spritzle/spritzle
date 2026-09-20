@@ -28,12 +28,14 @@ from urllib.parse import urlparse
 
 import aiohttp
 import click
-from rich import box
 from rich.markup import escape
 from rich.table import Table
 from tabulate import tabulate
 
 from spritzle.cli.display import (
+    format_latency,
+    get_border_style,
+    get_box_style,
     get_console,
     print_error,
     print_json,
@@ -370,34 +372,36 @@ def remote_status(client, name: Optional[str], json_output: bool, plain: bool):
         return
 
     has_default = any(r["is_default"] for r in results)
+    theme = getattr(client, "theme", "modern")
     table = Table(
-        box=box.ROUNDED,
+        box=get_box_style(theme),
+        border_style=get_border_style(theme),
         header_style="bold cyan",
-        caption="* default remote" if has_default else None,
-        caption_style="dim italic",
+        caption="[green]*[/green] default remote" if has_default else None,
+        caption_style="none",
     )
     table.add_column("", justify="center", width=1)
-    table.add_column("Name", style="bold")
-    table.add_column("Status")
-    table.add_column("Latency", justify="right")
-    table.add_column("URL")
-    table.add_column("Version", style="dim")
-    table.add_column("Uptime")
-    table.add_column("Torrents", justify="right")
+    table.add_column("Name", style="bold", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Latency", justify="right", no_wrap=True)
+    table.add_column("URL", min_width=24, no_wrap=False)
+    table.add_column("Version", no_wrap=True)
+    table.add_column("Uptime", no_wrap=True)
+    table.add_column("Torrents", justify="right", no_wrap=True)
 
     for r in results:
         marker = "[green]*[/green]" if r["is_default"] else " "
         status_str = r["status"]
         if status_str == "online":
-            status_display = "[green]online[/green]"
+            status_display = "[green]● online[/green]"
         elif status_str == "auth_failed":
-            status_display = "[yellow]auth_failed[/yellow]"
+            status_display = "[yellow]● auth_failed[/yellow]"
         elif status_str == "id_mismatch":
-            status_display = "[bold red]id_mismatch[/bold red]"
+            status_display = "[bold red]✖ id_mismatch[/bold red]"
         else:
-            status_display = "[red]offline[/red]"
+            status_display = "[red]● offline[/red]"
 
-        latency_str = f"{r['latency_ms']} ms" if r["latency_ms"] is not None else "[dim]-[/dim]"
+        latency_str = format_latency(r["latency_ms"], use_color=True)
         version_str = escape(r["version"] or "-")
         uptime_str = escape(r["uptime_formatted"] or "-")
         torrents_str = str(r["num_torrents"]) if r["num_torrents"] is not None else "-"
@@ -454,16 +458,18 @@ def remote_list(client, json_output: bool, plain: bool):
         return
 
     has_default = any(item["is_default"] for item in items)
+    theme = getattr(client, "theme", "modern")
     table = Table(
-        box=box.ROUNDED,
+        box=get_box_style(theme),
+        border_style=get_border_style(theme),
         header_style="bold cyan",
-        caption="* default remote" if has_default else None,
-        caption_style="dim italic",
+        caption="[green]*[/green] default remote" if has_default else None,
+        caption_style="none",
     )
     table.add_column("", justify="center", width=1)
-    table.add_column("Name", style="bold")
-    table.add_column("URL")
-    table.add_column("Daemon ID", style="dim")
+    table.add_column("Name", style="bold", no_wrap=True)
+    table.add_column("URL", no_wrap=False)
+    table.add_column("Daemon ID", no_wrap=True)
 
     for item in items:
         marker = "[green]*[/green]" if item["is_default"] else " "

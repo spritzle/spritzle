@@ -24,8 +24,6 @@ import sys
 from typing import Any, Dict
 
 import click
-from rich import box
-from rich.table import Table
 from tabulate import tabulate
 
 from spritzle.cli.display import (
@@ -35,6 +33,7 @@ from spritzle.cli.display import (
     print_error,
     print_json,
     render_kv_table,
+    render_stats_cards,
     should_use_color,
 )
 
@@ -157,36 +156,5 @@ async def f(client, all_stats: bool = False, raw: bool = False, json_output: boo
         return
 
     console = get_console(color_opt)
-    table = Table(
-        box=box.ROUNDED,
-        title="Session Statistics Summary",
-        title_style="bold",
-        show_header=True,
-    )
-    table.add_column("Category", style="bold cyan", no_wrap=True)
-    table.add_column("Metric")
-    table.add_column("Value", style="bold")
-
-    table.add_row("Torrents", "Downloading", str(summary_data["torrents"]["downloading"]))
-    table.add_row("", "Seeding", str(summary_data["torrents"]["seeding"]))
-    table.add_row("", "Checking", str(summary_data["torrents"]["checking"]))
-    table.add_row("", "Stopped", str(summary_data["torrents"]["stopped"]))
-    table.add_row("", "Queued (DL / Seed)", f"{summary_data['torrents']['queued_download']} / {summary_data['torrents']['queued_seed']}")
-    table.add_section()
-    table.add_row("Transfer", "Downloaded (Payload)", str(summary_data["transfer"]["downloaded"]))
-    table.add_row("", "Uploaded (Payload)", str(summary_data["transfer"]["uploaded"]))
-    table.add_row("", "Total (In / Out)", f"{summary_data['transfer']['total_received']} / {summary_data['transfer']['total_sent']}")
-    table.add_row("", "Share Ratio", str(ratio))
-    table.add_row("", "Wasted Data", str(summary_data["transfer"]["wasted"]))
-    table.add_section()
-    table.add_row("Peers", "Connected / Half-Open", f"{summary_data['peers']['connected']} / {summary_data['peers']['half_open']}")
-    table.add_row("", "Attempts / Incoming", f"{summary_data['peers']['connection_attempts']} / {summary_data['peers']['incoming_connections']}")
-    table.add_section()
-    if dht_nodes_count < 10:
-        dht_val = f"{dht_nodes_count} [yellow](bootstrapping DHT...)[/yellow] / {summary_data['dht']['torrents']}"
-    else:
-        dht_val = f"{dht_nodes_count} / {summary_data['dht']['torrents']}"
-    table.add_row("DHT", "Nodes / Torrents", dht_val)
-
-    console.print(table)
-    console.print("[dim]Use 'spritzle stats --all' to view all 100+ raw internal counters.[/dim]")
+    theme = getattr(client, "theme", "modern")
+    render_stats_cards(console, summary_data, color_opt=color_opt, theme=theme)

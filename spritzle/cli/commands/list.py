@@ -9,13 +9,32 @@ from spritzle.cli.display import (
     format_bytes,
     format_progress,
     format_speed,
-    format_state,
+    format_state_pill,
     get_console,
     print_error,
     print_json,
+    render_empty_list_card,
     render_rich_table,
     should_use_color,
 )
+
+HEADER_MAP: Dict[str, str] = {
+    "name": "Name",
+    "state": "Status",
+    "progress": "Progress",
+    "download_rate": "Down Speed",
+    "upload_rate": "Up Speed",
+    "total_size": "Size",
+    "total_wanted": "Wanted",
+    "total_done": "Downloaded",
+    "all_time_upload": "All-Time Up",
+    "all_time_download": "All-Time Down",
+    "spritzle.tags": "Tags",
+    "info_hash": "Info Hash",
+    "num_peers": "Peers",
+    "num_seeds": "Seeds",
+    "eta": "ETA",
+}
 
 
 @click.command("list", short_help="List torrents in the session.")
@@ -163,19 +182,14 @@ async def f(
     if not raw_items:
         if is_interactive:
             console = get_console(getattr(client, "color", None))
-            if query:
-                console.print("[yellow]No torrents match the specified filter.[/yellow]")
-            else:
-                console.print(
-                    "[bold]No torrents in session.[/bold]\n\n"
-                    "To add a torrent, run:\n"
-                    "  [cyan]spritzle add <path | url | magnet | info-hash>[/cyan]\n\n"
-                    "Examples:\n"
-                    "  spritzle add archlinux-x86_64.iso.torrent\n"
-                    "  spritzle add \"magnet:?xt=urn:btih:...\""
-                )
-            if dht_nodes is not None and dht_nodes < 10:
-                console.print("\n[yellow]bootstrapping DHT...[/yellow]")
+            theme = getattr(client, "theme", "modern")
+            render_empty_list_card(
+                console,
+                dht_nodes=dht_nodes,
+                query=query,
+                color_opt=getattr(client, "color", None),
+                theme=theme,
+            )
             return
         else:
             if header:
@@ -190,11 +204,13 @@ async def f(
             val = item.get(field, "")
             if is_interactive:
                 if field in ("download_rate", "upload_rate"):
-                    formatted_val = format_speed(val, human=True)
+                    formatted_val = format_speed(
+                        val, human=True, use_color=True, is_upload=(field == "upload_rate")
+                    )
                 elif field in ("total_done", "total_wanted", "total_size", "all_time_upload", "all_time_download"):
                     formatted_val = format_bytes(val, human=True)
                 elif field == "progress":
-                    formatted_val = format_progress(val, human=True)
+                    formatted_val = format_progress(val, human=True, style="smooth", use_color=True)
                 elif field == "state":
                     errc = item.get("errc")
                     has_error = False
@@ -204,13 +220,11 @@ async def f(
                         has_error = True
 
                     if has_error:
-                        formatted_val = "[bold red]error[/bold red]"
+                        formatted_val = "[bold red]✖ error[/bold red]"
                     else:
                         state_str = str(val)
-                        if state_str.lower() == "downloading" and int(item.get("num_peers", 0)) == 0:
-                            formatted_val = "[green]downloading[/green] [yellow](finding peers...)[/yellow]"
-                        else:
-                            formatted_val = format_state(state_str, use_color=True)
+                        peers = int(item.get("num_peers", 0))
+                        formatted_val = format_state_pill(state_str, use_color=True, peers=peers)
                 elif isinstance(val, bool):
                     formatted_val = format_bool(val, human=True, use_color=True)
                 elif isinstance(val, list):
@@ -236,9 +250,20 @@ async def f(
 
     if is_interactive:
         console = get_console(getattr(client, "color", None))
-        headers = field_list if header else []
-        caption = "[yellow]bootstrapping DHT...[/yellow]" if (dht_nodes is not None and dht_nodes < 10) else None
-        render_rich_table(console, headers, table, caption=caption)
+        theme = getattr(client, "theme", "modern")
+        headers = [HEADER_MAP.get(f, f) for f in field_list] if header else []
+        caption = (
+            "[yellow]●[/yellow] bootstrapping DHT..."
+            if (dht_nodes is not None and dht_nodes < 10)
+            else None
+        )
+        render_rich_table(
+            console,
+            headers,
+            table,
+            caption=caption,
+            theme=theme,
+        )
     else:
         tablefmt = "simple" if header else "plain"
         headers = field_list if header else []

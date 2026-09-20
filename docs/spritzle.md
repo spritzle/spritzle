@@ -364,6 +364,7 @@ Options:
 Supported `cli.toml` options:
 * `color`: Enable (`true`), disable (`false`), or auto-detect (`null`) ANSI terminal colors.
 * `plain`: Force plain unstyled tabular output (`true`/`false`).
+* `theme`: Visual display theme (`modern`, `minimal`, or `ascii`). Defaults to `modern`.
 
 **Examples:**
 
@@ -376,6 +377,7 @@ spritzle config plain
 
 # Set a configuration option directly or with --set
 spritzle config plain true
+spritzle config theme minimal
 spritzle config -s color false
 
 # Unset an override or reset to defaults
@@ -407,7 +409,7 @@ spritzle daemon-config save_resume_data_interval
 
 # Update a configuration key directly or with --set
 spritzle daemon-config save_resume_data_interval 30
-spritzle daemon-config -s add_torrent_params.save_path /mnt/storage/downloads
+spritzle daemon-config -s default_save_path /mnt/storage/downloads
 
 # Output as JSON
 spritzle daemon-config --json
