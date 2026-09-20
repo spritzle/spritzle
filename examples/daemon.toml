@@ -1,0 +1,7 @@
+# Spritzle Daemon Configuration (~/.config/spritzle/daemon.toml)
+
+# Default path where downloaded torrents are saved if not specified upon adding
+default_save_path = "~/Downloads"
+
+# Interval in seconds between automatic background fastresume state saves
+save_resume_data_interval = 60

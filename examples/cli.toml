@@ -1,0 +1,11 @@
+# Spritzle CLI Client Configuration (~/.config/spritzle/cli.toml)
+
+# Default remote daemon profile to use (managed via `spritzle remote`)
+# remote = "local"
+
+# Default output formatting preference
+# plain = false
+# json = false
+
+# Default list columns or sort order
+# sort = "name"

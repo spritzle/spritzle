@@ -13,7 +13,7 @@ Installation
 Clone the repository and install dependencies with [uv](https://github.com/astral-sh/uv):
 
 ```bash
-git clone https://github.com/AndrewResch/spritzle.git
+git clone https://github.com/spritzle/spritzle.git
 cd spritzle
 uv sync
 ```

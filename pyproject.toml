@@ -4,12 +4,40 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spritzle"
-version = "1.0"
-description = ""
+version = "1.0.0"
+description = "Lightweight BitTorrent daemon and CLI built around libtorrent with REST API and hook support"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
 authors = [
     { name = "Andrew Resch", email = "andrewresch@gmail.com" }
 ]
-requires-python = ">=3.11, <3.14"
+requires-python = ">=3.11, <3.15"
+keywords = [
+    "bittorrent",
+    "libtorrent",
+    "torrent",
+    "daemon",
+    "cli",
+    "rest-api",
+    "p2p",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Communications :: File Sharing",
+    "Topic :: Internet",
+    "Topic :: Utilities",
+]
 dependencies = [
     "aiohttp>=3.5",
     "click>=8.0",
@@ -17,6 +45,12 @@ dependencies = [
     "rich>=12.0.0",
     "tomlkit>=0.13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/spritzle/spritzle"
+Repository = "https://github.com/spritzle/spritzle"
+Issues = "https://github.com/spritzle/spritzle/issues"
+Documentation = "https://github.com/spritzle/spritzle#documentation"
 
 [project.optional-dependencies]
 daemon = [

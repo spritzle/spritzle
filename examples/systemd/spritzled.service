@@ -1,0 +1,12 @@
+[Unit]
+Description=Spritzle BitTorrent Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/spritzled --config-dir %h/.config/spritzle --port 17382 --log-level INFO
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
