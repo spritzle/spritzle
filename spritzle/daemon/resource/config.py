@@ -23,7 +23,7 @@
 from aiohttp import web
 
 
-from spritzle.daemon.keys import APP_KEY_CONFIG
+from spritzle.daemon.keys import APP_KEY_CONFIG, APP_KEY_CORE
 
 routes = web.RouteTableDef()
 
@@ -55,6 +55,7 @@ async def put_config(request):
     try:
         config.update(saved_secrets)
         config.update(new_values)
+        config._notify_change()
     except Exception as e:
         try:
             config.restore(snapshot)
@@ -78,6 +79,7 @@ async def patch_config(request):
     snapshot = config.snapshot()
     try:
         config.update(new_values)
+        config._notify_change()
     except Exception as e:
         try:
             config.restore(snapshot)
@@ -85,5 +87,12 @@ async def patch_config(request):
             pass
         raise web.HTTPBadRequest(reason=f"Failed to update config: {e}")
     return web.Response()
+
+
+@routes.post("/config/reload")
+async def post_config_reload(request):
+    core = request.app[APP_KEY_CORE]
+    reloaded = await core.reload_config(force=True)
+    return web.json_response({"status": "ok", "reloaded": reloaded})
 
 

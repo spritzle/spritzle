@@ -25,7 +25,7 @@ import logging
 import os
 from pathlib import Path
 import shutil
-from typing import Any, Dict, Iterator, Optional, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Union
 
 import tomlkit
 from tomlkit.items import Table
@@ -46,6 +46,7 @@ def get_default_save_path() -> str:
 DEFAULTS = {
     "default_save_path": get_default_save_path(),
     "save_resume_data_interval": 60,
+    "config_watch_interval": 2.0,
 }
 
 
@@ -108,11 +109,31 @@ class Config(collections.abc.MutableMapping[str, Any]):
 
         self._doc: TOMLDocument = tomlkit.document()
         self._unparseable = False
+        self._last_mtime_ns: Optional[int] = None
+        self._change_callbacks: list[Callable[["Config"], None]] = []
         if not self.in_memory and self.config_file is not None:
             if self.config_file.exists():
                 self.load()
             else:
                 self.save()
+
+    def add_change_callback(self, callback: Callable[["Config"], None]) -> None:
+        """Register a callback to be notified when configuration is reloaded or updated."""
+        if callback not in self._change_callbacks:
+            self._change_callbacks.append(callback)
+
+    def remove_change_callback(self, callback: Callable[["Config"], None]) -> None:
+        """Unregister a configuration change callback."""
+        if callback in self._change_callbacks:
+            self._change_callbacks.remove(callback)
+
+    def _notify_change(self) -> None:
+        """Notify all registered callbacks of configuration changes."""
+        for cb in list(self._change_callbacks):
+            try:
+                cb(self)
+            except Exception as e:
+                log.error(f"Error in config change callback: {e}")
 
     def load(self) -> None:
         """Load configuration from disk if present."""
@@ -122,6 +143,10 @@ class Config(collections.abc.MutableMapping[str, Any]):
                     content = f.read()
                     self._doc = tomlkit.parse(content)
                 self._unparseable = False
+                try:
+                    self._last_mtime_ns = self.config_file.stat().st_mtime_ns
+                except OSError:
+                    self._last_mtime_ns = None
             except Exception as e:
                 log.error(f"Failed to parse config file '{self.config_file}': {e}")
                 self._doc = tomlkit.document()
@@ -129,6 +154,41 @@ class Config(collections.abc.MutableMapping[str, Any]):
         else:
             self._doc = tomlkit.document()
             self._unparseable = False
+            self._last_mtime_ns = None
+
+    def reload(self, force: bool = False) -> bool:
+        """Reload configuration from disk.
+
+        Returns True if configuration was reloaded and changed, False otherwise.
+        If the file cannot be parsed or read, retains existing configuration and returns False.
+        """
+        if self.in_memory or self.config_file is None:
+            return False
+        if not self.config_file.exists():
+            return False
+
+        try:
+            mtime_ns = self.config_file.stat().st_mtime_ns
+        except OSError:
+            return False
+
+        if not force and self._last_mtime_ns is not None and mtime_ns == self._last_mtime_ns:
+            return False
+
+        try:
+            with self.config_file.open("r", encoding="utf-8") as f:
+                content = f.read()
+            new_doc = tomlkit.parse(content)
+        except Exception as e:
+            log.error(f"Failed to reload config file '{self.config_file}': {e}")
+            return False
+
+        self._doc = new_doc
+        self._last_mtime_ns = mtime_ns
+        self._unparseable = False
+        log.info(f"Reloaded configuration from '{self.config_file}'")
+        self._notify_change()
+        return True
 
     def save(self) -> None:
         """Atomically persist current configuration to disk."""
@@ -154,6 +214,10 @@ class Config(collections.abc.MutableMapping[str, Any]):
         except OSError:
             pass
         temp_file.replace(self.config_file)
+        try:
+            self._last_mtime_ns = self.config_file.stat().st_mtime_ns
+        except OSError:
+            self._last_mtime_ns = None
 
     def reset(self) -> None:
         """Reset all configuration overrides back to defaults."""

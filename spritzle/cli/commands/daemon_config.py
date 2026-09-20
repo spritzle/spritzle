@@ -47,11 +47,21 @@ from spritzle.cli.display import (
     multiple=True,
     help="Set a config value as: key value",
 )
+@click.option(
+    "--reload",
+    "-r",
+    "do_reload",
+    is_flag=True,
+    default=False,
+    help="Trigger the daemon to reload configuration from disk.",
+)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
-def command(client, key, value, set_value, json_output, plain):
-    if key and value is not None:
+def command(client, key, value, set_value, do_reload, json_output, plain):
+    if do_reload or key == "reload":
+        client.do_command(reloader, json_output, plain)
+    elif key and value is not None:
         client.do_command(setter, [(key, value)])
     elif key and not set_value:
         client.do_command(show_single, key, json_output, plain)
@@ -59,6 +69,41 @@ def command(client, key, value, set_value, json_output, plain):
         client.do_command(setter, set_value)
     else:
         client.do_command(show, json_output, plain)
+
+
+async def reloader(client, json_output: bool = False, plain: bool = False):
+    async with client.session.post(client.url("config/reload")) as resp:
+        if resp.status != 200:
+            err_msg = resp.reason
+            try:
+                err_json = await resp.json()
+                err_msg = err_json.get("message") or err_json.get("reason") or err_msg
+            except Exception:
+                pass
+            print_error(
+                f"Error reloading config: HTTP {resp.status} ({err_msg})",
+                color_opt=getattr(client, "color", None),
+            )
+            sys.exit(1)
+
+        result = await resp.json()
+
+    if json_output:
+        print_json(result)
+        return
+
+    reloaded = result.get("reloaded", False)
+    if reloaded:
+        msg = "Daemon configuration reloaded successfully."
+    else:
+        msg = "Daemon configuration checked; no changes detected."
+
+    if should_use_color(getattr(client, "color", None)) and not plain:
+        console = get_console(getattr(client, "color", None))
+        symbol = "[bold green]✓[/bold green]" if reloaded else "[bold yellow]•[/bold yellow]"
+        console.print(f"{symbol} {msg}")
+    else:
+        print(msg)
 
 
 async def setter(client, set_value):

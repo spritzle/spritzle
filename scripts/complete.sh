@@ -141,7 +141,7 @@ _spritzle() {
             ;;
         daemon-config)
             if [[ "${cur}" == -* ]]; then
-                COMPREPLY=($(compgen -W "-s --set --json --plain --help" -- "${cur}"))
+                COMPREPLY=($(compgen -W "-s --set -r --reload --json --plain --help" -- "${cur}"))
             fi
             ;;
         remote)

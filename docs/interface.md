@@ -119,6 +119,28 @@ $ http PATCH http://localhost:17382/config "Authorization: Bearer $TOKEN" defaul
 HTTP/1.1 200 OK
 ```
 
+### /config/reload
+#### POST
+
+Triggers the daemon to reload configuration settings from disk (`daemon.toml`).
+
+**Response Body:**
+* `status` (string): `"ok"`
+* `reloaded` (boolean): `true` if changes were detected and applied, `false` otherwise.
+
+**Example**
+
+```shell
+$ http POST http://localhost:17382/config/reload "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+    "reloaded": true,
+    "status": "ok"
+}
+```
+
 
 Session
 -------

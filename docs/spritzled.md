@@ -72,6 +72,15 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 | --- | --- | --- | --- |
 | `default_save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. Defaults to `$SPRITZLE_SAVE_PATH`, `$SPRITZLE_DOWNLOAD_DIR`, or `~/Downloads`. Spritzled auto-creates the directory on startup and validates write permissions. |
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
+| `config_watch_interval` | float | `2.0` | Interval in seconds between file watcher polling checks for `daemon.toml` modifications. Set to `0` or negative to disable file watching. |
+
+### Configuration Reloading & Live Watching
+
+`spritzled` supports dynamic configuration reloads without restarting the process:
+* **Automatic File Watching**: An asynchronous background watcher checks `daemon.toml` for external modifications every `config_watch_interval` seconds (`2.0s` by default). Valid configuration changes are dynamically applied to the running daemon.
+* **SIGHUP Reload**: Sending `SIGHUP` to the daemon process (`kill -HUP $PID` or `systemctl --user reload spritzled`) triggers an immediate configuration reload from disk.
+* **API / CLI Reload**: Call `POST /config/reload` or run `spritzle daemon-config --reload` to trigger an on-demand reload.
+* **Syntax Safety**: If an external edit contains syntax errors or invalid TOML, the reload safely fails, logs an error, and preserves the active running configuration without corruption.
 
 > [!NOTE]
 > Daemon configuration in `daemon.toml` is distinct from **libtorrent session settings** (such as `listen_interfaces`, `download_rate_limit`, `connections_limit`, etc.). Libtorrent session settings are preserved in `session.state` across restarts and can be inspected or adjusted at runtime via the REST API (`/session/settings`) or the CLI command `spritzle settings`.
@@ -93,6 +102,7 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/spritzled --config-dir %h/.config/spritzle --port 17382 --log-level INFO
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5
 

@@ -106,6 +106,7 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle daemon-config save_resume_data_interval",
         "spritzle daemon-config save_resume_data_interval 30",
         "spritzle daemon-config -s save_resume_data_interval 30",
+        "spritzle daemon-config --reload",
         "spritzle daemon-config --json",
     ],
     "remote": [

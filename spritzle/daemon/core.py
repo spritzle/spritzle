@@ -22,10 +22,11 @@
 
 import asyncio
 import importlib.metadata
+import functools
+import logging
 import os
 from pathlib import Path
-import logging
-import functools
+import signal
 import time
 from typing import Any, Dict, List, Optional, Sequence, Set, cast
 
@@ -70,6 +71,11 @@ class Core(object):
         self.alert = Alert()
         self.resume_data = ResumeData(self)
         self.torrent = Torrent(self)
+
+        self._tasks: Set[asyncio.Task] = set()
+        self._config_watch_task: Optional[asyncio.Task] = None
+        self._sighup_installed = False
+        self.config.add_change_callback(self._on_config_changed)
 
         self.alert.register_handler("session_stats_alert", self.on_session_stats_alert)
         self.alert.register_handler(
@@ -151,6 +157,38 @@ class Core(object):
             if info_hash not in self.torrent_data:
                 log.warning(f"Restoring missing metadata for ghost torrent {info_hash}")
                 self.torrent_data[info_hash] = {}
+        self._validate_default_save_path()
+        self._setup_signals()
+        self._start_config_watcher()
+
+        log.debug("Core started.")
+
+    async def stop(self):
+        log.debug("Core stopping..")
+        self._cleanup_signals()
+        await self._stop_config_watcher()
+        self.config.remove_change_callback(self._on_config_changed)
+        if self._tasks:
+            for t in list(self._tasks):
+                t.cancel()
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+            self._tasks.clear()
+        if self.session is None:
+            return
+        await self.hooks.stop()
+        await self.resume_data.stop()
+        await self.save_session_state()
+        self.session.pause()
+        await self.alert.stop()
+        del self.session
+        self.session = None
+        log.debug("Core stopped..")
+
+    def _on_config_changed(self, cfg: Config) -> None:
+        self._validate_default_save_path()
+        self.resume_data.notify_interval_changed()
+
+    def _validate_default_save_path(self) -> None:
         default_save_path = self.config.get("default_save_path")
         if default_save_path:
             p = Path(os.path.expanduser(str(default_save_path)))
@@ -163,20 +201,68 @@ class Core(object):
             elif not os.access(p, os.W_OK | os.X_OK):
                 log.warning(f"Default download directory '{p}' is not writable!")
 
-        log.debug("Core started.")
+    def _setup_signals(self) -> None:
+        if hasattr(signal, "SIGHUP"):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.add_signal_handler(signal.SIGHUP, self._on_sighup)
+                self._sighup_installed = True
+            except (ValueError, RuntimeError, NotImplementedError):
+                self._sighup_installed = False
 
-    async def stop(self):
-        log.debug("Core stopping..")
-        if self.session is None:
-            return
-        await self.hooks.stop()
-        await self.resume_data.stop()
-        await self.save_session_state()
-        self.session.pause()
-        await self.alert.stop()
-        del self.session
-        self.session = None
-        log.debug("Core stopped..")
+    def _cleanup_signals(self) -> None:
+        if self._sighup_installed and hasattr(signal, "SIGHUP"):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.remove_signal_handler(signal.SIGHUP)
+            except (ValueError, RuntimeError, NotImplementedError):
+                pass
+            self._sighup_installed = False
+
+    def _on_sighup(self) -> None:
+        log.info("Received SIGHUP, reloading configuration...")
+        t = asyncio.create_task(self.reload_config(force=True))
+        self._tasks.add(t)
+        t.add_done_callback(self._tasks.discard)
+
+    def _start_config_watcher(self) -> None:
+        if self._config_watch_task is None and not self.config.in_memory and self.config.config_file is not None:
+            loop = asyncio.get_running_loop()
+            self._config_watch_task = loop.create_task(self._config_watch_loop())
+
+    async def _stop_config_watcher(self) -> None:
+        if self._config_watch_task is not None:
+            self._config_watch_task.cancel()
+            try:
+                await self._config_watch_task
+            except asyncio.CancelledError:
+                pass
+            self._config_watch_task = None
+
+    async def _config_watch_loop(self) -> None:
+        try:
+            while True:
+                interval_val = self.config.get("config_watch_interval", 2.0)
+                try:
+                    interval = float(interval_val)
+                    if interval <= 0:
+                        interval = 2.0
+                except (TypeError, ValueError):
+                    interval = 2.0
+                await asyncio.sleep(interval)
+                await self.reload_config()
+        except asyncio.CancelledError:
+            pass
+
+    async def reload_config(self, force: bool = False) -> bool:
+        """Reload configuration from disk and apply dynamic updates.
+
+        Returns True if configuration changed and was reloaded, False otherwise.
+        """
+        reloaded = self.config.reload(force=force)
+        if reloaded:
+            log.info("Configuration reload successfully applied to daemon runtime.")
+        return reloaded
 
     async def save_session_state(self):
         if self.session is None:

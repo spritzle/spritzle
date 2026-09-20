@@ -395,6 +395,7 @@ spritzle daemon-config [OPTIONS] [KEY] [VALUE]
 
 Options:
 * `-s, --set KEY VALUE`: Set a daemon configuration value (`nargs=2`, can be specified multiple times).
+* `-r, --reload`: Trigger the daemon to reload configuration from `daemon.toml`.
 * `--json`: Output configuration as JSON.
 * `--plain`: Output plain unstyled text without ANSI colors.
 
@@ -410,6 +411,9 @@ spritzle daemon-config save_resume_data_interval
 # Update a configuration key directly or with --set
 spritzle daemon-config save_resume_data_interval 30
 spritzle daemon-config -s default_save_path /mnt/storage/downloads
+
+# Reload daemon configuration from disk
+spritzle daemon-config --reload
 
 # Output as JSON
 spritzle daemon-config --json

@@ -80,6 +80,11 @@ class ResumeData(object):
         self.pending_writes: Set[asyncio.Task] = set()
         self.deleted_hashes: Set[str] = set()
         self.save_interval = 60 * 30
+        self._interval_event = asyncio.Event()
+
+    def notify_interval_changed(self) -> None:
+        """Signal that the save_resume_data_interval configuration has changed."""
+        self._interval_event.set()
 
     async def start(self):
         self.loop = asyncio.get_running_loop()
@@ -120,7 +125,12 @@ class ResumeData(object):
                         interval = 60.0
                 except (TypeError, ValueError):
                     interval = 60.0
-                await asyncio.sleep(interval)
+                try:
+                    await asyncio.wait_for(self._interval_event.wait(), timeout=interval)
+                    self._interval_event.clear()
+                    continue
+                except asyncio.TimeoutError:
+                    pass
                 # Don't interrupt save process when loop is cancelled
                 if self.loop is not None:
                     save_all_task = self.loop.create_task(self.save_all())
