@@ -1,9 +1,0 @@
-version: 2
-jobs:
-    build:
-        docker:
-            - image: spritzle/cci-python
-        steps:
-            - checkout
-            - run: ~/.poetry/bin/poetry install
-            - run: ~/.poetry/bin/poetry run pytest
