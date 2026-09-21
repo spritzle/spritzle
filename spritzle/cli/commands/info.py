@@ -15,11 +15,12 @@ from spritzle.cli.display import (
     render_info_card,
     should_use_color,
 )
+from spritzle.cli.completion_helpers import complete_torrent_identifiers
 from spritzle.cli.lookup import resolve_single_torrent
 
 
 @click.command("info", short_help="Show detailed information for a torrent.")
-@click.argument("torrent", required=True)
+@click.argument("torrent", required=True, shell_complete=complete_torrent_identifiers)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj

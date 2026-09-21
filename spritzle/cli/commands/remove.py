@@ -3,12 +3,18 @@ import sys
 
 import click
 
+from spritzle.cli.completion_helpers import complete_torrent_identifiers
 from spritzle.cli.display import get_response_error, print_error, print_success
 from spritzle.cli.lookup import resolve_target_torrents
 
 
 @click.command("remove", short_help="Remove a torrent from the session.")
-@click.argument("torrent", required=False, metavar="[INFO-HASH|NAME]")
+@click.argument(
+    "torrent",
+    required=False,
+    metavar="[INFO-HASH|NAME]",
+    shell_complete=complete_torrent_identifiers,
+)
 @click.option("--delete-files", is_flag=True, help="Delete torrent files from storage.")
 @click.option("-q", "--query", multiple=True, help="Query string to filter torrents.")
 @click.option("--all", "all_torrents", is_flag=True, help="Remove all torrents.")

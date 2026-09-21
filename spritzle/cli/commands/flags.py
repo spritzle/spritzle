@@ -12,14 +12,37 @@ from spritzle.cli.display import (
     render_kv_table,
     should_use_color,
 )
+from spritzle.cli.completion_helpers import (
+    complete_torrent_flags,
+    complete_torrent_identifiers,
+)
 from spritzle.cli.lookup import resolve_single_torrent, resolve_target_torrents
 
 
 @click.command("flags", short_help="Show and modify torrent flags.")
-@click.argument("torrent", required=False, metavar="[INFO-HASH|NAME]")
+@click.argument(
+    "torrent",
+    required=False,
+    metavar="[INFO-HASH|NAME]",
+    shell_complete=complete_torrent_identifiers,
+)
 @click.option("--header/--no-header", default=True, help="Print header in output.")
-@click.option("-s", "--sets", help="Set flags.", type=str, multiple=True)
-@click.option("-u", "--unsets", help="Unset flags.", type=str, multiple=True)
+@click.option(
+    "-s",
+    "--sets",
+    help="Set flags.",
+    type=str,
+    multiple=True,
+    shell_complete=complete_torrent_flags,
+)
+@click.option(
+    "-u",
+    "--unsets",
+    help="Unset flags.",
+    type=str,
+    multiple=True,
+    shell_complete=complete_torrent_flags,
+)
 @click.option("-q", "--query", multiple=True, help="Query string to filter torrents.")
 @click.option("--all", "all_torrents", is_flag=True, help="Apply to all torrents.")
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")

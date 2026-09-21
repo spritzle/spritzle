@@ -19,7 +19,7 @@ from spritzle.cli.display import (
 
 
 @click.command("add", short_help="Add a torrent to the session.")
-@click.argument("path", required=True)
+@click.argument("path", required=True, type=click.Path())
 @click.option(
     "--option",
     "-o",

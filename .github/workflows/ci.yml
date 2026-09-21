@@ -30,8 +30,11 @@ jobs:
       - name: Run Type Checker
         run: uv run ty check
 
-      - name: Check Shell Completion Script
-        run: bash -n scripts/complete.sh
+      - name: Verify Shell Completion Generation
+        run: |
+          uv run spritzle completion bash > /dev/null
+          uv run spritzle completion zsh > /dev/null
+          uv run spritzle completion fish > /dev/null
 
   test:
     name: Test (Python ${{ matrix.python-version }})

@@ -592,20 +592,55 @@ spritzle help settings
 
 ## Shell Completion
 
-### Bash Completion Script
+Spritzle provides native multi-shell autocompletion for Bash, Zsh, and Fish via `spritzle completion`. It dynamically completes subcommands, options, flags, torrent info-hashes, remote profile names, and filesystem paths.
 
-Spritzle includes a shell completion script in [`scripts/complete.sh`](../scripts/complete.sh). To enable it in your bash session:
+### Bash
+
+Enable in your current session:
 
 ```shell
-source /path/to/spritzle/scripts/complete.sh
+source <(spritzle completion bash)
 ```
 
-### Click Built-in Completion
+Or persist to `~/.bashrc`:
 
-You can also use Click's standard completion generation for Bash:
+```shell
+spritzle completion bash >> ~/.bashrc
+```
+
+Alternatively, you can evaluate Click's direct completion loader:
 
 ```shell
 eval "$(_SPRITZLE_COMPLETE=bash_source spritzle)"
 ```
 
-Add this line to your `~/.bashrc` to enable automatic completion for `spritzle` commands, options, and info-hashes on every shell login.
+### Zsh
+
+Enable in your current session:
+
+```shell
+eval "$(spritzle completion zsh)"
+```
+
+Or persist to `~/.zshrc`:
+
+```shell
+spritzle completion zsh >> ~/.zshrc
+```
+
+> [!TIP]
+> Add `alias spritzle='noglob spritzle'` to `~/.zshrc` to pass unquoted magnet links without shell globbing conflicts.
+
+### Fish
+
+Enable in your current session:
+
+```shell
+spritzle completion fish | source
+```
+
+Or persist to your Fish completions directory:
+
+```shell
+spritzle completion fish > ~/.config/fish/completions/spritzle.fish
+```

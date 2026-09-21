@@ -3,12 +3,18 @@ import sys
 
 import click
 
+from spritzle.cli.completion_helpers import complete_torrent_identifiers
 from spritzle.cli.display import get_response_error, print_error, print_success
 from spritzle.cli.lookup import resolve_target_torrents
 
 
 @click.command("pause", short_help="Pause a torrent.")
-@click.argument("torrent", required=False, metavar="[INFO-HASH|NAME]")
+@click.argument(
+    "torrent",
+    required=False,
+    metavar="[INFO-HASH|NAME]",
+    shell_complete=complete_torrent_identifiers,
+)
 @click.option("-q", "--query", multiple=True, help="Query string to filter torrents.")
 @click.option("--all", "all_torrents", is_flag=True, help="Pause all torrents.")
 @click.option("--quiet", "-Q", is_flag=True, default=False, help="Print only affected info-hashes.")

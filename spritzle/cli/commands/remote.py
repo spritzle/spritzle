@@ -32,6 +32,7 @@ from rich.markup import escape
 from rich.table import Table
 from tabulate import tabulate
 
+from spritzle.cli.completion_helpers import complete_remotes
 from spritzle.cli.display import (
     format_latency,
     get_border_style,
@@ -267,7 +268,7 @@ def remote_add(
 
 
 @command.command("set-key", short_help="Update the API key for an existing remote.")
-@click.argument("name")
+@click.argument("name", shell_complete=complete_remotes)
 @click.argument("key", required=False, default=None)
 @click.pass_obj
 def remote_set_key(client, name: str, key: Optional[str]):
@@ -323,7 +324,7 @@ def remote_set_key(client, name: str, key: Optional[str]):
 
 
 @command.command("status", short_help="Check connection and status of remote daemons.")
-@click.argument("name", required=False, default=None)
+@click.argument("name", required=False, default=None, shell_complete=complete_remotes)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
@@ -484,7 +485,7 @@ def remote_list(client, json_output: bool, plain: bool):
 
 
 @command.command("use", short_help="Switch the active default remote.")
-@click.argument("name")
+@click.argument("name", shell_complete=complete_remotes)
 @click.pass_obj
 def remote_use(client, name: str):
     """Switch the default remote."""
@@ -498,7 +499,7 @@ def remote_use(client, name: str):
 
 
 @command.command("remove", short_help="Remove a remote.")
-@click.argument("name")
+@click.argument("name", shell_complete=complete_remotes)
 @click.pass_obj
 def remote_remove(client, name: str):
     """Remove a configured remote."""
@@ -511,7 +512,7 @@ def remote_remove(client, name: str):
 
 
 @command.command("show", short_help="Show details for a remote.")
-@click.argument("name")
+@click.argument("name", shell_complete=complete_remotes)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj

@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import aiohttp
 import click
 
+from spritzle.cli.completion_helpers import complete_remotes
 from spritzle.cli.config import CLIConfig, RemotesConfig
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
@@ -166,10 +167,17 @@ cmd_dir = Path(__file__).parent / "commands"
 @click.option(
     "-c",
     "--config",
+    type=click.Path(file_okay=False, dir_okay=True),
     default=None,
     help="Configuration directory. [default: ~/.config/spritzle]",
 )
-@click.option("-r", "--remote", default=None, help="Remote daemon profile to use.")
+@click.option(
+    "-r",
+    "--remote",
+    default=None,
+    shell_complete=complete_remotes,
+    help="Remote daemon profile to use.",
+)
 @click.option("--color/--no-color", default=None, help="Enable or disable color output.")
 @click.pass_context
 def cli(ctx, config, remote, color):

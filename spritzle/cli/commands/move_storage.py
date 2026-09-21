@@ -2,13 +2,23 @@ import sys
 
 import click
 
+from spritzle.cli.completion_helpers import complete_torrent_identifiers
 from spritzle.cli.display import get_response_error, print_error, print_success
 from spritzle.cli.lookup import resolve_single_torrent
 
 
 @click.command("move-storage", short_help="Move torrent storage to a new path.")
-@click.argument("torrent", required=True, metavar="[INFO-HASH|NAME]")
-@click.argument("path", required=True)
+@click.argument(
+    "torrent",
+    required=True,
+    metavar="[INFO-HASH|NAME]",
+    shell_complete=complete_torrent_identifiers,
+)
+@click.argument(
+    "path",
+    required=True,
+    type=click.Path(file_okay=False, dir_okay=True),
+)
 @click.pass_obj
 def command(client, torrent, path):
     client.do_command(f, torrent, path)
