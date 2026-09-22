@@ -464,14 +464,6 @@ async def run_dashboard(
                     if await _sleep_or_quit(interval, watcher.quit_event):
                         break
     except (asyncio.CancelledError, KeyboardInterrupt):
-        if is_interactive:
-            console.print("\n[dim]Dashboard stopped.[/dim]")
-        else:
-            print("\nDashboard stopped.")
-    else:
-        if not once:
-            if is_interactive:
-                console.print("\n[dim]Dashboard stopped.[/dim]")
-            else:
-                print("\nDashboard stopped.")
+        pass
+
 

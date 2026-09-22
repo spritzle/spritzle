@@ -1662,7 +1662,7 @@ def test_top_command(cli):
         res = runner.invoke(spritzle_cli, ["top", "--plain"])
         assert res.exit_code == 0
         assert "Spritzle Monitor" in res.output
-        assert "Dashboard stopped" in res.output
+        assert "Dashboard stopped" not in res.output
 
 
 def test_list_command_watch(cli):
@@ -1677,7 +1677,7 @@ def test_list_command_watch(cli):
         res = runner.invoke(spritzle_cli, ["list", "--watch", "--plain"])
         assert res.exit_code == 0
         assert "Spritzle Monitor" in res.output
-        assert "Dashboard stopped" in res.output
+        assert "Dashboard stopped" not in res.output
 
 
 def test_dht_bootstrap_indicator_stats(cli):
@@ -1715,7 +1715,7 @@ def test_top_command_quit_with_q(cli):
         res = runner.invoke(spritzle_cli, ["top", "--plain"])
         assert res.exit_code == 0
         assert "Spritzle Monitor" in res.output
-        assert "Dashboard stopped" in res.output
+        assert "Dashboard stopped" not in res.output
 
 
 def test_key_press_watcher_pty():
