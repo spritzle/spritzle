@@ -125,7 +125,13 @@ async def test_handler_validation():
 async def test_alert_with_real_session_and_alert_fd():
     import libtorrent as lt
 
-    ses = lt.session({"alert_mask": int(lt.alert.category_t.all_categories)})
+    ses = lt.session({
+        "enable_dht": False,
+        "enable_lsd": False,
+        "enable_upnp": False,
+        "enable_natpmp": False,
+        "alert_mask": int(lt.alert.category_t.all_categories),
+    })
     a = spritzle.daemon.alert.Alert()
 
     called = asyncio.Event()
@@ -152,19 +158,22 @@ async def test_alert_with_real_session_and_alert_fd():
 
 async def test_alert_no_deadlock_on_sync_handle_calls(tmp_path):
     import libtorrent as lt
+    from tests.daemon.common import torrent_dir
 
     ses = lt.session({
+        "enable_dht": False,
+        "enable_lsd": False,
+        "enable_upnp": False,
+        "enable_natpmp": False,
         "alert_mask": int(lt.alert.category_t.all_categories),
     })
     a = spritzle.daemon.alert.Alert()
     await a.start(ses)
 
     try:
-        p = lt.parse_magnet_uri(
-            "magnet:?xt=urn:btih:f45add9d1a5185d8588df7dd6cd89993dd0174fa&dn=archlinux&tr=http://tracker.example.com/announce"
-        )
-        p.save_path = str(tmp_path)
-        h: Any = cast(Any, ses.add_torrent(p))
+        t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+        ti = lt.torrent_info(lt.bdecode(t1))
+        h: Any = cast(Any, ses.add_torrent({"ti": ti, "save_path": str(tmp_path)}))
 
         for _ in range(200):
             ses.post_session_stats()

@@ -7,6 +7,7 @@
   - Linting: `uv run ruff check`
   - Type checking: `uv run ty check`
 - **CLI & Daemon Extra Decoupling**: The base package is a pure-Python HTTP client without native dependencies. The daemon runtime requires native `libtorrent`, installed via the `daemon` extra (`spritzle[daemon]`). Never add `libtorrent` imports to `spritzle/cli/`.
+- **No External / Real Torrents in Tests**: Never use real torrent files, live magnet links, or public tracker URLs in tests or test scripts. Always use the local fixture torrent files in `tests/daemon/torrents/` (e.g. `testtorrent1.torrent`, `random_one_file.torrent`) with network features (`enable_dht`, `enable_lsd`, `enable_upnp`, `enable_natpmp`) disabled in test sessions to ensure tests are strictly offline and never utilize public internet swarms, bandwidth, or external tracker infrastructure.
 - Tests involve real libtorrent sessions; expect full runs to take ~60–90 seconds.
 
 ## 2. Concurrency & Libtorrent Rules
