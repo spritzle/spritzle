@@ -11,6 +11,7 @@ from spritzle.cli.display import (
     format_speed,
     format_state_pill,
     get_console,
+    get_display_state,
     print_error,
     print_json,
     render_empty_list_card,
@@ -109,7 +110,7 @@ async def f(
     field_list: List[str] = [f.strip() for f in fields.split(",") if f.strip()]
     needed_keys = set(field_list)
     if "state" in needed_keys:
-        needed_keys.update(["errc", "num_peers"])
+        needed_keys.update(["errc", "num_peers", "paused", "flags"])
 
     params_with_keys = dict(params)
     params_with_keys["keys"] = ",".join(sorted(needed_keys))
@@ -164,7 +165,13 @@ async def f(
     if json_output:
         json_data = []
         for item in raw_items:
-            json_data.append({f: item.get(f, None) for f in field_list})
+            row = {}
+            for f in field_list:
+                if f == "state":
+                    row[f] = get_display_state(item)
+                else:
+                    row[f] = item.get(f, None)
+            json_data.append(row)
         print_json(json_data)
         return
 
@@ -214,17 +221,12 @@ async def f(
                 elif field == "progress":
                     formatted_val = format_progress(val, human=True, style="smooth", use_color=True)
                 elif field == "state":
-                    errc = item.get("errc")
-                    has_error = False
-                    if isinstance(errc, dict) and errc.get("value", 0) != 0:
-                        has_error = True
-                    elif item.get("last_error"):
-                        has_error = True
-
-                    if has_error:
+                    state_str = get_display_state(item)
+                    if state_str == "error":
                         formatted_val = "[bold red]✖ error[/bold red]"
+                    elif state_str == "paused":
+                        formatted_val = format_state_pill("paused", use_color=True)
                     else:
-                        state_str = str(val)
                         peers = int(item.get("num_peers", 0))
                         formatted_val = format_state_pill(state_str, use_color=True, peers=peers)
                 elif isinstance(val, bool):
@@ -236,16 +238,7 @@ async def f(
                 values.append(formatted_val)
             else:
                 if field == "state":
-                    errc = item.get("errc")
-                    has_error = False
-                    if isinstance(errc, dict) and errc.get("value", 0) != 0:
-                        has_error = True
-                    elif item.get("last_error"):
-                        has_error = True
-                    if has_error:
-                        values.append("error")
-                    else:
-                        values.append(str(val))
+                    values.append(get_display_state(item))
                 else:
                     values.append(type_formatters.get(type(val), str)(val))
         table.append(values)

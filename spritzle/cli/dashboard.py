@@ -23,6 +23,7 @@ from spritzle.cli.display import (
     format_speed,
     format_state_pill,
     get_console,
+    get_display_state,
     should_use_color,
 )
 
@@ -64,7 +65,7 @@ async def fetch_torrents_with_status(client, query: Optional[Sequence[str]] = No
             else:
                 params[q] = ""
 
-    dash_keys = "name,info_hash,state,progress,download_rate,upload_rate,total_wanted,total_done,num_peers,num_seeds"
+    dash_keys = "name,info_hash,state,progress,download_rate,upload_rate,total_wanted,total_done,num_peers,num_seeds,paused,flags,errc,last_error"
     params_with_keys = dict(params)
     params_with_keys["keys"] = dash_keys
 
@@ -103,7 +104,7 @@ def render_single_watch_panel(data: Dict[str, Any], is_color: bool = True) -> Pa
     name = data.get("name") or data.get("info_hash", "torrent")
     info_hash = data.get("info_hash", "")
     short_hash = f"{info_hash[:8]}..." if len(info_hash) >= 8 else info_hash
-    state = str(data.get("state", "downloading"))
+    state = get_display_state(data)
     progress = float(data.get("progress", 0.0))
     dl_rate = float(data.get("download_rate", 0))
     ul_rate = float(data.get("upload_rate", 0))
@@ -234,8 +235,8 @@ def build_dashboard_renderable(
     total_dl = sum(float(t.get("download_rate", 0)) for t in items)
     total_ul = sum(float(t.get("upload_rate", 0)) for t in items)
 
-    num_dl = sum(1 for t in items if str(t.get("state", "")).lower() == "downloading")
-    num_seed = sum(1 for t in items if str(t.get("state", "")).lower() == "seeding")
+    num_dl = sum(1 for t in items if get_display_state(t) == "downloading")
+    num_seed = sum(1 for t in items if get_display_state(t) == "seeding")
 
     if dht_nodes < 10:
         dht_disp = (
@@ -279,7 +280,7 @@ def build_dashboard_renderable(
     else:
         for t in items:
             name = t.get("name") or t.get("info_hash", "torrent")
-            state = str(t.get("state", "downloading"))
+            state = get_display_state(t)
             progress = float(t.get("progress", 0.0))
             dl_rate = float(t.get("download_rate", 0))
             ul_rate = float(t.get("upload_rate", 0))
@@ -466,7 +467,7 @@ async def run_dashboard(
                         for t in items:
                             name = t.get("name") or t.get("info_hash", "torrent")
                             pct = f"{float(t.get('progress', 0.0)) * 100:.1f}%"
-                            st = t.get("state", "")
+                            st = get_display_state(t)
                             dl = format_speed(t.get("download_rate", 0))
                             ul = format_speed(t.get("upload_rate", 0))
                             peers = t.get("num_peers", 0)

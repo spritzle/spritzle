@@ -897,6 +897,57 @@ def test_list_plain_and_color_flags(cli):
     assert "file1.txt" in res_color.output
 
 
+def test_paused_torrent_display(cli):
+    import json
+    import libtorrent as lt
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from tests.daemon.common import torrent_dir
+
+    t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
+    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    runner = CliRunner()
+
+    # Pause the torrent via CLI
+    res_pause = runner.invoke(spritzle_cli, ["pause", ih])
+    assert res_pause.exit_code == 0
+    assert "paused successfully" in res_pause.output
+
+    # List output should show paused status
+    res_list = runner.invoke(spritzle_cli, ["list"])
+    assert res_list.exit_code == 0
+    assert "paused" in res_list.output.lower()
+
+    # Plain output mode
+    res_plain = runner.invoke(spritzle_cli, ["list", "--plain"])
+    assert res_plain.exit_code == 0
+    assert "paused" in res_plain.output.lower()
+
+    # JSON output mode
+    res_json = runner.invoke(spritzle_cli, ["list", "--json"])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert len(data) == 1
+    assert data[0]["state"] == "paused"
+
+    # Info output mode
+    res_info = runner.invoke(spritzle_cli, ["info", ih])
+    assert res_info.exit_code == 0
+    assert "paused" in res_info.output.lower()
+
+    # Resume the torrent via CLI
+    res_resume = runner.invoke(spritzle_cli, ["resume", ih])
+    assert res_resume.exit_code == 0
+    assert "resumed successfully" in res_resume.output
+
+    # List output after resume should not be paused
+    res_resumed_json = runner.invoke(spritzle_cli, ["list", "--json"])
+    assert res_resumed_json.exit_code == 0
+    data_resumed = json.loads(res_resumed_json.output)
+    assert data_resumed[0]["state"] != "paused"
+
+
 def test_flags_json_and_plain(cli):
     import json
     import libtorrent as lt

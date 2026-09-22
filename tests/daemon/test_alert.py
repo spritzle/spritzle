@@ -161,7 +161,7 @@ async def test_alert_no_deadlock_on_sync_handle_calls(tmp_path):
 
     try:
         p = lt.parse_magnet_uri(
-            "magnet:?xt=urn:btih:3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0&dn=test&tr=http://tracker.example.com/announce"
+            "magnet:?xt=urn:btih:f45add9d1a5185d8588df7dd6cd89993dd0174fa&dn=archlinux&tr=http://tracker.example.com/announce"
         )
         p.save_path = str(tmp_path)
         h: Any = cast(Any, ses.add_torrent(p))

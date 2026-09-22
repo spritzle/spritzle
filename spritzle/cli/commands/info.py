@@ -11,6 +11,7 @@ from spritzle.cli.display import (
     format_speed,
     format_state,
     get_console,
+    get_display_state,
     print_error,
     print_json,
     render_info_card,
@@ -69,6 +70,7 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
             pass
 
     if json_output:
+        data["state"] = get_display_state(data)
         print_json(data)
         return
 
@@ -83,7 +85,7 @@ async def f(client, torrent: str, json_output: bool = False, plain: bool = False
 
     # Plain output mode
     name = data.get("name", "<unknown>")
-    state = data.get("state", "")
+    state = get_display_state(data)
     progress = data.get("progress", 0.0)
     dl_rate = data.get("download_rate", 0)
     ul_rate = data.get("upload_rate", 0)

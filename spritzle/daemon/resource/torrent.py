@@ -141,7 +141,10 @@ def get_torrent_list(core, query=None) -> List[Any]:
         statuses: List[Dict[str, Any]] = []
         for handle in core.session.get_torrents():
             info_hash = str(handle.info_hash())
-            st = common.struct_to_dict(handle.status(), only_keys=list(keys))
+            fetch_k = list(keys)
+            if "state" in fetch_k:
+                fetch_k = list(set(fetch_k) | {"paused", "flags"})
+            st = common.struct_to_dict(handle.status(), only_keys=fetch_k)
             if info_hash in core.torrent_data:
                 st.update(core.torrent_data[info_hash])
             statuses.append(st)
@@ -169,6 +172,8 @@ def get_torrent_list(core, query=None) -> List[Any]:
                 fetch_keys.add(k.rsplit(".", 1)[0])
             else:
                 fetch_keys.add(k)
+        if "state" in fetch_keys:
+            fetch_keys.update(["paused", "flags"])
 
     statuses = []
     for handle in core.session.get_torrents():
@@ -252,8 +257,11 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
                     raise web.HTTPBadRequest(
                         reason=f"Invalid operator {op}, must provide valid operator: {sorted(ops)}"
                     )
+                target_val = status[key]
+                if key == "state" and (status.get("paused") is True or (int(status.get("flags", 0)) & 16) != 0):
+                    target_val = "paused"
                 pat = get_pattern(value)
-                matched = bool(pat.match(status[key]))
+                matched = bool(pat.match(target_val))
                 if op == "ne" and matched:
                     break
                 elif op in ("", "eq") and not matched:
@@ -877,7 +885,16 @@ async def post_torrent_method(request):
         args = []
 
     try:
-        result = method(*args)
+        if method_name == "pause":
+            if hasattr(handle, "unset_flags") and hasattr(lt, "torrent_flags"):
+                handle.unset_flags(lt.torrent_flags.auto_managed)
+            result = handle.pause(*args)
+        elif method_name == "resume":
+            if hasattr(handle, "set_flags") and hasattr(lt, "torrent_flags"):
+                handle.set_flags(lt.torrent_flags.auto_managed)
+            result = handle.resume(*args)
+        else:
+            result = method(*args)
     except Exception as ex:
         raise web.HTTPBadRequest(text=f"Something went wrong: {ex}")
 

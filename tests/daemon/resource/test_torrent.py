@@ -468,19 +468,39 @@ async def test_delete_torrent_alert_exception_handling(cli, monkeypatch):
 async def test_pause_resume_torrent(cli):
     tid = await test_post_torrent(cli)
 
+    # Initial post_torrent adds in paused state
     response = await cli.get(f"/torrent/{tid}")
     data = await response.json()
     assert data["flags"] & lt.torrent_flags.paused
 
+    # Query for paused vs downloading
+    r_paused = await cli.get("/torrent?state=paused")
+    assert r_paused.status == 200
+    assert len(await r_paused.json()) == 1
+
+    r_dl = await cli.get("/torrent?state=downloading")
+    assert r_dl.status == 200
+    assert len(await r_dl.json()) == 0
+
+    # Resume torrent: re-enables auto_managed and unsets paused
     await cli.post(f"/torrent/{tid}/resume")
     response = await cli.get(f"/torrent/{tid}")
     data = await response.json()
-    assert not data["flags"] & lt.torrent_flags.paused
+    assert not (data["flags"] & lt.torrent_flags.paused)
+    assert data["flags"] & lt.torrent_flags.auto_managed
 
+    r_paused = await cli.get("/torrent?state=paused")
+    assert len(await r_paused.json()) == 0
+
+    # Pause torrent: unsets auto_managed so queueing won't auto-resume it, and sets paused
     await cli.post(f"/torrent/{tid}/pause")
     response = await cli.get(f"/torrent/{tid}")
     data = await response.json()
     assert data["flags"] & lt.torrent_flags.paused
+    assert not (data["flags"] & lt.torrent_flags.auto_managed)
+
+    r_paused = await cli.get("/torrent?state=paused")
+    assert len(await r_paused.json()) == 1
 
 
 async def test_edit_queue_position(cli):

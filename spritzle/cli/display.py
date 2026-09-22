@@ -148,6 +148,16 @@ STATE_GLYPHS: Dict[str, str] = {
 }
 
 
+def get_display_state(item: Dict[str, Any]) -> str:
+    """Resolve the effective display state (error, paused, downloading, seeding, etc.) for a torrent."""
+    errc = item.get("errc")
+    if (isinstance(errc, dict) and errc.get("value", 0) != 0) or item.get("last_error") or item.get("error"):
+        return "error"
+    if item.get("paused") is True or (int(item.get("flags", 0)) & 16) != 0:
+        return "paused"
+    return str(item.get("state", "downloading"))
+
+
 def format_state(state: str, use_color: bool = True) -> str:
     """Format torrent state with semantic color coding."""
     if not use_color:
@@ -299,7 +309,7 @@ def render_post_add_card(
     size_bytes = torrent.get("size") or torrent.get("total_wanted") or torrent.get("total_size") or 0
     size_str = format_bytes(size_bytes) if size_bytes > 0 else "unknown (fetching metadata...)"
     save_path = torrent.get("save_path", "")
-    state = torrent.get("state", "downloading")
+    state = get_display_state(torrent)
     peers = torrent.get("num_peers", 0)
 
     is_color = should_use_color(color_opt)
@@ -352,7 +362,7 @@ def render_info_card(
     """Render comprehensive torrent information in a modern multi-section card."""
     is_color = should_use_color(color_opt)
     name = data.get("name", "<unknown>")
-    state = str(data.get("state", "unknown"))
+    state = get_display_state(data)
     progress = float(data.get("progress", 0.0))
     dl_rate = float(data.get("download_rate", 0))
     ul_rate = float(data.get("upload_rate", 0))
