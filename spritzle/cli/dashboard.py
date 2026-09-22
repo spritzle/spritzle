@@ -1,5 +1,14 @@
 import asyncio
+import os
+import sys
 from typing import Any, Dict, List, Optional, Sequence
+
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None  # type: ignore[assignment]
+    tty = None  # type: ignore[assignment]
 
 from rich.console import Group
 from rich.live import Live
@@ -305,10 +314,100 @@ def build_dashboard_renderable(
             table,
         ),
         title="[bold]Spritzle Torrent Monitor[/bold]" if is_color else "Spritzle Torrent Monitor",
-        subtitle="[dim]Press Ctrl+C to exit[/dim]" if is_color else "Press Ctrl+C to exit",
+        subtitle="[dim]Press 'q' or Ctrl+C to exit[/dim]" if is_color else "Press 'q' or Ctrl+C to exit",
         border_style="dim" if is_color else "none",
     )
     return panel
+
+
+class KeyPressWatcher:
+    """Async context manager that puts stdin in cbreak mode to detect 'q' keypress."""
+
+    def __init__(
+        self,
+        quit_event: Optional[asyncio.Event] = None,
+        fd: Optional[int] = None,
+    ) -> None:
+        self.quit_event = quit_event if quit_event is not None else asyncio.Event()
+        self._target_fd = fd
+        self._fd: Optional[int] = None
+        self._old_settings: Optional[Any] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    async def __aenter__(self) -> "KeyPressWatcher":
+        if termios is None or tty is None:
+            return self
+        try:
+            target_fd = self._target_fd
+            if target_fd is None and hasattr(sys.stdin, "fileno") and sys.stdin.isatty():
+                target_fd = sys.stdin.fileno()
+
+            if target_fd is not None and os.isatty(target_fd):
+                self._old_settings = termios.tcgetattr(target_fd)
+                tty.setcbreak(target_fd)
+                self._fd = target_fd
+                self._loop = asyncio.get_running_loop()
+                self._loop.add_reader(self._fd, self._on_stdin)
+        except Exception:
+            self._cleanup()
+        return self
+
+    def _on_stdin(self) -> None:
+        try:
+            if self._fd is None:
+                return
+            data = os.read(self._fd, 1024)
+        except Exception:
+            data = b""
+        if not data:
+            if self._loop and self._fd is not None:
+                try:
+                    self._loop.remove_reader(self._fd)
+                except Exception:
+                    pass
+            return
+        if b"q" in data or b"Q" in data or b"\x03" in data:
+            self.quit_event.set()
+
+    def _cleanup(self) -> None:
+        if self._loop and self._fd is not None:
+            try:
+                self._loop.remove_reader(self._fd)
+            except Exception:
+                pass
+        if self._fd is not None and self._old_settings is not None and termios is not None:
+            try:
+                termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_settings)
+            except Exception:
+                pass
+        self._fd = None
+        self._old_settings = None
+        self._loop = None
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self._cleanup()
+
+
+async def _sleep_or_quit(interval: float, quit_event: Optional[asyncio.Event]) -> bool:
+    """Sleep for up to `interval` seconds, returning True if quit_event is set."""
+    if quit_event is None:
+        await asyncio.sleep(interval)
+        return False
+    if quit_event.is_set():
+        return True
+
+    if interval <= 0.05:
+        await asyncio.sleep(interval)
+        return quit_event.is_set()
+
+    loop = asyncio.get_running_loop()
+    end_time = loop.time() + interval
+    while loop.time() < end_time:
+        if quit_event.is_set():
+            return True
+        step = min(0.05, max(0.0, end_time - loop.time()))
+        await asyncio.sleep(step)
+    return quit_event.is_set()
 
 
 async def run_dashboard(
@@ -318,48 +417,61 @@ async def run_dashboard(
     color_opt: Optional[bool] = None,
     plain: bool = False,
     once: bool = False,
+    quit_event: Optional[asyncio.Event] = None,
 ) -> None:
     """Run an interactive updating Rich dashboard (spritzle top / list --watch)."""
     is_interactive = should_use_color(color_opt) and not plain
     console = get_console(color_opt)
 
     try:
-        if is_interactive:
-            with Live(console=console, refresh_per_second=4, transient=False) as live:
+        async with KeyPressWatcher(quit_event=quit_event) as watcher:
+            if is_interactive:
+                with Live(console=console, refresh_per_second=4, transient=False) as live:
+                    while True:
+                        items = await fetch_torrents_with_status(client, query)
+                        stats = await fetch_session_stats(client)
+                        live.update(build_dashboard_renderable(items, stats, is_color=True))
+
+                        if once:
+                            break
+                        if await _sleep_or_quit(interval, watcher.quit_event):
+                            break
+            else:
                 while True:
                     items = await fetch_torrents_with_status(client, query)
                     stats = await fetch_session_stats(client)
-                    live.update(build_dashboard_renderable(items, stats, is_color=True))
+                    dht_nodes = int(stats.get("dht.dht_nodes", 0))
+                    dht_str = f"{dht_nodes} (bootstrapping DHT...)" if dht_nodes < 10 else f"{dht_nodes}"
+                    total_dl = sum(float(t.get("download_rate", 0)) for t in items)
+                    total_ul = sum(float(t.get("upload_rate", 0)) for t in items)
+                    print(
+                        f"--- Spritzle Monitor | DL: {format_speed(total_dl)} | UL: {format_speed(total_ul)} | DHT: {dht_str} ---"
+                    )
+                    if not items:
+                        print("No active torrents.")
+                    else:
+                        for t in items:
+                            name = t.get("name") or t.get("info_hash", "torrent")
+                            pct = f"{float(t.get('progress', 0.0)) * 100:.1f}%"
+                            st = t.get("state", "")
+                            dl = format_speed(t.get("download_rate", 0))
+                            ul = format_speed(t.get("upload_rate", 0))
+                            peers = t.get("num_peers", 0)
+                            print(f"{name}\t{st}\t{pct}\t{dl}\t{ul}\t{peers}")
 
                     if once:
                         break
-                    await asyncio.sleep(interval)
-        else:
-            while True:
-                items = await fetch_torrents_with_status(client, query)
-                stats = await fetch_session_stats(client)
-                dht_nodes = int(stats.get("dht.dht_nodes", 0))
-                dht_str = f"{dht_nodes} (bootstrapping DHT...)" if dht_nodes < 10 else f"{dht_nodes}"
-                total_dl = sum(float(t.get("download_rate", 0)) for t in items)
-                total_ul = sum(float(t.get("upload_rate", 0)) for t in items)
-                print(f"--- Spritzle Monitor | DL: {format_speed(total_dl)} | UL: {format_speed(total_ul)} | DHT: {dht_str} ---")
-                if not items:
-                    print("No active torrents.")
-                else:
-                    for t in items:
-                        name = t.get("name") or t.get("info_hash", "torrent")
-                        pct = f"{float(t.get('progress', 0.0)) * 100:.1f}%"
-                        st = t.get("state", "")
-                        dl = format_speed(t.get("download_rate", 0))
-                        ul = format_speed(t.get("upload_rate", 0))
-                        peers = t.get("num_peers", 0)
-                        print(f"{name}\t{st}\t{pct}\t{dl}\t{ul}\t{peers}")
-
-                if once:
-                    break
-                await asyncio.sleep(interval)
+                    if await _sleep_or_quit(interval, watcher.quit_event):
+                        break
     except (asyncio.CancelledError, KeyboardInterrupt):
         if is_interactive:
             console.print("\n[dim]Dashboard stopped.[/dim]")
         else:
             print("\nDashboard stopped.")
+    else:
+        if not once:
+            if is_interactive:
+                console.print("\n[dim]Dashboard stopped.[/dim]")
+            else:
+                print("\nDashboard stopped.")
+

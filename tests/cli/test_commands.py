@@ -1696,6 +1696,81 @@ def test_dht_bootstrap_indicator_stats(cli):
     assert "bootstrapping DHT..." in res_stats.output
 
 
+def test_top_command_quit_with_q(cli):
+    from unittest.mock import patch
+    import asyncio
+    runner = CliRunner()
+
+    from spritzle.cli.dashboard import run_dashboard
+
+    quit_event = asyncio.Event()
+    original_run_dashboard = run_dashboard
+
+    async def patched_run_dashboard(*args, **kwargs):
+        kwargs["quit_event"] = quit_event
+        quit_event.set()
+        return await original_run_dashboard(*args, **kwargs)
+
+    with patch("spritzle.cli.commands.top.run_dashboard", side_effect=patched_run_dashboard):
+        res = runner.invoke(spritzle_cli, ["top", "--plain"])
+        assert res.exit_code == 0
+        assert "Spritzle Monitor" in res.output
+        assert "Dashboard stopped" in res.output
+
+
+def test_key_press_watcher_pty():
+    import asyncio
+    import os
+    import pty
+
+    from spritzle.cli.dashboard import KeyPressWatcher
+
+    master, slave = pty.openpty()
+
+    async def run_test():
+        watcher = KeyPressWatcher(fd=slave)
+        async with watcher:
+            assert not watcher.quit_event.is_set()
+            os.write(master, b"q")
+            await asyncio.wait_for(watcher.quit_event.wait(), timeout=1.0)
+            assert watcher.quit_event.is_set()
+
+    asyncio.run(run_test())
+    os.close(master)
+    os.close(slave)
+
+
+def test_key_press_watcher_uppercase_q_pty():
+    import asyncio
+    import os
+    import pty
+
+    from spritzle.cli.dashboard import KeyPressWatcher
+
+    master, slave = pty.openpty()
+
+    async def run_test():
+        watcher = KeyPressWatcher(fd=slave)
+        async with watcher:
+            assert not watcher.quit_event.is_set()
+            os.write(master, b"Q")
+            await asyncio.wait_for(watcher.quit_event.wait(), timeout=1.0)
+            assert watcher.quit_event.is_set()
+
+    asyncio.run(run_test())
+    os.close(master)
+    os.close(slave)
+
+
+def test_build_dashboard_renderable_subtitle():
+    from spritzle.cli.dashboard import build_dashboard_renderable
+    panel_color = build_dashboard_renderable([], {}, is_color=True)
+    assert "Press 'q' or Ctrl+C to exit" in str(panel_color.subtitle)
+    panel_plain = build_dashboard_renderable([], {}, is_color=False)
+    assert "Press 'q' or Ctrl+C to exit" in str(panel_plain.subtitle)
+
+
+
 
 
 

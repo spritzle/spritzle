@@ -142,7 +142,7 @@ spritzle list --watch
 
 ### `top` - Live Dashboard
 
-Displays an interactive, continuously updating terminal dashboard showing overall transfer speeds, active torrents, connected peers, ETA, and DHT status.
+Displays an interactive, continuously updating terminal dashboard showing overall transfer speeds, active torrents, connected peers, ETA, and DHT status. Press `q` or `Ctrl+C` to exit.
 
 ```shell
 spritzle top [OPTIONS]
