@@ -244,11 +244,11 @@ def build_dashboard_renderable(
             else f"{dht_nodes} (bootstrapping DHT...)"
         )
     else:
-        dht_disp = f"[green]● {dht_nodes} nodes[/green]" if is_color else f"{dht_nodes}"
+        dht_disp = f"[magenta]● {dht_nodes} nodes[/magenta]" if is_color else f"{dht_nodes}"
 
     header_text = (
         f"▼ DL: [bold green]{format_speed(total_dl)}[/bold green]  "
-        f"▲ UL: [bold cyan]{format_speed(total_ul)}[/bold cyan]  │  "
+        f"▲ UL: [bold blue]{format_speed(total_ul)}[/bold blue]  │  "
         f"Peers: [bold]{connected_peers}[/bold]  │  "
         f"Torrents: [green]● {num_dl} downloading[/green], [blue]● {num_seed} seeding[/blue]  │  "
         f"DHT: {dht_disp}"

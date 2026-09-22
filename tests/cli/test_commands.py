@@ -1828,6 +1828,23 @@ def test_dashboard_renderable_fullscreen_height():
     assert "Press 'q' or Ctrl+C to exit" in lines[-1]
 
 
+def test_dashboard_colors_dht_and_upload():
+    from spritzle.cli.dashboard import build_dashboard_renderable
+    from spritzle.cli.display import format_speed
+
+    upload_speed = format_speed(1048576, human=True, use_color=True, is_upload=True)
+    assert "[blue]▲" in upload_speed
+    assert "[cyan]" not in upload_speed
+
+    stats = {"dht.dht_nodes": 50}
+    panel = build_dashboard_renderable([], stats, is_color=True)
+    header_str = str(panel.renderable.renderables[0])
+    assert "[magenta]● 50 nodes[/magenta]" in header_str
+    assert "[bold blue]" in header_str
+    assert "[bold cyan]" not in header_str
+
+
+
 
 
 

@@ -74,7 +74,7 @@ def format_speed(
         return f"[dim]{formatted}[/dim]"
 
     if is_upload:
-        return f"[cyan]▲ {formatted}[/cyan]"
+        return f"[blue]▲ {formatted}[/blue]"
     return f"[green]▼ {formatted}[/green]"
 
 
@@ -503,7 +503,7 @@ def render_stats_cards(
             else f"{dht_nodes} (bootstrapping DHT...)"
         )
     else:
-        dht_status = f"[green]● {dht_nodes} nodes[/green]" if is_color else f"{dht_nodes} nodes"
+        dht_status = f"[magenta]● {dht_nodes} nodes[/magenta]" if is_color else f"{dht_nodes} nodes"
 
     grid = Table.grid(padding=(0, 3))
     grid.add_column(style="dim", no_wrap=True)
