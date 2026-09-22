@@ -437,6 +437,10 @@ $ http DELETE "http://localhost:17382/torrent?progress.ge=1.0" "Authorization: B
 
 Returns a status dictionary for the torrent.
 
+**Query Parameters:**
+* `detail=full`: Embeds `files`, `peers`, and `trackers` arrays directly into the status object, along with `total_pieces`, `piece_length`, and `num_files`.
+* `expand=<files|peers|trackers>`: Comma-separated list of sub-resources to embed into the response.
+
 **Example**
 
 ```shell
@@ -446,7 +450,9 @@ Content-Length: 4059
 Content-Type: application/json; charset=utf-8
 
 {
+    "added_time": 1700000000,
     "auto_managed": false,
+    "completed_time": 0,
     "download_payload_rate": 0,
     "download_rate": 0,
     "has_incoming": false,
@@ -471,6 +477,68 @@ the `delete_files` parameter to the query string.
 $ http DELETE "http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719?delete_files" "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 0
+```
+
+### /torrent/\<info-hash\>/files
+#### GET
+
+Returns a list of files contained in the torrent with their relative paths, byte sizes, and download progress.
+
+**Example Response:**
+```json
+[
+    {
+        "done": 524288000,
+        "index": 0,
+        "path": "archlinux-x86_64.iso",
+        "priority": 4,
+        "progress": 0.5,
+        "size": 1048576000
+    }
+]
+```
+
+### /torrent/\<info-hash\>/peers
+#### GET
+
+Returns a list of currently connected peers in the torrent swarm, including endpoints, client software identifiers, transfer rates, and progress.
+
+**Example Response:**
+```json
+[
+    {
+        "client": "Transmission 3.00",
+        "down_speed": 1048576,
+        "flags": 0,
+        "host": "192.168.1.50",
+        "ip": "192.168.1.50:51413",
+        "port": 51413,
+        "progress": 0.95,
+        "source": 1,
+        "total_download": 10485760,
+        "total_upload": 0,
+        "up_speed": 0
+    }
+]
+```
+
+### /torrent/\<info-hash\>/trackers
+#### GET
+
+Returns a list of trackers configured for the torrent with their tiers, announcement states, and error statuses.
+
+**Example Response:**
+```json
+[
+    {
+        "fails": 0,
+        "message": "",
+        "tier": 0,
+        "updating": false,
+        "url": "http://tracker.archlinux.org:6969/announce",
+        "verified": true
+    }
+]
 ```
 
 ### /torrent/\<info-hash\>/flags

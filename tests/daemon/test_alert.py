@@ -21,6 +21,7 @@
 #
 
 import asyncio
+from typing import Any, cast
 from unittest.mock import MagicMock, AsyncMock
 
 import pytest
@@ -119,3 +120,59 @@ async def test_handler_validation():
 
     with pytest.raises(ValueError):
         a.register_handler(invalid_alert_type, valid_handler)
+
+
+async def test_alert_with_real_session_and_alert_fd():
+    import libtorrent as lt
+
+    ses = lt.session({"alert_mask": int(lt.alert.category_t.all_categories)})
+    a = spritzle.daemon.alert.Alert()
+
+    called = asyncio.Event()
+
+    async def on_stats(alert):
+        called.set()
+
+    a.register_handler("session_stats_alert", on_stats)
+    await a.start(ses)
+
+    assert a._notify_r is not None
+    assert a._notify_w is not None
+
+    ses.post_session_stats()
+
+    try:
+        await asyncio.wait_for(called.wait(), timeout=2.0)
+    finally:
+        await a.stop()
+
+    assert a._notify_r is None
+    assert a._notify_w is None
+
+
+async def test_alert_no_deadlock_on_sync_handle_calls(tmp_path):
+    import libtorrent as lt
+
+    ses = lt.session({
+        "alert_mask": int(lt.alert.category_t.all_categories),
+    })
+    a = spritzle.daemon.alert.Alert()
+    await a.start(ses)
+
+    try:
+        p = lt.parse_magnet_uri(
+            "magnet:?xt=urn:btih:3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0&dn=test&tr=http://tracker.example.com/announce"
+        )
+        p.save_path = str(tmp_path)
+        h: Any = cast(Any, ses.add_torrent(p))
+
+        for _ in range(200):
+            ses.post_session_stats()
+            tr = h.trackers()
+            assert isinstance(tr, (list, tuple))
+            st = h.status()
+            assert st is not None
+    finally:
+        await a.stop()
+
+

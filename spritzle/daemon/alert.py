@@ -22,6 +22,7 @@
 
 import asyncio
 import logging
+import socket
 from typing import Optional
 
 import libtorrent as lt
@@ -71,6 +72,8 @@ class Alert(object):
         self.handlers = {"all_categories": [debug_handler]}
         self.categories = build_categories()
         self.alert_types = build_alert_types()
+        self._notify_r: Optional[socket.socket] = None
+        self._notify_w: Optional[socket.socket] = None
 
     async def start(self, session):
         self.loop = asyncio.get_running_loop()
@@ -78,12 +81,75 @@ class Alert(object):
         self.session = session
         self.run = True
         self.pop_alerts_task = self.loop.create_task(self.pop_alerts())
-        self.session.set_alert_notify(self.alert_notify)
+
+        # libtorrent's set_alert_notify executes a Python callback directly from
+        # libtorrent's internal thread, requiring PyGILState_Ensure. When Python
+        # calls any synchronous libtorrent method (e.g. handle.trackers(), status()),
+        # Python holds the GIL, causing a circular deadlock if an alert fires.
+        # set_alert_fd writes a byte to a non-blocking socket from C++ without
+        # touching Python or acquiring the GIL.
+        use_alert_fd = False
+        set_alert_fd_fn = getattr(self.session, "set_alert_fd", None) if self.session is not None else None
+        if callable(set_alert_fd_fn):
+            try:
+                self._notify_r, self._notify_w = socket.socketpair()
+                self._notify_r.setblocking(False)
+                self._notify_w.setblocking(False)
+                set_alert_fd_fn(self._notify_w.fileno())
+                self.loop.add_reader(self._notify_r.fileno(), self._on_alert_fd_readable)
+                use_alert_fd = True
+            except (NotImplementedError, AttributeError, OSError) as e:
+                log.warning(f"Failed to configure set_alert_fd: {e}; falling back to set_alert_notify")
+                if self._notify_r is not None:
+                    try:
+                        self._notify_r.close()
+                    except Exception:
+                        pass
+                    self._notify_r = None
+                if self._notify_w is not None:
+                    try:
+                        self._notify_w.close()
+                    except Exception:
+                        pass
+                    self._notify_w = None
+
+        if not use_alert_fd and self.session is not None:
+            self.session.set_alert_notify(self.alert_notify)
+
+        self.event.set()
 
     async def stop(self):
         log.debug("Alert stopping..")
         self.run = False
         self.event.set()
+
+        set_alert_fd_fn = getattr(self.session, "set_alert_fd", None) if self.session is not None else None
+        if callable(set_alert_fd_fn):
+            try:
+                set_alert_fd_fn(-1)
+            except Exception:
+                pass
+
+        if self.loop is not None and self._notify_r is not None:
+            try:
+                self.loop.remove_reader(self._notify_r.fileno())
+            except Exception:
+                pass
+
+        if self._notify_r is not None:
+            try:
+                self._notify_r.close()
+            except Exception:
+                pass
+            self._notify_r = None
+
+        if self._notify_w is not None:
+            try:
+                self._notify_w.close()
+            except Exception:
+                pass
+            self._notify_w = None
+
         await asyncio.sleep(0)
         if self.pop_alerts_task:
             await self.pop_alerts_task
@@ -96,9 +162,21 @@ class Alert(object):
             raise ValueError("Alert handlers must be coroutine functions.")
         self.handlers.setdefault(alert_type, []).append(handler)
 
+    def _on_alert_fd_readable(self):
+        if self._notify_r is not None:
+            try:
+                while True:
+                    data = self._notify_r.recv(4096)
+                    if not data:
+                        break
+            except (BlockingIOError, InterruptedError):
+                pass
+            except Exception:
+                pass
+        self.event.set()
+
     def alert_notify(self):
-        # This function is called from libtorrent so we must not block it. Return here
-        # as quickly as possible.
+        # Fallback if set_alert_fd is unavailable
         if self.loop is None:
             return
         self.loop.call_soon_threadsafe(self.event.set)

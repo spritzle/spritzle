@@ -1271,6 +1271,9 @@ def test_info_command(cli):
     handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
     ih = str(handle.info_hash())
 
+    # Add a tracker to the handle
+    handle.add_tracker({"url": "http://tracker.example.com/announce", "tier": 0})
+
     # Plain output
     res_info = runner.invoke(
         spritzle_cli, ["info", ih, "--plain"]
@@ -1278,6 +1281,12 @@ def test_info_command(cli):
     assert res_info.exit_code == 0
     assert ih in res_info.output
     assert "Info Hash" in res_info.output
+    assert "Added" in res_info.output
+    assert "Share Ratio" in res_info.output
+    assert "Files (1):" in res_info.output
+    assert "tmprandomfile" in res_info.output
+    assert "Trackers:" in res_info.output
+    assert "http://tracker.example.com/announce" in res_info.output
 
     # JSON output
     res_json = runner.invoke(
@@ -1286,6 +1295,13 @@ def test_info_command(cli):
     assert res_json.exit_code == 0
     data = json.loads(res_json.output)
     assert data["info_hash"] == ih
+    assert "files" in data
+    assert len(data["files"]) == 1
+    assert data["files"][0]["path"] == "tmprandomfile"
+    assert "trackers" in data
+    assert any(t["url"] == "http://tracker.example.com/announce" for t in data["trackers"])
+    assert "added_time" in data
+    assert data["added_time"] > 0
 
     # Color output (ensure markup tags like [green] are not leaked as raw text)
     res_color = runner.invoke(
@@ -1295,12 +1311,74 @@ def test_info_command(cli):
     assert "[green]" not in res_color.output
     assert "[/green]" not in res_color.output
     assert "State" in res_color.output
+    assert "tmprandomfile" in res_color.output
+    assert "Trackers" in res_color.output
 
     # Error visibility
     core.torrent_data.setdefault(ih, {})["last_error"] = "Storage device write failure"
     res_err = runner.invoke(spritzle_cli, ["info", ih, "--plain"])
     assert res_err.exit_code == 0
     assert "Storage device write failure" in res_err.output
+
+
+def test_info_display_with_peers():
+    import io
+    from rich.console import Console
+    from spritzle.cli.display import render_info_card
+
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=True, color_system="truecolor", width=120, height=40)
+    data = {
+        "name": "archlinux-x86_64.iso",
+        "state": "downloading",
+        "progress": 0.5,
+        "download_rate": 1048576,
+        "upload_rate": 524288,
+        "total_size": 1000000000,
+        "total_done": 500000000,
+        "total_wanted": 1000000000,
+        "num_peers": 2,
+        "num_seeds": 1,
+        "num_pieces": 100,
+        "total_pieces": 200,
+        "piece_length": 524288,
+        "added_time": 1700000000,
+        "completed_time": 0,
+        "save_path": "/tmp",
+        "trackers": [
+            {"tier": 0, "url": "http://tracker.archlinux.org:6969/announce", "verified": True}
+        ],
+        "peers": [
+            {
+                "ip": "192.168.1.50:51413",
+                "client": "Transmission 3.00",
+                "down_speed": 1048576,
+                "up_speed": 0,
+                "progress": 0.95,
+            }
+        ],
+        "files": [
+            {
+                "index": 0,
+                "path": "archlinux-x86_64.iso",
+                "size": 1000000000,
+                "done": 500000000,
+                "progress": 0.5,
+            }
+        ],
+    }
+    render_info_card(console, data, "44a040be6d74d8d290cd20128788864cbf770719", color_opt=True)
+    out = buf.getvalue()
+    assert "archlinux-x86_64.iso" in out
+    assert "Connected Peers" in out
+    assert "192.168.1.50:51413" in out
+    assert "Transmission 3.00" in out
+    assert "Trackers" in out
+    assert "Files" in out
+    assert "Added" in out
+    assert "Share Ratio" in out
+    assert "95.0%" in out
+    assert "50.0%" in out
 
 
 def test_add_magnet_command(cli):

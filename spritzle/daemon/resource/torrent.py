@@ -335,6 +335,113 @@ def get_torrent_list_by_query(query, statuses, return_statuses: bool = False) ->
     return torrents
 
 
+def get_torrent_files(handle: Any) -> List[Dict[str, Any]]:
+    ti = handle.torrent_file() if handle.is_valid() else None
+    if not ti:
+        return []
+    fs = ti.files()
+    num = ti.num_files()
+    try:
+        progresses = handle.file_progress()
+    except Exception:
+        progresses = []
+    try:
+        priorities = handle.get_file_priorities()
+    except Exception:
+        priorities = []
+
+    files = []
+    for i in range(num):
+        size = fs.file_size(i)
+        done = progresses[i] if i < len(progresses) else 0
+        prio = priorities[i] if i < len(priorities) else 4
+        prog = (done / size) if size > 0 else 1.0
+        files.append({
+            "index": i,
+            "path": fs.file_path(i),
+            "size": size,
+            "done": done,
+            "progress": round(prog, 4),
+            "priority": prio,
+        })
+    return files
+
+
+def get_torrent_peers(handle: Any) -> List[Dict[str, Any]]:
+    try:
+        peer_infos = handle.get_peer_info()
+    except Exception:
+        return []
+
+    peers = []
+    for p in peer_infos:
+        ip_str = p.ip[0] if isinstance(p.ip, (tuple, list)) and len(p.ip) > 0 else ""
+        port = p.ip[1] if isinstance(p.ip, (tuple, list)) and len(p.ip) > 1 else 0
+        client = ""
+        if getattr(p, "client", None):
+            client = (
+                p.client.decode("utf-8", errors="replace").strip("\x00 \t\r\n")
+                if isinstance(p.client, bytes)
+                else str(p.client).strip("\x00 \t\r\n")
+            )
+        if not client and getattr(p, "pid", None):
+            try:
+                identify_fn = getattr(lt, "identify_client", None)
+                if identify_fn:
+                    identified = identify_fn(p.pid).strip()
+                    if identified and identified != "Unknown" and not identified.startswith("Unknown [00000000"):
+                        client = identified
+            except Exception:
+                pass
+        if not client:
+            flags = getattr(p, "flags", 0)
+            peer_info_cls = getattr(lt, "peer_info", None)
+            handshake_flag = getattr(peer_info_cls, "handshake", 64) if peer_info_cls else 64
+            connecting_flag = getattr(peer_info_cls, "connecting", 128) if peer_info_cls else 128
+            if flags & handshake_flag:
+                client = "<handshaking>"
+            elif flags & connecting_flag:
+                client = "<connecting>"
+            else:
+                client = "<unknown>"
+        peers.append({
+            "ip": f"{ip_str}:{port}" if port else ip_str,
+            "host": ip_str,
+            "port": port,
+            "client": client,
+            "down_speed": int(p.down_speed),
+            "up_speed": int(p.up_speed),
+            "progress": round(float(p.progress), 4),
+            "total_download": int(p.total_download),
+            "total_upload": int(p.total_upload),
+            "flags": int(p.flags),
+            "source": int(p.source),
+        })
+    return peers
+
+
+def get_torrent_trackers(handle: Any) -> List[Dict[str, Any]]:
+    try:
+        raw_trackers = handle.trackers()
+    except Exception:
+        return []
+
+    trackers = []
+    for tr in raw_trackers:
+        if isinstance(tr, dict):
+            item = dict(tr)
+            if "last_error" in item and hasattr(item["last_error"], "value"):
+                item["last_error"] = {
+                    "value": item["last_error"].value(),
+                    "message": item["last_error"].message(),
+                }
+            trackers.append(item)
+        else:
+            item = common.struct_to_dict(tr)
+            trackers.append(item)
+    return trackers
+
+
 @routes.get("/torrent")
 @routes.get("/torrent/{tid}")
 async def get_torrent(request):
@@ -352,7 +459,49 @@ async def get_torrent(request):
         if info_hash in core.torrent_data:
             status.update(core.torrent_data[info_hash])
 
+        query = request.query
+        detail = query.get("detail")
+        expand = [x.strip() for x in query.get("expand", "").split(",") if x.strip()]
+        include_full = detail in ("full", "all", "1", "true")
+
+        ti = handle.torrent_file() if handle.is_valid() else None
+        if ti:
+            status["total_pieces"] = ti.num_pieces()
+            status["piece_length"] = ti.piece_length()
+            status["num_files"] = ti.num_files()
+
+        if include_full or "files" in expand or "files" in query:
+            status["files"] = get_torrent_files(handle)
+        if include_full or "peers" in expand or "peers" in query:
+            status["peers"] = get_torrent_peers(handle)
+        if include_full or "trackers" in expand or "trackers" in query:
+            status["trackers"] = get_torrent_trackers(handle)
+
         return web.json_response(status)
+
+
+@routes.get("/torrent/{tid}/files")
+async def get_torrent_files_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+    return web.json_response(get_torrent_files(handle))
+
+
+@routes.get("/torrent/{tid}/peers")
+async def get_torrent_peers_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+    return web.json_response(get_torrent_peers(handle))
+
+
+@routes.get("/torrent/{tid}/trackers")
+async def get_torrent_trackers_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+    return web.json_response(get_torrent_trackers(handle))
 
 
 @routes.post("/torrent")

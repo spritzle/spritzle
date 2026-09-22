@@ -165,7 +165,7 @@ spritzle top -i 0.5 -q state=downloading
 
 ### `info` - Show Detailed Torrent Information
 
-Displays comprehensive status and metadata for a specific torrent.
+Displays comprehensive status, swarm metrics, and metadata for a specific torrent. Output includes state, added datetime, completed datetime, transfer progress, speeds, share ratio, pieces, trackers, connected peers, and contained files.
 
 ```shell
 spritzle info [OPTIONS] [INFO-HASH|NAME]
@@ -175,7 +175,7 @@ Arguments:
 * `[INFO-HASH|NAME]`: 40-character hex info-hash or torrent display name (resolves uniquely).
 
 Options:
-* `--json`: Output as JSON.
+* `--json`: Output full structured data as JSON (including `files`, `peers`, `trackers`, and `added_time`).
 * `--plain`: Output plain unstyled text without borders or ANSI colors.
 
 **Examples:**

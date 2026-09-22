@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import sys
@@ -236,6 +237,22 @@ def format_eta(seconds: Union[int, float, None], human: bool = True) -> str:
     return f"{d}d {h:02d}h"
 
 
+def format_datetime(ts: Union[int, float, None], human: bool = True) -> str:
+    """Format unix timestamp into local human-readable datetime string."""
+    if ts is None:
+        return "--" if human else "0"
+    try:
+        val = float(ts)
+        if val <= 0:
+            return "--" if human else "0"
+        if not human:
+            return str(int(val))
+        dt = datetime.datetime.fromtimestamp(val).astimezone()
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(ts)
+
+
 def render_rich_table(
     console: Console,
     headers: Sequence[str],
@@ -380,12 +397,42 @@ def render_info_card(
     )
     eta_disp = format_eta(eta_sec)
 
+    added_time = data.get("added_time")
+    added_str = format_datetime(added_time)
+    completed_time = data.get("completed_time")
+    completed_str = (
+        format_datetime(completed_time)
+        if completed_time and float(completed_time) > 0
+        else None
+    )
+
+    total_up = float(data.get("all_time_upload") or data.get("total_upload") or 0)
+    total_dl = float(data.get("all_time_download") or data.get("total_done") or data.get("total_download") or 0)
+    ratio = (total_up / total_dl) if total_dl > 0 else 0.0
+    if is_color:
+        ratio_str = f"[bold green]{ratio:.2f}[/bold green]" if ratio >= 1.0 else f"[yellow]{ratio:.2f}[/yellow]"
+    else:
+        ratio_str = f"{ratio:.2f}"
+
+    total_pieces = data.get("total_pieces")
+    piece_length = data.get("piece_length")
+    if total_pieces:
+        pieces_disp = f"{num_pieces} / {total_pieces}"
+        if piece_length:
+            pieces_disp += f" ({format_bytes(piece_length)})"
+    else:
+        pieces_disp = str(num_pieces)
+
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="dim", no_wrap=True, width=14)
     grid.add_column()
 
     grid.add_row("State", state_pill)
     grid.add_row("Info Hash", f"[cyan]{info_hash}[/cyan]" if is_color else info_hash)
+    if added_str != "--":
+        grid.add_row("Added", added_str)
+    if completed_str:
+        grid.add_row("Completed", completed_str)
     if tags_str != "<none>":
         grid.add_row("Tags", f"[magenta]{escape(tags_str)}[/magenta]" if is_color else tags_str)
 
@@ -403,6 +450,7 @@ def render_info_card(
         if is_color
         else f"DL: {dl_disp}  UL: {ul_disp}  ETA: {eta_disp}",
     )
+    grid.add_row("  Share Ratio", ratio_str)
 
     grid.add_row("", "")
     grid.add_row("[bold cyan]Swarm[/bold cyan]", "")
@@ -412,7 +460,7 @@ def render_info_card(
         if is_color
         else f"{num_peers} connected (seeds: {num_seeds})",
     )
-    grid.add_row("  Pieces", str(num_pieces))
+    grid.add_row("  Pieces", pieces_disp)
 
     grid.add_row("", "")
     grid.add_row("[bold cyan]Storage[/bold cyan]", "")
@@ -427,6 +475,122 @@ def render_info_card(
     border_style = get_border_style(theme)
     panel = Panel(grid, title=title, border_style=border_style, box=box_style, padding=(1, 2))
     console.print(panel)
+
+    # Trackers Section
+    trackers = data.get("trackers") or []
+    if trackers:
+        tracker_table = Table(
+            title="Trackers",
+            title_style="bold",
+            caption_style="none",
+            box=box_style,
+            border_style=border_style,
+            header_style="bold cyan",
+            show_header=True,
+            pad_edge=True,
+        )
+        tracker_table.add_column("Tier", justify="right", width=6, style="dim")
+        tracker_table.add_column("URL", style="white")
+        tracker_table.add_column("Status", no_wrap=True)
+
+        for tr in trackers:
+            tier_str = str(tr.get("tier", 0))
+            url_str = escape(str(tr.get("url", "")))
+            if tr.get("updating"):
+                st_disp = "[yellow]updating[/yellow]" if is_color else "updating"
+            elif tr.get("fails", 0) > 0 or (tr.get("last_error") and tr["last_error"].get("value", 0) != 0):
+                msg = tr.get("message") or (tr.get("last_error") or {}).get("message") or f"error ({tr.get('fails')} fails)"
+                st_disp = f"[red]{escape(str(msg))}[/red]" if is_color else str(msg)
+            elif tr.get("verified") or tr.get("is_working"):
+                st_disp = "[green]working[/green]" if is_color else "working"
+            else:
+                st_disp = "[dim]idle[/dim]" if is_color else "idle"
+
+            tracker_table.add_row(tier_str, url_str, st_disp)
+        console.print(tracker_table)
+
+    # Connected Peers Section
+    peers = data.get("peers") or []
+    if peers:
+        peer_table = Table(
+            title=f"Connected Peers ({len(peers)})",
+            title_style="bold",
+            caption_style="none",
+            box=box_style,
+            border_style=border_style,
+            header_style="bold cyan",
+            show_header=True,
+            pad_edge=True,
+        )
+        peer_table.add_column("IP Address", style="cyan", no_wrap=True)
+        peer_table.add_column("Client", style="dim", no_wrap=True)
+        peer_table.add_column("Down Speed", justify="right", no_wrap=True)
+        peer_table.add_column("Up Speed", justify="right", no_wrap=True)
+        peer_table.add_column("Progress", min_width=18, no_wrap=True)
+
+        display_peers = peers[:10]
+        for p in display_peers:
+            ip_str = escape(str(p.get("ip", "")))
+            client_val = str(p.get("client") or "").strip()
+            client_str = escape(client_val) if client_val else "[dim]<unknown>[/dim]"
+            p_down = format_speed(p.get("down_speed", 0), use_color=is_color)
+            p_up = format_speed(p.get("up_speed", 0), use_color=is_color, is_upload=True)
+            p_prog = format_progress(
+                p.get("progress", 0.0),
+                human=True,
+                width=10,
+                style="smooth" if is_color else "blocks",
+                use_color=is_color,
+            )
+            peer_table.add_row(ip_str, client_str, p_down, p_up, p_prog)
+
+        if len(peers) > 10:
+            peer_table.caption = (
+                f"[dim]... and {len(peers) - 10} more peers (use --json to see all)[/dim]"
+                if is_color
+                else f"... and {len(peers) - 10} more peers (use --json to see all)"
+            )
+        console.print(peer_table)
+
+    # Files Section
+    files = data.get("files") or []
+    if files:
+        file_table = Table(
+            title=f"Files ({len(files)})",
+            title_style="bold",
+            caption_style="none",
+            box=box_style,
+            border_style=border_style,
+            header_style="bold cyan",
+            show_header=True,
+            pad_edge=True,
+        )
+        file_table.add_column("#", justify="right", style="dim", width=4)
+        file_table.add_column("Path", style="white")
+        file_table.add_column("Size", justify="right", no_wrap=True)
+        file_table.add_column("Progress", min_width=18, no_wrap=True)
+
+        display_files = files[:15]
+        for f in display_files:
+            idx_str = str(f.get("index", 0))
+            path_str = escape(str(f.get("path", "")))
+            sz_str = format_bytes(f.get("size", 0))
+            f_prog = format_progress(
+                f.get("progress", 0.0),
+                human=True,
+                width=10,
+                style="smooth" if is_color else "blocks",
+                use_color=is_color,
+            )
+            file_table.add_row(idx_str, path_str, sz_str, f_prog)
+
+        if len(files) > 15:
+            file_table.caption = (
+                f"[dim]... and {len(files) - 15} more files (use --json to see all)[/dim]"
+                if is_color
+                else f"... and {len(files) - 15} more files (use --json to see all)"
+            )
+        console.print(file_table)
 
 
 def render_status_card(

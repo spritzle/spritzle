@@ -807,6 +807,87 @@ async def test_post_torrent_invalid_magnet_uri(cli):
     assert resp.status == 400
 
 
+async def test_torrent_subresources(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    body = await resp.json()
+    info_hash = body["info_hash"]
+
+    # 1. GET /torrent/{tid}/files
+    resp_files = await cli.get(f"/torrent/{info_hash}/files")
+    assert resp_files.status == 200
+    files = await resp_files.json()
+    assert isinstance(files, list)
+    assert len(files) == 1
+    assert files[0]["index"] == 0
+    assert files[0]["path"] == "tmprandomfile"
+    assert files[0]["size"] == 4194304
+    assert files[0]["progress"] == 0.0
+
+    # 2. GET /torrent/{tid}/peers
+    resp_peers = await cli.get(f"/torrent/{info_hash}/peers")
+    assert resp_peers.status == 200
+    peers = await resp_peers.json()
+    assert isinstance(peers, list)
+
+    # 3. GET /torrent/{tid}/trackers
+    resp_trackers = await cli.get(f"/torrent/{info_hash}/trackers")
+    assert resp_trackers.status == 200
+    trackers = await resp_trackers.json()
+    assert isinstance(trackers, list)
+
+    # 4. GET /torrent/{tid}?detail=full
+    resp_detail = await cli.get(f"/torrent/{info_hash}?detail=full")
+    assert resp_detail.status == 200
+    detail = await resp_detail.json()
+    assert "files" in detail
+    assert "peers" in detail
+    assert "trackers" in detail
+    assert "total_pieces" in detail
+    assert "piece_length" in detail
+    assert detail["files"][0]["path"] == "tmprandomfile"
+    assert detail["added_time"] > 0
+
+
+def test_get_torrent_peers_identification():
+    from spritzle.daemon.resource.torrent import get_torrent_peers
+
+    class MockPeer:
+        def __init__(self, ip, client, pid, flags=0):
+            self.ip = ip
+            self.client = client
+            self.pid = pid
+            self.down_speed = 100
+            self.up_speed = 0
+            self.progress = 0.5
+            self.total_download = 1000
+            self.total_upload = 0
+            self.flags = flags
+            self.source = 1
+
+    class MockHandle:
+        def __init__(self, peers):
+            self._peers = peers
+
+        def get_peer_info(self):
+            return self._peers
+
+    # 1. Peer with explicit client string
+    p1 = MockPeer(("192.168.1.1", 6881), b"Transmission/3.00", lt.sha1_hash(b"\x00" * 20))
+    # 2. Peer with empty client bytes but known peer ID (qBittorrent)
+    p2 = MockPeer(("192.168.1.2", 6881), b"", lt.sha1_hash(b"-qB4500-123456789012"))
+    # 3. Peer with empty client and handshaking flag
+    p3 = MockPeer(("192.168.1.3", 6881), b"", lt.sha1_hash(b"\x00" * 20), flags=64)
+
+    handle = MockHandle([p1, p2, p3])
+    result = get_torrent_peers(handle)
+    assert len(result) == 3
+    assert result[0]["client"] == "Transmission/3.00"
+    assert result[1]["client"] == "qBittorrent 4.5.0"
+    assert result[2]["client"] == "<handshaking>"
+
+
 
 
 
