@@ -1770,6 +1770,49 @@ def test_build_dashboard_renderable_subtitle():
     assert "Press 'q' or Ctrl+C to exit" in str(panel_plain.subtitle)
 
 
+def test_dashboard_row_single_line():
+    from rich.console import Console
+    from spritzle.cli.dashboard import build_dashboard_renderable
+
+    items = [
+        {
+            "name": "archlinux-2026.09.01-x86_64-super-extremely-long-name-that-might-overflow.iso",
+            "state": "downloading",
+            "progress": 0.452,
+            "download_rate": 4520000,
+            "upload_rate": 120000,
+            "total_wanted": 1200000000,
+            "total_done": 540000000,
+            "num_peers": 24,
+            "num_seeds": 8,
+        },
+        {
+            "name": "short.iso",
+            "state": "seeding",
+            "progress": 1.0,
+            "download_rate": 0,
+            "upload_rate": 850000,
+            "total_wanted": 4500000000,
+            "total_done": 4500000000,
+            "num_peers": 0,
+            "num_seeds": 0,
+        },
+    ]
+
+    for width in (60, 80, 100, 120):
+        c = Console(width=width, height=30)
+        panel = build_dashboard_renderable(items, {}, is_color=True)
+        table = panel.renderable.renderables[2]
+        for col in table.columns:
+            assert col.no_wrap is True
+
+        with c.capture() as cap:
+            c.print(table)
+        rendered_lines = [line for line in cap.get().splitlines() if line.strip()]
+        assert len(rendered_lines) == 3
+
+
+
 
 
 

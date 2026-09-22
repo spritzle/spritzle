@@ -264,14 +264,14 @@ def build_dashboard_renderable(
         show_header=True,
         expand=True,
     )
-    table.add_column("Name", ratio=3, no_wrap=True)
-    table.add_column("Status", ratio=2)
-    table.add_column("Progress", ratio=2)
-    table.add_column("Size", justify="right", ratio=1)
-    table.add_column("Down Speed", justify="right", ratio=1)
-    table.add_column("Up Speed", justify="right", ratio=1)
-    table.add_column("Peers", justify="right", ratio=1)
-    table.add_column("ETA", justify="right", ratio=1)
+    table.add_column("Name", ratio=1, min_width=12, no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Progress", no_wrap=True)
+    table.add_column("Size", justify="right", no_wrap=True)
+    table.add_column("Down Speed", justify="right", no_wrap=True)
+    table.add_column("Up Speed", justify="right", no_wrap=True)
+    table.add_column("Peers", justify="right", no_wrap=True)
+    table.add_column("ETA", justify="right", no_wrap=True)
 
     if not items:
         table.add_row("[dim]No active torrents[/dim]" if is_color else "No active torrents", "", "", "", "", "", "", "")
@@ -292,13 +292,13 @@ def build_dashboard_renderable(
             else:
                 eta_sec = None
 
-            status_str = format_state_pill(state, use_color=is_color, peers=num_peers)
+            status_str = format_state_pill(state, use_color=is_color)
 
             table.add_row(
                 escape(str(name)),
                 status_str,
                 format_progress(
-                    progress, human=True, width=14, style="smooth" if is_color else "blocks", use_color=is_color
+                    progress, human=True, width=10, style="smooth" if is_color else "blocks", use_color=is_color
                 ),
                 format_bytes(total_wanted),
                 format_speed(dl_rate, use_color=is_color),

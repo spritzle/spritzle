@@ -55,6 +55,8 @@
 - **CLI Configuration vs. Remote Profile Separation**: CLI client preferences are persisted locally in `<config_dir>/cli.toml` via `CLIConfig` (managed via `spritzle config`). Remote daemon profiles and API credentials are kept strictly isolated in `<config_dir>/remotes.toml` (mode `0600`) via `RemotesConfig` (managed exclusively via `spritzle remote`), ensuring credentials are never exposed in dotfile repositories or mixed into client option tables.
 - **Live Dashboard & Watch Interrupt Handling**: Commands providing continuous or live stream output (`top`, `list --watch`, `add --watch`) must handle `asyncio.CancelledError` and `KeyboardInterrupt` gracefully to prevent dumping uncaught Python tracebacks, ensuring standard terminal state restoration across interactive and plain non-TTY modes.
 - **Terminal Italic Inverse-Video Pitfall**: In many Linux terminal emulators and configurations lacking an italic font variant, ECMA-48 ANSI sequence `\x1b[3m` (italic) falls back to standout / inverse video (`smso`), painting a solid inverted (often white) background bar across text and padding spaces. In Rich `Table`, always explicitly set `caption_style="none"` instead of `"italic"` or `"dim italic"` to avoid rendering unintended solid background bars under tables.
+- **Single-Line Dashboard Rows**: In Rich live dashboard tables (`top`, `list --watch`), set `no_wrap=True` on all columns and avoid multi-word status badges that duplicate adjacent column information. Without `no_wrap=True`, varying transfer rates, peer counts, or status messages will wrap across line breaks unpredictably, causing rows to jarringly flip between one line and two.
+
 
 
 
