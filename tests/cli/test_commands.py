@@ -1812,6 +1812,23 @@ def test_dashboard_row_single_line():
         assert len(rendered_lines) == 3
 
 
+def test_dashboard_renderable_fullscreen_height():
+    from rich.console import Console
+    from spritzle.cli.dashboard import build_dashboard_renderable
+
+    panel = build_dashboard_renderable([], {}, is_color=True, height=24)
+    assert panel.height == 24
+
+    c = Console(width=80, height=24)
+    with c.capture() as cap:
+        c.print(panel)
+    lines = cap.get().splitlines()
+    assert len(lines) == 24
+    assert "Spritzle Torrent Monitor" in lines[0]
+    assert "Press 'q' or Ctrl+C to exit" in lines[-1]
+
+
+
 
 
 

@@ -92,7 +92,9 @@ async def f(
         from spritzle.cli.dashboard import run_dashboard
 
         color_opt = getattr(client, "color", None)
-        await run_dashboard(client, query=query, interval=interval, color_opt=color_opt, plain=plain)
+        await run_dashboard(
+            client, query=query, interval=interval, color_opt=color_opt, plain=plain, fullscreen=False
+        )
         return
 
     type_formatters = {list: list_formatter}

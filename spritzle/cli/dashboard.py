@@ -226,6 +226,7 @@ def build_dashboard_renderable(
     items: List[Dict[str, Any]],
     stats: Dict[str, Any],
     is_color: bool = True,
+    height: Optional[int] = None,
 ) -> Any:
     """Build the Rich renderable for spritzle top / list --watch."""
     dht_nodes = int(stats.get("dht.dht_nodes", 0))
@@ -316,6 +317,7 @@ def build_dashboard_renderable(
         title="[bold]Spritzle Torrent Monitor[/bold]" if is_color else "Spritzle Torrent Monitor",
         subtitle="[dim]Press 'q' or Ctrl+C to exit[/dim]" if is_color else "Press 'q' or Ctrl+C to exit",
         border_style="dim" if is_color else "none",
+        height=height,
     )
     return panel
 
@@ -418,6 +420,7 @@ async def run_dashboard(
     plain: bool = False,
     once: bool = False,
     quit_event: Optional[asyncio.Event] = None,
+    fullscreen: bool = True,
 ) -> None:
     """Run an interactive updating Rich dashboard (spritzle top / list --watch)."""
     is_interactive = should_use_color(color_opt) and not plain
@@ -426,11 +429,21 @@ async def run_dashboard(
     try:
         async with KeyPressWatcher(quit_event=quit_event) as watcher:
             if is_interactive:
-                with Live(console=console, refresh_per_second=4, transient=False) as live:
+                with Live(
+                    console=console,
+                    refresh_per_second=4,
+                    transient=False,
+                    screen=fullscreen,
+                ) as live:
                     while True:
                         items = await fetch_torrents_with_status(client, query)
                         stats = await fetch_session_stats(client)
-                        live.update(build_dashboard_renderable(items, stats, is_color=True))
+                        render_height = console.height if fullscreen else None
+                        live.update(
+                            build_dashboard_renderable(
+                                items, stats, is_color=True, height=render_height
+                            )
+                        )
 
                         if once:
                             break
