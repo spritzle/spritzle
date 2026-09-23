@@ -140,6 +140,15 @@ class Client(object):
             asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(_do_command(cmd, *args, **kwargs))
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+            for t in pending:
+                t.cancel()
+            if pending:
+                try:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
         except aiohttp.ClientConnectorCertificateError as e:
             from spritzle.cli.display import print_error
 
@@ -157,6 +166,16 @@ class Client(object):
                 color_opt=self.color,
             )
             sys.exit(1)
+        finally:
+            from spritzle.cli.dashboard import _restore_all_terminals
+
+            _restore_all_terminals()
+            try:
+                if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
+                    sys.stdout.write("\x1b[?25h")
+                    sys.stdout.flush()
+            except Exception:
+                pass
 
 
 

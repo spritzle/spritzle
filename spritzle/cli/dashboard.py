@@ -1,7 +1,9 @@
 import asyncio
+import atexit
 import os
+import signal
 import sys
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 try:
     import termios
@@ -26,6 +28,27 @@ from spritzle.cli.display import (
     get_display_state,
     should_use_color,
 )
+
+_active_terminal_restorers: Set[Callable[[], None]] = set()
+
+
+def _restore_all_terminals() -> None:
+    """Safely restore terminal settings and show cursor for all active terminal watchers."""
+    for restorer in list(_active_terminal_restorers):
+        try:
+            restorer()
+        except Exception:
+            pass
+    _active_terminal_restorers.clear()
+    try:
+        if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
+            sys.stdout.write("\x1b[?25h")
+            sys.stdout.flush()
+    except Exception:
+        pass
+
+
+atexit.register(_restore_all_terminals)
 
 
 async def fetch_torrent_data(client, info_hash: str) -> Optional[Dict[str, Any]]:
@@ -221,6 +244,12 @@ async def watch_single_torrent(
             console.print("\n[dim]Watching stopped.[/dim]")
         else:
             print("\nWatching stopped.")
+    finally:
+        if is_interactive:
+            try:
+                console.show_cursor(True)
+            except Exception:
+                pass
 
 
 def build_dashboard_renderable(
@@ -336,6 +365,9 @@ class KeyPressWatcher:
         self._fd: Optional[int] = None
         self._old_settings: Optional[Any] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._restorer: Optional[Callable[[], None]] = None
+        self._sigint_installed: bool = False
+        self._sigterm_installed: bool = False
 
     async def __aenter__(self) -> "KeyPressWatcher":
         if termios is None or tty is None:
@@ -349,11 +381,48 @@ class KeyPressWatcher:
                 self._old_settings = termios.tcgetattr(target_fd)
                 tty.setcbreak(target_fd)
                 self._fd = target_fd
+
+                saved_fd = target_fd
+                saved_settings = list(self._old_settings)
+
+                def _do_restore() -> None:
+                    if termios is not None:
+                        try:
+                            restored = list(saved_settings)
+                            restored[3] |= (termios.ECHO | termios.ICANON | termios.ISIG)
+                            termios.tcsetattr(saved_fd, termios.TCSANOW, restored)
+                        except Exception:
+                            pass
+                    try:
+                        if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
+                            sys.stdout.write("\x1b[?25h")
+                            sys.stdout.flush()
+                    except Exception:
+                        pass
+
+                self._restorer = _do_restore
+                _active_terminal_restorers.add(_do_restore)
+
                 self._loop = asyncio.get_running_loop()
                 self._loop.add_reader(self._fd, self._on_stdin)
+
+                try:
+                    self._loop.add_signal_handler(signal.SIGINT, self._on_signal)
+                    self._sigint_installed = True
+                except (ValueError, RuntimeError, NotImplementedError):
+                    self._sigint_installed = False
+
+                try:
+                    self._loop.add_signal_handler(signal.SIGTERM, self._on_signal)
+                    self._sigterm_installed = True
+                except (ValueError, RuntimeError, NotImplementedError):
+                    self._sigterm_installed = False
         except Exception:
             self._cleanup()
         return self
+
+    def _on_signal(self) -> None:
+        self.quit_event.set()
 
     def _on_stdin(self) -> None:
         try:
@@ -373,16 +442,30 @@ class KeyPressWatcher:
             self.quit_event.set()
 
     def _cleanup(self) -> None:
-        if self._loop and self._fd is not None:
-            try:
-                self._loop.remove_reader(self._fd)
-            except Exception:
-                pass
-        if self._fd is not None and self._old_settings is not None and termios is not None:
-            try:
-                termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_settings)
-            except Exception:
-                pass
+        if self._loop:
+            if self._sigint_installed:
+                try:
+                    self._loop.remove_signal_handler(signal.SIGINT)
+                except (ValueError, RuntimeError, NotImplementedError):
+                    pass
+                self._sigint_installed = False
+            if self._sigterm_installed:
+                try:
+                    self._loop.remove_signal_handler(signal.SIGTERM)
+                except (ValueError, RuntimeError, NotImplementedError):
+                    pass
+                self._sigterm_installed = False
+            if self._fd is not None:
+                try:
+                    self._loop.remove_reader(self._fd)
+                except Exception:
+                    pass
+
+        if self._restorer is not None:
+            self._restorer()
+            _active_terminal_restorers.discard(self._restorer)
+            self._restorer = None
+
         self._fd = None
         self._old_settings = None
         self._loop = None
@@ -479,5 +562,12 @@ async def run_dashboard(
                         break
     except (asyncio.CancelledError, KeyboardInterrupt):
         pass
+    finally:
+        _restore_all_terminals()
+        if is_interactive:
+            try:
+                console.show_cursor(True)
+            except Exception:
+                pass
 
 

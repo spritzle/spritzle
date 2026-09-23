@@ -1865,6 +1865,8 @@ def test_key_press_watcher_pty():
             assert watcher.quit_event.is_set()
 
     asyncio.run(run_test())
+    import termios
+    assert bool(termios.tcgetattr(slave)[3] & termios.ECHO) is True
     os.close(master)
     os.close(slave)
 
@@ -1873,6 +1875,7 @@ def test_key_press_watcher_uppercase_q_pty():
     import asyncio
     import os
     import pty
+    import termios
 
     from spritzle.cli.dashboard import KeyPressWatcher
 
@@ -1887,6 +1890,77 @@ def test_key_press_watcher_uppercase_q_pty():
             assert watcher.quit_event.is_set()
 
     asyncio.run(run_test())
+    attr = termios.tcgetattr(slave)
+    assert bool(attr[3] & termios.ECHO) is True
+    os.close(master)
+    os.close(slave)
+
+
+def test_key_press_watcher_echo_restored_on_cancellation_and_atexit():
+    import asyncio
+    import os
+    import pty
+    import termios
+
+    from spritzle.cli.dashboard import KeyPressWatcher, _restore_all_terminals
+
+    master, slave = pty.openpty()
+
+    async def run_test():
+        watcher = KeyPressWatcher(fd=slave)
+        try:
+            async with watcher:
+                # Terminal echo should be disabled in cbreak
+                mid = termios.tcgetattr(slave)
+                assert not (mid[3] & termios.ECHO)
+                raise RuntimeError("simulated crash")
+        except RuntimeError:
+            pass
+
+    asyncio.run(run_test())
+    # Verify __aexit__ cleaned up
+    attr = termios.tcgetattr(slave)
+    assert bool(attr[3] & termios.ECHO) is True
+
+    # Also test global restorer fallback
+    tty_mod = __import__("tty")
+    tty_mod.setcbreak(slave)
+    mid2 = termios.tcgetattr(slave)
+    assert not (mid2[3] & termios.ECHO)
+
+    # Register in active restorers and trigger global restorer
+    from spritzle.cli.dashboard import _active_terminal_restorers
+    _active_terminal_restorers.add(lambda: termios.tcsetattr(slave, termios.TCSANOW, attr))
+    _restore_all_terminals()
+    after = termios.tcgetattr(slave)
+    assert bool(after[3] & termios.ECHO) is True
+
+    os.close(master)
+    os.close(slave)
+
+
+def test_key_press_watcher_sigint_handling():
+    import asyncio
+    import os
+    import pty
+    import termios
+
+    from spritzle.cli.dashboard import KeyPressWatcher
+
+    master, slave = pty.openpty()
+
+    async def run_test():
+        watcher = KeyPressWatcher(fd=slave)
+        async with watcher:
+            assert not watcher.quit_event.is_set()
+            # Simulate SIGINT signal delivery
+            watcher._on_signal()
+            assert watcher.quit_event.is_set()
+
+    asyncio.run(run_test())
+    attr = termios.tcgetattr(slave)
+    assert bool(attr[3] & termios.ECHO) is True
+
     os.close(master)
     os.close(slave)
 
