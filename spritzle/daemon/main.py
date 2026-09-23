@@ -191,12 +191,14 @@ def run_daemon(
     port: int = 17382,
     debug: bool = False,
     config_dir: Optional[str] = None,
+    state_dir: Optional[str] = None,
     log_level: str = "INFO",
+    listen_interfaces: Optional[str] = None,
 ):
     check_libtorrent()
     log = setup_logger(name="spritzle", level=log_level)
     log.info(
-        f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, log_level={log_level}, debug={debug}"
+        f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, state_dir={state_dir}, log_level={log_level}, debug={debug}, listen_interfaces={listen_interfaces}"
     )
 
     try:
@@ -217,7 +219,11 @@ def run_daemon(
         log.error("Exiting..")
         sys.exit(1)
 
-    core = Core(config)
+    core = Core(
+        config,
+        state_dir=Path(state_dir) if state_dir else None,
+        startup_listen_interfaces=listen_interfaces,
+    )
     bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
     core.key_manager.ensure_local_client_remote(f"http://{bracketed_host}:{port}", core.identity.daemon_id)
     daemon_app = create_app(core, log)
@@ -248,8 +254,17 @@ def run_daemon(
     "--config_dir",
     "config_dir",
     default=None,
-    type=str,
+    type=click.Path(),
     help="Configuration directory.",
+)
+@click.option(
+    "-s",
+    "--state-dir",
+    "--state_dir",
+    "state_dir",
+    default=None,
+    type=click.Path(),
+    help="Directory for persistent daemon state (resume data, keys, identity).",
 )
 @click.option(
     "-l",
@@ -258,8 +273,16 @@ def run_daemon(
     show_default=True,
     help="Log level.",
 )
+@click.option(
+    "-i",
+    "--listen-interfaces",
+    "listen_interfaces",
+    default=None,
+    type=str,
+    help="Network interfaces to bind (e.g. 'tun0:6881' or 'wg0:6881').",
+)
 @click.pass_context
-def main(ctx, host, port, debug, config_dir, log_level):
+def main(ctx, host, port, debug, config_dir, state_dir, log_level, listen_interfaces):
     """Spritzle daemon."""
     if ctx.invoked_subcommand is None:
         run_daemon(
@@ -267,7 +290,9 @@ def main(ctx, host, port, debug, config_dir, log_level):
             port=port,
             debug=debug,
             config_dir=config_dir,
+            state_dir=state_dir,
             log_level=log_level,
+            listen_interfaces=listen_interfaces,
         )
 
 
@@ -285,15 +310,25 @@ def key_group():
     "--config_dir",
     "config_dir",
     default=None,
-    type=str,
+    type=click.Path(),
     help="Configuration directory.",
 )
+@click.option(
+    "-s",
+    "--state-dir",
+    "--state_dir",
+    "state_dir",
+    default=None,
+    type=click.Path(),
+    help="State directory.",
+)
 @click.pass_context
-def key_create(ctx, name, config_dir):
+def key_create(ctx, name, config_dir, state_dir):
     """Create a new API key."""
     cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
+    st_dir = state_dir or (ctx.parent.parent.params.get("state_dir") if ctx.parent and ctx.parent.parent else None)
     config = Config(config_dir=cfg_dir)
-    core = Core(config)
+    core = Core(config, state_dir=Path(st_dir) if st_dir else None)
     raw_key, meta = core.key_manager.create_key(name=name)
     click.echo(f"Created API key for '{meta['name']}' ({meta['id']}):")
     click.echo(raw_key)
@@ -306,15 +341,25 @@ def key_create(ctx, name, config_dir):
     "--config_dir",
     "config_dir",
     default=None,
-    type=str,
+    type=click.Path(),
     help="Configuration directory.",
 )
+@click.option(
+    "-s",
+    "--state-dir",
+    "--state_dir",
+    "state_dir",
+    default=None,
+    type=click.Path(),
+    help="State directory.",
+)
 @click.pass_context
-def key_list(ctx, config_dir):
+def key_list(ctx, config_dir, state_dir):
     """List API keys."""
     cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
+    st_dir = state_dir or (ctx.parent.parent.params.get("state_dir") if ctx.parent and ctx.parent.parent else None)
     config = Config(config_dir=cfg_dir)
-    core = Core(config)
+    core = Core(config, state_dir=Path(st_dir) if st_dir else None)
     keys = core.key_manager.list_keys()
     if not keys:
         click.echo("No API keys found.")
@@ -332,15 +377,25 @@ def key_list(ctx, config_dir):
     "--config_dir",
     "config_dir",
     default=None,
-    type=str,
+    type=click.Path(),
     help="Configuration directory.",
 )
+@click.option(
+    "-s",
+    "--state-dir",
+    "--state_dir",
+    "state_dir",
+    default=None,
+    type=click.Path(),
+    help="State directory.",
+)
 @click.pass_context
-def key_revoke(ctx, key_id_or_name, config_dir):
+def key_revoke(ctx, key_id_or_name, config_dir, state_dir):
     """Revoke an API key by ID or name."""
     cfg_dir = config_dir or (ctx.parent.parent.params.get("config_dir") if ctx.parent and ctx.parent.parent else None)
+    st_dir = state_dir or (ctx.parent.parent.params.get("state_dir") if ctx.parent and ctx.parent.parent else None)
     config = Config(config_dir=cfg_dir)
-    core = Core(config)
+    core = Core(config, state_dir=Path(st_dir) if st_dir else None)
     if core.key_manager.revoke_key(key_id_or_name):
         click.echo(f"Revoked API key: {key_id_or_name}")
     else:

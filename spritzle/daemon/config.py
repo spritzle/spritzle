@@ -47,6 +47,8 @@ DEFAULTS = {
     "default_save_path": get_default_save_path(),
     "save_resume_data_interval": 60,
     "config_watch_interval": 2.0,
+    "listen_interfaces": os.environ.get("SPRITZLE_LISTEN_INTERFACES", ""),
+    "state_dir": os.environ.get("SPRITZLE_STATE_DIR", ""),
 }
 
 

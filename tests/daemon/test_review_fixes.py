@@ -411,3 +411,75 @@ async def test_delete_torrent_timeout_cleans_state(cli, core):
         assert info_hash not in core.torrent_data
 
 
+def test_core_state_dir_precedence(tmp_path, monkeypatch):
+    from pathlib import Path
+    from spritzle.daemon.config import Config
+    from spritzle.daemon.core import Core
+
+    cfg = Config(in_memory=True)
+
+    # 1. Hardcoded default when nothing is set
+    monkeypatch.delenv("SPRITZLE_STATE_DIR", raising=False)
+    core_default = Core(cfg)
+    assert core_default.state_dir == Path.home() / ".local" / "share" / "spritzle" / "state"
+
+    # 2. Config file setting overrides default
+    cfg["state_dir"] = str(tmp_path / "from_config")
+    core_config = Core(cfg)
+    assert core_config.state_dir == tmp_path / "from_config"
+
+    # 3. Environment variable overrides config file
+    monkeypatch.setenv("SPRITZLE_STATE_DIR", str(tmp_path / "from_env"))
+    core_env = Core(cfg)
+    assert core_env.state_dir == tmp_path / "from_env"
+
+    # 4. Explicit parameter overrides environment variable
+    core_explicit = Core(cfg, state_dir=tmp_path / "from_explicit")
+    assert core_explicit.state_dir == tmp_path / "from_explicit"
+
+
+def test_spritzled_key_custom_state_dir(tmp_path):
+    from click.testing import CliRunner
+    from spritzle.daemon.main import main as spritzled_cli
+
+    runner = CliRunner()
+    state_dir = tmp_path / "custom_state"
+    config_dir = tmp_path / "custom_config"
+
+    # 1. Create key with -s / --state-dir
+    res = runner.invoke(
+        spritzled_cli,
+        ["key", "create", "-n", "testkey", "-c", str(config_dir), "-s", str(state_dir)],
+    )
+    assert res.exit_code == 0
+    assert "Created API key for 'testkey'" in res.output
+
+    # Verify keys.json was written inside custom state_dir
+    assert (state_dir / "keys.json").exists()
+
+    # 2. List keys using -s
+    res_list = runner.invoke(
+        spritzled_cli,
+        ["key", "list", "-c", str(config_dir), "-s", str(state_dir)],
+    )
+    assert res_list.exit_code == 0
+    assert "testkey" in res_list.output
+
+    # 3. Test parent option inheritance: spritzled -s ... key list
+    res_parent = runner.invoke(
+        spritzled_cli,
+        ["-c", str(config_dir), "-s", str(state_dir), "key", "list"],
+    )
+    assert res_parent.exit_code == 0
+    assert "testkey" in res_parent.output
+
+    # 4. Revoke key
+    key_id = res.output.split("(")[1].split(")")[0]
+    res_revoke = runner.invoke(
+        spritzled_cli,
+        ["key", "revoke", key_id, "-c", str(config_dir), "-s", str(state_dir)],
+    )
+    assert res_revoke.exit_code == 0
+    assert f"Revoked API key: {key_id}" in res_revoke.output
+
+

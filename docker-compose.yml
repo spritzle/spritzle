@@ -1,0 +1,22 @@
+services:
+  spritzled:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spritzle/spritzled:latest
+    container_name: spritzled
+    restart: unless-stopped
+    ports:
+      - "17382:17382"       # REST API / Web Daemon
+      - "6881:6881"         # BitTorrent TCP
+      - "6881:6881/udp"     # BitTorrent UDP / DHT
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      # Optional: Bind directly to host network interface
+      # - LISTEN_INTERFACES=eth0:6881
+    volumes:
+      - ./config:/config
+      - ./state:/state
+      - ./downloads:/downloads

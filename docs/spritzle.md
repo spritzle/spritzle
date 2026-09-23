@@ -419,6 +419,98 @@ spritzle daemon-config --reload
 spritzle daemon-config --json
 ```
 
+### `files` - Inspect and Manage File Priorities
+
+Inspects files within a torrent and modifies download priorities for selective downloading (0 = skip, 1 = low, 4 = normal, 7 = top).
+
+```shell
+spritzle files [OPTIONS] [INFO-HASH|NAME]
+```
+
+Options:
+* `-p, --set-priority INDEX PRIORITY`: Set priority for a file (`nargs=2`, multiple times; e.g. `-p 0 7` or `-p 1 skip`).
+* `--skip INDEX`: Skip downloading the specified file index (`priority 0`).
+* `--normal INDEX`: Set normal priority (`priority 4`).
+* `--top INDEX`: Set top priority (`priority 7`).
+* `--all PRIORITY`: Set priority for all files in the torrent.
+* `--header / --no-header`: Toggle table headers.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled output.
+
+**Examples:**
+
+```shell
+# List files with progress and priorities
+spritzle files archlinux-x86_64.iso
+
+# Skip downloading file 1 and prioritize file 0
+spritzle files archlinux-x86_64.iso --skip 1 --top 0
+
+# Set specific numerical priorities
+spritzle files archlinux-x86_64.iso -p 0 7 -p 1 0
+
+# Set all files to normal
+spritzle files archlinux-x86_64.iso --all normal
+```
+
+### `trackers` - Inspect and Manage Trackers
+
+View, add, delete, or trigger announce updates for trackers associated with a torrent.
+
+```shell
+spritzle trackers [OPTIONS] [INFO-HASH|NAME]
+```
+
+Options:
+* `-a, --add URL`: Add a new tracker URL to the torrent.
+* `-t, --tier INTEGER`: Tier priority for the newly added tracker (default: `0`).
+* `-d, --remove, --delete TARGET`: Remove a tracker by announce URL or numerical index.
+* `-r, --reannounce`: Force an immediate tracker re-announce.
+* `--header / --no-header`: Toggle table headers.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled tabular output.
+
+**Examples:**
+
+```shell
+# List trackers and current tier/error status
+spritzle trackers archlinux-x86_64.iso
+
+# Add a primary tracker
+spritzle trackers archlinux-x86_64.iso --add http://tracker.example.com:6969/announce
+
+# Add a backup tracker at tier 1
+spritzle trackers archlinux-x86_64.iso --add http://backup.example.com/announce --tier 1
+
+# Remove a tracker by URL or index
+spritzle trackers archlinux-x86_64.iso --remove http://tracker.example.com:6969/announce
+spritzle trackers archlinux-x86_64.iso --remove 0
+
+# Force immediate reannounce
+spritzle trackers archlinux-x86_64.iso --reannounce
+```
+
+### `reannounce` - Force Tracker Re-announce
+
+Shortcut command to trigger an immediate re-announce across one, multiple, or all torrents.
+
+```shell
+spritzle reannounce [OPTIONS] [INFO-HASH|NAME]
+```
+
+Options:
+* `-q, --query TEXT`: Filter torrents to reannounce.
+* `--all`: Reannounce all active torrents.
+* `-Q, --quiet`: Print only affected info-hashes.
+
+**Examples:**
+
+```shell
+spritzle reannounce archlinux-x86_64.iso
+spritzle reannounce -q name=archlinux.*
+spritzle reannounce --all
+```
+
 ### `settings` - View and Update libtorrent Settings
 
 Inspects, resets, or modifies libtorrent session settings for the running daemon session.
@@ -429,6 +521,11 @@ spritzle settings [OPTIONS]
 
 Options:
 * `-s, --set KEY VALUE`: Set a session setting value (`nargs=2`, can be specified multiple times; e.g. `-s connections_limit 200`).
+* `-i, --listen-interfaces TEXT`: Bind session to specific network interfaces (e.g. `tun0:6881`, `wg0:6881`).
+* `--profile [deluge-2.1.1|qbittorrent-4.6.5|transmission-4.0.5|spritzle-default]`: Apply a private tracker client identity preset profile.
+* `--peer-id TEXT`: Set custom peer ID / client identification prefix.
+* `--peer-fingerprint TEXT`: Set 8-byte peer fingerprint (e.g. `-DE2110-`).
+* `--user-agent TEXT`: Set custom User-Agent string.
 * `-r, --reset TEXT`: Reset specified setting(s) back to libtorrent baseline defaults.
 * `--reset-all`: Reset all settings to factory baseline defaults.
 * `-m, --modified`: Show only settings that differ from libtorrent baseline defaults.
@@ -444,6 +541,15 @@ spritzle settings
 
 # View only modified settings
 spritzle settings --modified
+
+# Bind to VPN interface
+spritzle settings -i tun0:6881
+
+# Apply a private tracker client identity profile
+spritzle settings --profile deluge-2.1.1
+
+# Emulate custom Deluge client identity directly
+spritzle settings --user-agent 'Deluge/2.1.1 libtorrent/2.0.10.0' --peer-id '-DE2110-'
 
 # Change download rate limit and connection limits (KEY VALUE syntax)
 spritzle settings -s download_rate_limit 1048576 -s connections_limit 200

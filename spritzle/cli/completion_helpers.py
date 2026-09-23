@@ -175,3 +175,22 @@ def complete_torrent_identifiers(
         return results
     except Exception:
         return []
+
+
+PROFILES = (
+    "deluge-2.1.1",
+    "qbittorrent-4.6.5",
+    "transmission-4.0.5",
+    "spritzle-default",
+)
+
+
+def complete_profiles(
+    ctx: Optional[click.Context], param: Any, incomplete: str
+) -> List[CompletionItem]:
+    """Complete client identification profile names."""
+    return [
+        CompletionItem(p)
+        for p in PROFILES
+        if p.startswith(incomplete)
+    ]

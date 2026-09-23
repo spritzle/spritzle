@@ -74,6 +74,7 @@ Documentation
 * [Remote Daemons & API Keys](docs/remotes.md): Remote profiles, zero-config local discovery, and daemon identity verification.
 * [REST API Interface](docs/interface.md): Full HTTP REST API reference and examples.
 * [Hooks System](docs/hooks.md): Custom scripting with libtorrent status alerts.
+* [Docker & VPN Deployment](docs/docker.md): Lightweight Docker container deployment and Gluetun VPN leak protection.
 * [Architecture Design](docs/design.md): System architecture and request lifecycle.
 
 Authors

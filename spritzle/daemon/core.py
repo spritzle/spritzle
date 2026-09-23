@@ -28,7 +28,7 @@ import os
 from pathlib import Path
 import signal
 import time
-from typing import Any, Dict, List, Optional, Sequence, Set, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, Union, cast
 
 import libtorrent as lt
 
@@ -44,20 +44,28 @@ log = logging.getLogger("spritzle")
 
 
 class Core(object):
-    def __init__(self, config: Config, state_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        config: Config,
+        state_dir: Optional[Union[Path, str]] = None,
+        startup_listen_interfaces: Optional[str] = None,
+    ):
         self.config = config
         self.start_time = time.time()
         self.session: Optional[lt.session] = None
+        self.startup_listen_interfaces = startup_listen_interfaces
 
         self.hooks = Hooks(Path(self.config.path, "hooks"))
-        if state_dir is None:
+        if state_dir is not None:
+            self.state_dir = Path(state_dir).expanduser()
+        else:
             env_state_dir = os.environ.get("SPRITZLE_STATE_DIR")
             if env_state_dir:
-                self.state_dir = Path(env_state_dir)
+                self.state_dir = Path(env_state_dir).expanduser()
+            elif config and config.get("state_dir"):
+                self.state_dir = Path(str(config.get("state_dir"))).expanduser()
             else:
                 self.state_dir = Path(Path.home(), ".local", "share", "spritzle", "state")
-        else:
-            self.state_dir = state_dir
         # TODO check dir for rw, etc
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.identity = Identity(self.state_dir)
@@ -145,8 +153,20 @@ class Core(object):
         log.debug("Core starting..")
         if settings is None:
             settings = self.get_default_settings()
+
+        explicit_interfaces = (
+            getattr(self, "startup_listen_interfaces", None)
+            or settings.get("listen_interfaces")
+            or self.config.get("listen_interfaces")
+            or os.environ.get("SPRITZLE_LISTEN_INTERFACES")
+        )
+        if explicit_interfaces:
+            settings["listen_interfaces"] = str(explicit_interfaces).strip()
+
         self.session = lt.session(settings)
         await self.load_session_state()
+        if explicit_interfaces and self.session is not None:
+            cast(Any, self.session).apply_settings({"listen_interfaces": str(explicit_interfaces).strip()})
         await self.alert.start(self.session)
         await self.resume_data.start()
 
@@ -261,6 +281,13 @@ class Core(object):
         """
         reloaded = self.config.reload(force=force)
         if reloaded:
+            if self.session is not None:
+                configured_interfaces = self.config.get("listen_interfaces")
+                if configured_interfaces:
+                    try:
+                        cast(Any, self.session).apply_settings({"listen_interfaces": str(configured_interfaces).strip()})
+                    except Exception as e:
+                        log.error(f"Failed to apply reloaded listen_interfaces: {e}")
             log.info("Configuration reload successfully applied to daemon runtime.")
         return reloaded
 

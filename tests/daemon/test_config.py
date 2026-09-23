@@ -165,3 +165,28 @@ def test_delitem_nonexistent():
     c = Config(in_memory=True)
     with pytest.raises(KeyError):
         del c["nonexistent"]
+
+
+def test_listen_interfaces_config(monkeypatch):
+    c = Config(in_memory=True)
+    assert c.get("listen_interfaces") == ""
+
+    c["listen_interfaces"] = "tun0:6881"
+    assert c.get("listen_interfaces") == "tun0:6881"
+
+    monkeypatch.setenv("SPRITZLE_LISTEN_INTERFACES", "wg0:6881")
+    from spritzle.daemon.config import DEFAULTS
+    assert "listen_interfaces" in DEFAULTS
+
+
+def test_state_dir_config(monkeypatch):
+    c = Config(in_memory=True)
+    assert "state_dir" in c.defaults
+
+    c["state_dir"] = "/tmp/my-custom-state"
+    assert c.get("state_dir") == "/tmp/my-custom-state"
+
+    monkeypatch.setenv("SPRITZLE_STATE_DIR", "/tmp/env-state")
+    from spritzle.daemon.config import DEFAULTS
+    assert "state_dir" in DEFAULTS
+

@@ -172,11 +172,37 @@ Content-Type: application/json; charset=utf-8
 
 Updates one or more session settings. The request body must be a JSON object mapping setting names to values.
 
+**Special Profile Keys:**
+* `profile`: Set a predefined client identity profile (`deluge-2.1.1`, `qbittorrent-4.6.5`, `transmission-4.0.5`, `spritzle-default`). Automatically populates matching `user_agent`, `peer_fingerprint`, and `handshake_client_version`.
+* `peer_id`: Automatically sets the 8-character `peer_fingerprint` prefix from the provided peer ID string.
+* `listen_interfaces`: Binds libtorrent session to specific interface/port endpoints (e.g. `tun0:6881`).
+
 **Example**
 
 ```shell
-$ http PUT http://localhost:17382/session/settings "Authorization: Bearer $TOKEN" connections_limit:=200 download_rate_limit:=1048576
+$ http PUT http://localhost:17382/session/settings "Authorization: Bearer $TOKEN" profile=deluge-2.1.1 listen_interfaces="tun0:6881"
 HTTP/1.1 200 OK
+```
+
+### /session/profiles
+#### GET
+
+Returns the dictionary of predefined private tracker client identity profiles.
+
+**Example Response:**
+```json
+{
+    "deluge-2.1.1": {
+        "handshake_client_version": "Deluge 2.1.1",
+        "peer_fingerprint": "-DE2110-",
+        "user_agent": "Deluge/2.1.1 libtorrent/2.0.10.0"
+    },
+    "qbittorrent-4.6.5": {
+        "handshake_client_version": "qBittorrent/4.6.5",
+        "peer_fingerprint": "-qB4650-",
+        "user_agent": "qBittorrent/4.6.5"
+    }
+}
 ```
 
 ### /session/settings/defaults
@@ -498,6 +524,30 @@ Returns a list of files contained in the torrent with their relative paths, byte
 ]
 ```
 
+#### PUT
+
+Updates download priorities for one or more files in the torrent. Priorities range from `0` (skip / do not download) to `7` (maximum / top priority), where `4` is standard default.
+Accepts an index-to-priority dictionary (`{"0": 0, "1": 7}`), a list of priority objects (`[{"index": 0, "priority": 0}]`), or a list of priorities matching the torrent's file count.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/files "Authorization: Bearer $TOKEN" 0:=0 1:=7
+HTTP/1.1 200 OK
+```
+
+### /torrent/\<info-hash\>/files/\<index\>
+#### PUT
+
+Updates the download priority for a single file specified by its numerical index.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/files/0 "Authorization: Bearer $TOKEN" priority:=0
+HTTP/1.1 200 OK
+```
+
 ### /torrent/\<info-hash\>/peers
 #### GET
 
@@ -507,7 +557,7 @@ Returns a list of currently connected peers in the torrent swarm, including endp
 ```json
 [
     {
-        "client": "Transmission 3.00",
+        "client": "Deluge 2.1.1",
         "down_speed": 1048576,
         "flags": 0,
         "host": "192.168.1.50",
@@ -539,6 +589,51 @@ Returns a list of trackers configured for the torrent with their tiers, announce
         "verified": true
     }
 ]
+```
+
+#### POST
+
+Adds a new tracker to the torrent.
+
+**Example**
+
+```shell
+$ http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/trackers "Authorization: Bearer $TOKEN" url="http://tracker.example.com/announce" tier:=0
+HTTP/1.1 201 Created
+```
+
+#### PUT
+
+Replaces or reorders the entire list of trackers for the torrent.
+
+**Example**
+
+```shell
+$ http PUT http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/trackers "Authorization: Bearer $TOKEN" trackers:='[{"url": "http://primary.com/announce", "tier": 0}, {"url": "http://backup.com/announce", "tier": 1}]'
+HTTP/1.1 200 OK
+```
+
+#### DELETE
+
+Removes a tracker by URL (query parameter or JSON body) or index.
+
+**Example**
+
+```shell
+$ http DELETE "http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/trackers?url=http://old.com/announce" "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+```
+
+### /torrent/\<info-hash\>/reannounce
+#### POST
+
+Forces an immediate re-announcement to all active trackers for the torrent.
+
+**Example**
+
+```shell
+$ http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/reannounce "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
 ```
 
 ### /torrent/\<info-hash\>/flags

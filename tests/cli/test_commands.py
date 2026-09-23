@@ -1402,7 +1402,7 @@ def test_info_display_with_peers():
         "peers": [
             {
                 "ip": "192.168.1.50:51413",
-                "client": "Transmission 3.00",
+                "client": "Deluge 2.1.1",
                 "down_speed": 1048576,
                 "up_speed": 0,
                 "progress": 0.95,
@@ -1423,7 +1423,7 @@ def test_info_display_with_peers():
     assert "archlinux-x86_64.iso" in out
     assert "Connected Peers" in out
     assert "192.168.1.50:51413" in out
-    assert "Transmission 3.00" in out
+    assert "Deluge 2.1.1" in out
     assert "Trackers" in out
     assert "Files" in out
     assert "Added" in out
@@ -2045,6 +2045,130 @@ def test_dashboard_colors_dht_and_upload():
     assert "[magenta]● 50 nodes[/magenta]" in header_str
     assert "[bold blue]" in header_str
     assert "[bold cyan]" not in header_str
+
+
+def test_files_command(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    # 1. Plain listing
+    res = runner.invoke(spritzle_cli, ["files", ih, "--plain"])
+    assert res.exit_code == 0
+    assert "tmprandomfile" in res.output
+    assert "Index" in res.output
+    assert "Priority" in res.output
+
+    # 2. JSON listing
+    res_json = runner.invoke(spritzle_cli, ["files", ih, "--json"])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert len(data) == 1
+    assert data[0]["path"] == "tmprandomfile"
+
+    # 3. Set priority using -p
+    res_set = runner.invoke(spritzle_cli, ["files", ih, "-p", "0", "7"])
+    assert res_set.exit_code == 0
+    assert "Updated priorities" in res_set.output
+
+    # 4. Set priority using --skip
+    res_skip = runner.invoke(spritzle_cli, ["files", ih, "--skip", "0"])
+    assert res_skip.exit_code == 0
+    assert "Updated priorities" in res_skip.output
+
+    # 5. Set priority using --normal
+    res_norm = runner.invoke(spritzle_cli, ["files", ih, "--normal", "0"])
+    assert res_norm.exit_code == 0
+    assert "Updated priorities" in res_norm.output
+
+
+def test_trackers_command(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    # 1. Add tracker
+    tracker_url = "http://clitracker.example.com:6969/announce"
+    res_add = runner.invoke(spritzle_cli, ["trackers", ih, "--add", tracker_url])
+    assert res_add.exit_code == 0
+    assert "Added tracker" in res_add.output
+
+    # 2. Plain listing
+    res_list = runner.invoke(spritzle_cli, ["trackers", ih, "--plain"])
+    assert res_list.exit_code == 0
+    assert tracker_url in res_list.output
+    assert "Tier" in res_list.output
+
+    # 3. JSON listing
+    res_json = runner.invoke(spritzle_cli, ["trackers", ih, "--json"])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert any(t["url"] == tracker_url for t in data)
+
+    # 4. Reannounce via trackers --reannounce
+    res_re = runner.invoke(spritzle_cli, ["trackers", ih, "--reannounce"])
+    assert res_re.exit_code == 0
+    assert "Reannounced" in res_re.output
+
+    # 5. Remove tracker
+    res_del = runner.invoke(spritzle_cli, ["trackers", ih, "--remove", tracker_url])
+    assert res_del.exit_code == 0
+    assert "Removed tracker" in res_del.output
+
+
+def test_reannounce_command(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    res = runner.invoke(spritzle_cli, ["reannounce", ih])
+    assert res.exit_code == 0
+    assert "reannounced successfully" in res.output
+
+
+def test_settings_profile_and_interface_command(cli):
+    runner = CliRunner()
+
+    # Set listen-interfaces
+    res = runner.invoke(spritzle_cli, ["settings", "-i", "127.0.0.1:6881"])
+    assert res.exit_code == 0
+
+    # Set profile
+    res = runner.invoke(spritzle_cli, ["settings", "--profile", "deluge-2.1.1"])
+    assert res.exit_code == 0
+
+    # Verify via settings --json
+    res_json = runner.invoke(spritzle_cli, ["settings", "--json"])
+    assert res_json.exit_code == 0
+    data = json.loads(res_json.output)
+    assert data["user_agent"] == "Deluge/2.1.1 libtorrent/2.0.10.0"
+    assert data["peer_fingerprint"] == "-DE2110-"
+    assert "127.0.0.1:6881" in data["listen_interfaces"]
+
 
 
 

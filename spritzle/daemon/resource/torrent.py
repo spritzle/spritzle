@@ -496,6 +496,121 @@ async def get_torrent_files_endpoint(request):
     return web.json_response(get_torrent_files(handle))
 
 
+@routes.put("/torrent/{tid}/files")
+async def put_torrent_files_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+
+    ti = handle.torrent_file() if handle.is_valid() else None
+    if not ti:
+        raise web.HTTPBadRequest(reason="Torrent metadata not available yet.")
+
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    num_files = ti.num_files()
+    updates: Dict[int, int] = {}
+
+    if isinstance(data, dict):
+        if "files" in data and isinstance(data["files"], (dict, list)):
+            data = data["files"]
+        elif "priorities" in data and isinstance(data["priorities"], list):
+            data = data["priorities"]
+
+    if isinstance(data, dict):
+        for k, v in data.items():
+            try:
+                idx = int(k)
+                prio = int(v)
+            except (ValueError, TypeError):
+                raise web.HTTPBadRequest(reason=f"Invalid file index or priority: '{k}': '{v}'")
+            updates[idx] = prio
+    elif isinstance(data, list):
+        if all(isinstance(x, (int, str)) and str(x).isdigit() for x in data):
+            if len(data) != num_files:
+                raise web.HTTPBadRequest(
+                    reason=f"Priority list length ({len(data)}) must match number of files ({num_files})."
+                )
+            for idx, p in enumerate(data):
+                updates[idx] = int(p)
+        elif all(isinstance(x, dict) and "index" in x and "priority" in x for x in data):
+            for item in data:
+                try:
+                    idx = int(item["index"])
+                    prio = int(item["priority"])
+                except (ValueError, TypeError):
+                    raise web.HTTPBadRequest(reason=f"Invalid entry in priority list: {item}")
+                updates[idx] = prio
+        else:
+            raise web.HTTPBadRequest(reason="Invalid list format for file priorities.")
+    else:
+        raise web.HTTPBadRequest(reason="Body must be a JSON object or array.")
+
+    for idx, prio in updates.items():
+        if not (0 <= idx < num_files):
+            raise web.HTTPBadRequest(reason=f"File index {idx} out of range [0, {num_files - 1}].")
+        if not (0 <= prio <= 7):
+            raise web.HTTPBadRequest(reason=f"Priority {prio} out of valid range [0, 7].")
+
+    for idx, prio in updates.items():
+        handle.file_priority(idx, prio)
+
+    try:
+        handle.save_resume_data()
+    except Exception:
+        pass
+
+    res_files = get_torrent_files(handle)
+    for f in res_files:
+        if f.get("index") in updates:
+            f["priority"] = updates[f["index"]]
+
+    return web.json_response(res_files)
+
+
+@routes.put("/torrent/{tid}/files/{index:\\d+}")
+async def put_torrent_single_file_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    file_idx = int(request.match_info["index"])
+    handle = get_valid_handle(core, tid)
+
+    ti = handle.torrent_file() if handle.is_valid() else None
+    if not ti:
+        raise web.HTTPBadRequest(reason="Torrent metadata not available yet.")
+
+    num_files = ti.num_files()
+    if not (0 <= file_idx < num_files):
+        raise web.HTTPBadRequest(reason=f"File index {file_idx} out of range [0, {num_files - 1}].")
+
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    if not isinstance(data, dict) or "priority" not in data:
+        raise web.HTTPBadRequest(reason="Request body must contain 'priority'.")
+
+    try:
+        prio = int(data["priority"])
+    except (ValueError, TypeError):
+        raise web.HTTPBadRequest(reason=f"Invalid priority: {data['priority']}")
+
+    if not (0 <= prio <= 7):
+        raise web.HTTPBadRequest(reason=f"Priority {prio} out of valid range [0, 7].")
+
+    handle.file_priority(file_idx, prio)
+    try:
+        handle.save_resume_data()
+    except Exception:
+        pass
+
+    return web.json_response({"index": file_idx, "priority": prio})
+
+
 @routes.get("/torrent/{tid}/peers")
 async def get_torrent_peers_endpoint(request):
     core = request.app[APP_KEY_CORE]
@@ -510,6 +625,179 @@ async def get_torrent_trackers_endpoint(request):
     tid = request.match_info["tid"]
     handle = get_valid_handle(core, tid)
     return web.json_response(get_torrent_trackers(handle))
+
+
+@routes.post("/torrent/{tid}/trackers")
+async def post_torrent_trackers_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    if not isinstance(data, dict):
+        raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
+    url = data.get("url")
+    if not url or not isinstance(url, str):
+        raise web.HTTPBadRequest(reason="Missing or invalid 'url' field.")
+
+    url = url.strip()
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https", "udp", "wss"):
+        raise web.HTTPBadRequest(reason=f"Unsupported tracker protocol scheme '{parsed.scheme}'.")
+
+    tier = data.get("tier", 0)
+    try:
+        tier = int(tier)
+    except (ValueError, TypeError):
+        raise web.HTTPBadRequest(reason="Field 'tier' must be an integer.")
+
+    if tier < 0:
+        raise web.HTTPBadRequest(reason="Field 'tier' cannot be negative.")
+
+    tracker_dict = {"url": url, "tier": tier}
+    try:
+        handle.add_tracker(tracker_dict)
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Failed to add tracker: {e}")
+
+    try:
+        handle.save_resume_data()
+    except Exception:
+        pass
+
+    return web.json_response(get_torrent_trackers(handle), status=201)
+
+
+@routes.put("/torrent/{tid}/trackers")
+async def put_torrent_trackers_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Invalid JSON: {e}")
+
+    if isinstance(data, dict) and "trackers" in data:
+        data = data["trackers"]
+
+    if not isinstance(data, list):
+        raise web.HTTPBadRequest(reason="Request body must be a list of tracker objects.")
+
+    trackers_to_set = []
+    for item in data:
+        if not isinstance(item, dict):
+            raise web.HTTPBadRequest(reason="Each tracker entry must be a JSON object.")
+        url = item.get("url")
+        if not url or not isinstance(url, str):
+            raise web.HTTPBadRequest(reason="Tracker entry missing or invalid 'url'.")
+        url = url.strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https", "udp", "wss"):
+            raise web.HTTPBadRequest(reason=f"Unsupported tracker protocol scheme '{parsed.scheme}'.")
+        tier = item.get("tier", 0)
+        try:
+            tier = int(tier)
+        except (ValueError, TypeError):
+            raise web.HTTPBadRequest(reason="Field 'tier' must be an integer.")
+        trackers_to_set.append({"url": url, "tier": tier})
+
+    try:
+        handle.replace_trackers(trackers_to_set)
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Failed to replace trackers: {e}")
+
+    try:
+        handle.save_resume_data()
+    except Exception:
+        pass
+
+    return web.json_response(get_torrent_trackers(handle))
+
+
+@routes.delete("/torrent/{tid}/trackers")
+async def delete_torrent_trackers_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+
+    url = request.query.get("url")
+    index = request.query.get("index")
+
+    if not url and index is None and request.can_read_body:
+        try:
+            data = await request.json()
+            if isinstance(data, dict):
+                url = data.get("url")
+                index = data.get("index")
+        except Exception:
+            pass
+
+    if not url and index is None:
+        raise web.HTTPBadRequest(reason="Must specify 'url' or 'index' to delete a tracker.")
+
+    try:
+        current_trackers = list(handle.trackers())
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Failed to retrieve trackers: {e}")
+
+    to_remove = None
+    if index is not None:
+        try:
+            idx = int(index)
+        except (ValueError, TypeError):
+            raise web.HTTPBadRequest(reason="Invalid index.")
+        if 0 <= idx < len(current_trackers):
+            to_remove = current_trackers[idx].get("url")
+            new_trackers = [t for i, t in enumerate(current_trackers) if i != idx]
+        else:
+            raise web.HTTPNotFound(reason=f"Tracker index {idx} out of range.")
+    else:
+        target_url = str(url).strip()
+        matched = False
+        new_trackers = []
+        for t in current_trackers:
+            t_url = t.get("url") if isinstance(t, dict) else getattr(t, "url", "")
+            if t_url == target_url:
+                matched = True
+                to_remove = target_url
+            else:
+                new_trackers.append(t)
+        if not matched:
+            raise web.HTTPNotFound(reason=f"Tracker URL not found: {target_url}")
+
+    try:
+        handle.replace_trackers(new_trackers)
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Failed to update trackers: {e}")
+
+    try:
+        handle.save_resume_data()
+    except Exception:
+        pass
+
+    return web.json_response({"deleted": to_remove, "trackers": get_torrent_trackers(handle)})
+
+
+@routes.post("/torrent/{tid}/reannounce")
+@routes.post("/torrent/{tid}/trackers/reannounce")
+async def post_torrent_reannounce_endpoint(request):
+    core = request.app[APP_KEY_CORE]
+    tid = request.match_info["tid"]
+    handle = get_valid_handle(core, tid)
+
+    try:
+        handle.force_reannounce()
+    except Exception as e:
+        raise web.HTTPBadRequest(reason=f"Failed to reannounce: {e}")
+
+    return web.json_response({"status": "reannounced", "info_hash": str(handle.info_hash())})
 
 
 @routes.post("/torrent")

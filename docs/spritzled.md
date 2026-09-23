@@ -13,7 +13,9 @@ spritzled [OPTIONS] [COMMAND] [ARGS]...
 * `-H, --host TEXT`: Hostname or IP to listen on (default: `127.0.0.1`, env: `SPRITZLE_HOST`).
 * `-p, --port INTEGER`: Port for the HTTP REST server to listen on (default: `17382`, env: `SPRITZLE_PORT`).
 * `-c, --config-dir, --config_dir PATH`: Path to the configuration directory (default: `~/.config/spritzle`, env: `SPRITZLE_CONFIG_DIR`).
+* `-s, --state-dir, --state_dir PATH`: Path to the state directory for persistent data (resume files, keys, identity; default: `~/.local/share/spritzle/state`, env: `SPRITZLE_STATE_DIR`).
 * `-l, --log-level [DEBUG|INFO|WARNING|ERROR]`: Daemon log verbosity (default: `INFO`, env: `SPRITZLE_LOG_LEVEL`).
+* `-i, --listen-interfaces TEXT`: Network interface and port to bind for BitTorrent swarm traffic (default: libtorrent default, env: `SPRITZLE_LISTEN_INTERFACES`; e.g. `tun0:6881` or `wg0:6881`).
 * `--debug`: Enable asyncio event loop debug mode.
 * `--help`: Show the help message and exit.
 
@@ -27,21 +29,21 @@ Manage API keys for the daemon directly from the host.
 Creates a new API key (printed once to stdout) and saves its SHA-256 hash to state.
 
 ```shell
-spritzled key create [-n, --name <name>] [-c, --config-dir <path>]
+spritzled key create [-n, --name <name>] [-c, --config-dir <path>] [-s, --state-dir <path>]
 ```
 
 ##### `spritzled key list`
 Lists all active and revoked API keys.
 
 ```shell
-spritzled key list [-c, --config-dir <path>]
+spritzled key list [-c, --config-dir <path>] [-s, --state-dir <path>]
 ```
 
 ##### `spritzled key revoke`
 Revokes an active API key by ID or name.
 
 ```shell
-spritzled key revoke <id_or_name> [-c, --config-dir <path>]
+spritzled key revoke <id_or_name> [-c, --config-dir <path>] [-s, --state-dir <path>]
 ```
 
 ---
@@ -73,6 +75,8 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 | `default_save_path` | string | `~/Downloads` | Default directory where downloaded files are saved. Defaults to `$SPRITZLE_SAVE_PATH`, `$SPRITZLE_DOWNLOAD_DIR`, or `~/Downloads`. Spritzled auto-creates the directory on startup and validates write permissions. |
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
 | `config_watch_interval` | float | `2.0` | Interval in seconds between file watcher polling checks for `daemon.toml` modifications. Set to `0` or negative to disable file watching. |
+| `listen_interfaces` | string | `""` | Network interfaces and ports to bind for BitTorrent swarm traffic (e.g. `tun0:6881`). When defined, overrides libtorrent defaults on startup and config reload. |
+| `state_dir` | string | `""` | Directory for persistent daemon state (resume data, keys, identity). When not specified, defaults to `$SPRITZLE_STATE_DIR` or `~/.local/share/spritzle/state`. |
 
 ### Configuration Reloading & Live Watching
 
@@ -83,9 +87,16 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 * **Syntax Safety**: If an external edit contains syntax errors or invalid TOML, the reload safely fails, logs an error, and preserves the active running configuration without corruption.
 
 > [!NOTE]
-> Daemon configuration in `daemon.toml` is distinct from **libtorrent session settings** (such as `listen_interfaces`, `download_rate_limit`, `connections_limit`, etc.). Libtorrent session settings are preserved in `session.state` across restarts and can be inspected or adjusted at runtime via the REST API (`/session/settings`) or the CLI command `spritzle settings`.
+> Daemon configuration in `daemon.toml` is distinct from **libtorrent session settings** (such as dynamic rate limits or connection counts). Libtorrent session settings are preserved in `session.state` across restarts and can be inspected or adjusted at runtime via the REST API (`/session/settings`) or the CLI command `spritzle settings`.
 
 For detailed information on configuring clients and third-party integrations, see the [remotes documentation](remotes.md).
+
+---
+
+## Running with Docker & VPN
+
+Spritzle provides an official lightweight container image for `spritzled` with native support for Docker Compose and Gluetun VPN leak protection (`tun0`).
+See the [Docker documentation](docker.md) for complete setup instructions and VPN templates.
 
 
 ---

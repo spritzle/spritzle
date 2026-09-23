@@ -197,3 +197,48 @@ async def test_post_settings_reset_bad_payload(cli):
     assert resp.status == 400
 
 
+async def test_get_session_profiles(cli):
+    resp = await cli.get("/session/profiles")
+    assert resp.status == 200
+    profiles = await resp.json()
+    assert "deluge-2.1.1" in profiles
+    assert "qbittorrent-4.6.5" in profiles
+    assert "transmission-4.0.5" in profiles
+    assert profiles["deluge-2.1.1"]["peer_fingerprint"] == "-DE2110-"
+
+
+async def test_put_settings_profile(cli):
+    resp = await cli.put("/session/settings", json={"profile": "deluge-2.1.1"})
+    assert resp.status == 200
+
+    resp = await cli.get("/session/settings")
+    settings = await resp.json()
+    assert settings["user_agent"] == "Deluge/2.1.1 libtorrent/2.0.10.0"
+    assert settings["peer_fingerprint"] == "-DE2110-"
+
+    # Test invalid profile
+    resp = await cli.put("/session/settings", json={"profile": "invalid-profile-xyz"})
+    assert resp.status == 400
+    err = await resp.text()
+    assert "Unknown profile" in err
+
+
+async def test_put_settings_peer_id(cli):
+    resp = await cli.put("/session/settings", json={"peer_id": "-TR4050-123456789012"})
+    assert resp.status == 200
+
+    resp = await cli.get("/session/settings")
+    settings = await resp.json()
+    assert settings["peer_fingerprint"] == "-TR4050-"
+
+
+async def test_put_settings_listen_interfaces(cli):
+    resp = await cli.put("/session/settings", json={"listen_interfaces": "127.0.0.1:6881"})
+    assert resp.status == 200
+
+    resp = await cli.get("/session/settings")
+    settings = await resp.json()
+    assert "127.0.0.1:6881" in settings["listen_interfaces"]
+
+
+

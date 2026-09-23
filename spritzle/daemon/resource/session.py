@@ -21,11 +21,46 @@
 #
 
 import asyncio
+import importlib.metadata
 from aiohttp import web
+import libtorrent as lt
 
 from spritzle.daemon.keys import APP_KEY_CORE
 
 routes = web.RouteTableDef()
+
+try:
+    _version_str = importlib.metadata.version("spritzle")
+except Exception:
+    _version_str = "1.0.0"
+
+PROFILES = {
+    "deluge-2.1.1": {
+        "user_agent": "Deluge/2.1.1 libtorrent/2.0.10.0",
+        "peer_fingerprint": "-DE2110-",
+        "handshake_client_version": "Deluge 2.1.1",
+    },
+    "qbittorrent-4.6.5": {
+        "user_agent": "qBittorrent/4.6.5",
+        "peer_fingerprint": "-qB4650-",
+        "handshake_client_version": "qBittorrent/4.6.5",
+    },
+    "transmission-4.0.5": {
+        "user_agent": "Transmission/4.0.5",
+        "peer_fingerprint": "-TR4050-",
+        "handshake_client_version": "Transmission/4.0.5",
+    },
+    "spritzle-default": {
+        "user_agent": f"Spritzle/{_version_str} libtorrent/{lt.__version__}",
+        "peer_fingerprint": "-LT0100-",
+        "handshake_client_version": f"Spritzle/{_version_str}",
+    },
+}
+
+
+@routes.get("/session/profiles")
+async def get_session_profiles(request):
+    return web.json_response(PROFILES)
 
 
 @routes.get("/session/settings")
@@ -88,6 +123,20 @@ async def put_session_settings(request):
 
     if not isinstance(settings, dict):
         raise web.HTTPBadRequest(reason="Request body must be a JSON object.")
+
+    if "profile" in settings:
+        profile_name = str(settings.pop("profile")).strip().lower()
+        if profile_name not in PROFILES:
+            raise web.HTTPBadRequest(
+                reason=f"Unknown profile '{profile_name}'. Available: {', '.join(sorted(PROFILES.keys()))}"
+            )
+        for k, v in PROFILES[profile_name].items():
+            settings.setdefault(k, v)
+
+    if "peer_id" in settings:
+        peer_id_val = str(settings.pop("peer_id")).strip()
+        if peer_id_val:
+            settings["peer_fingerprint"] = peer_id_val[:8]
 
     current = core.session.get_settings()
 

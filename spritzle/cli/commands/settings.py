@@ -4,6 +4,7 @@ import sys
 import click
 from tabulate import tabulate
 
+from spritzle.cli.completion_helpers import complete_profiles
 from spritzle.cli.display import (
     get_console,
     get_response_error,
@@ -53,12 +54,78 @@ from spritzle.cli.display import (
     default=False,
     help="Show default values for settings.",
 )
+@click.option(
+    "-i",
+    "--listen-interfaces",
+    "listen_interfaces",
+    type=str,
+    default=None,
+    help="Bind session to specific network interfaces (e.g. 'tun0:6881').",
+)
+@click.option(
+    "--profile",
+    "profile",
+    type=click.Choice(
+        ["deluge-2.1.1", "qbittorrent-4.6.5", "transmission-4.0.5", "spritzle-default"],
+        case_sensitive=False,
+    ),
+    shell_complete=complete_profiles,
+    default=None,
+    help="Apply private tracker client identity profile.",
+)
+@click.option(
+    "--peer-id",
+    "peer_id",
+    type=str,
+    default=None,
+    help="Set custom peer ID / client identification prefix.",
+)
+@click.option(
+    "--peer-fingerprint",
+    "peer_fingerprint",
+    type=str,
+    default=None,
+    help="Set 8-byte peer fingerprint (e.g. '-qB4650-').",
+)
+@click.option(
+    "--user-agent",
+    "user_agent",
+    type=str,
+    default=None,
+    help="Set custom User-Agent string.",
+)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
-def command(client, set_value, reset_keys, reset_all, modified, defaults, json_output, plain):
-    if set_value:
-        client.do_command(setter, set_value)
+def command(
+    client,
+    set_value,
+    reset_keys,
+    reset_all,
+    modified,
+    defaults,
+    listen_interfaces,
+    profile,
+    peer_id,
+    peer_fingerprint,
+    user_agent,
+    json_output,
+    plain,
+):
+    sets = list(set_value)
+    if listen_interfaces:
+        sets.append(("listen_interfaces", listen_interfaces))
+    if profile:
+        sets.append(("profile", profile))
+    if peer_id:
+        sets.append(("peer_id", peer_id))
+    if peer_fingerprint:
+        sets.append(("peer_fingerprint", peer_fingerprint))
+    if user_agent:
+        sets.append(("user_agent", user_agent))
+
+    if sets:
+        client.do_command(setter, sets)
     elif reset_keys or reset_all:
         client.do_command(resetter, reset_keys, reset_all)
     else:

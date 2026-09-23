@@ -894,7 +894,7 @@ def test_get_torrent_peers_identification():
             return self._peers
 
     # 1. Peer with explicit client string
-    p1 = MockPeer(("192.168.1.1", 6881), b"Transmission/3.00", lt.sha1_hash(b"\x00" * 20))
+    p1 = MockPeer(("192.168.1.1", 6881), b"Deluge/2.1.1", lt.sha1_hash(b"\x00" * 20))
     # 2. Peer with empty client bytes but known peer ID (qBittorrent)
     p2 = MockPeer(("192.168.1.2", 6881), b"", lt.sha1_hash(b"-qB4500-123456789012"))
     # 3. Peer with empty client and handshaking flag
@@ -903,9 +903,98 @@ def test_get_torrent_peers_identification():
     handle = MockHandle([p1, p2, p3])
     result = get_torrent_peers(handle)
     assert len(result) == 3
-    assert result[0]["client"] == "Transmission/3.00"
+    assert result[0]["client"] == "Deluge/2.1.1"
     assert result[1]["client"] == "qBittorrent 4.5.0"
     assert result[2]["client"] == "<handshaking>"
+
+
+async def test_torrent_files_priorities(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    body = await resp.json()
+    info_hash = body["info_hash"]
+
+    # 1. Update via dict
+    resp = await cli.put(f"/torrent/{info_hash}/files", json={"0": 0})
+    assert resp.status == 200
+    files = await resp.json()
+    assert files[0]["priority"] == 0
+
+    # 2. Update via list of ints
+    resp = await cli.put(f"/torrent/{info_hash}/files", json=[7])
+    assert resp.status == 200
+    files = await resp.json()
+    assert files[0]["priority"] == 7
+
+    # 3. Update via list of dicts
+    resp = await cli.put(f"/torrent/{info_hash}/files", json=[{"index": 0, "priority": 1}])
+    assert resp.status == 200
+    files = await resp.json()
+    assert files[0]["priority"] == 1
+
+    # 4. Update single file endpoint
+    resp = await cli.put(f"/torrent/{info_hash}/files/0", json={"priority": 4})
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["index"] == 0
+    assert data["priority"] == 4
+
+    # 5. Invalid priority validation
+    resp = await cli.put(f"/torrent/{info_hash}/files/0", json={"priority": 9})
+    assert resp.status == 400
+
+    resp = await cli.put(f"/torrent/{info_hash}/files/0", json={"priority": -1})
+    assert resp.status == 400
+
+    # 6. Invalid file index validation
+    resp = await cli.put(f"/torrent/{info_hash}/files/99", json={"priority": 0})
+    assert resp.status == 400
+
+
+async def test_torrent_trackers_crud(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    body = await resp.json()
+    info_hash = body["info_hash"]
+
+    # 1. Add tracker
+    resp = await cli.post(
+        f"/torrent/{info_hash}/trackers",
+        json={"url": "http://tracker.example.com:6969/announce", "tier": 0},
+    )
+    assert resp.status == 201
+    trackers = await resp.json()
+    assert any(t["url"] == "http://tracker.example.com:6969/announce" for t in trackers)
+
+    # 2. Replace trackers via PUT
+    new_trackers = [
+        {"url": "http://primary.tracker.com/announce", "tier": 0},
+        {"url": "http://secondary.tracker.com/announce", "tier": 1},
+    ]
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json=new_trackers)
+    assert resp.status == 200
+    trackers = await resp.json()
+    assert len(trackers) == 2
+    assert trackers[0]["url"] == "http://primary.tracker.com/announce"
+    assert trackers[1]["url"] == "http://secondary.tracker.com/announce"
+
+    # 3. Delete tracker by URL
+    resp = await cli.delete(
+        f"/torrent/{info_hash}/trackers?url=http://secondary.tracker.com/announce"
+    )
+    assert resp.status == 200
+    del_data = await resp.json()
+    assert del_data["deleted"] == "http://secondary.tracker.com/announce"
+    assert len(del_data["trackers"]) == 1
+
+    # 4. Reannounce
+    resp = await cli.post(f"/torrent/{info_hash}/reannounce")
+    assert resp.status == 200
+    re_data = await resp.json()
+    assert re_data["status"] == "reannounced"
+
 
 
 

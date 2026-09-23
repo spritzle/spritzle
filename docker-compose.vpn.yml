@@ -1,0 +1,47 @@
+services:
+  vpn:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "17382:17382"       # Spritzle REST API forwarded through VPN container
+      - "6881:6881"         # BitTorrent incoming port forwarded through VPN
+      - "6881:6881/udp"
+    environment:
+      # Example WireGuard / Provider configuration (AirVPN, Mullvad, ProtonVPN, Custom, etc.)
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      # Configure your WireGuard settings:
+      # - WIREGUARD_PRIVATE_KEY=...
+      # - WIREGUARD_ADDRESSES=...
+      - FIREWALL_VPN_INPUT_PORTS=6881
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+
+  spritzled:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spritzle/spritzled:latest
+    container_name: spritzled
+    restart: unless-stopped
+    # Routes all network traffic strictly through the VPN container
+    network_mode: "service:vpn"
+    depends_on:
+      vpn:
+        condition: service_healthy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      # Strict VPN interface binding: libtorrent binds strictly to tun0/wg0
+      - VPN_BIND=true
+      - LISTEN_INTERFACES=tun0:6881
+    volumes:
+      - ./config:/config
+      - ./state:/state
+      - ./downloads:/downloads
