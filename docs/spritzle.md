@@ -142,7 +142,7 @@ spritzle list --watch
 
 ### `top` - Live Dashboard
 
-Displays an interactive, continuously updating full-screen terminal dashboard (using the alternate screen buffer, similar to unix `top`) showing overall transfer speeds, active torrents, connected peers, ETA, and DHT status. Press `q` or `Ctrl+C` to exit.
+Displays an interactive, continuously updating full-screen terminal dashboard (using the alternate screen buffer, similar to unix `top` and `htop`) showing overall transfer speeds, active torrents, connected peers, ETA, and DHT status.
 
 ```shell
 spritzle top [OPTIONS]
@@ -153,14 +153,71 @@ Options:
 * `-q, --query TEXT`: Filter torrents (e.g. `state=downloading`).
 * `--plain`: Force plain unstyled output.
 
+**Interactive Controls & Keybindings:**
+
+* **Navigation & Selection**:
+  * `↑` / `↓` or `j` / `k`: Move cursor selection up / down.
+  * `Home` / `End` or `g` / `G`: Jump to the top / bottom of the list.
+  * `PgUp` / `PgDn`: Scroll list by 10 items.
+  * `Space`: Toggle multi-selection checkbox on the highlighted torrent.
+  * `*`: Select all / deselect all torrents.
+  * `Enter` or `i`: Open / close the detailed Torrent Inspector.
+
+* **Quick Filter Tabs**:
+  * `1` - `7`: Switch filter tab (`1:All`, `2:Downloading`, `3:Seeding`, `4:Paused`, `5:Active`, `6:Errors`, `7:Checking`).
+  * `Tab` / `Shift+Tab`: Cycle filter tabs forward / backward.
+  * `/`: Live text search (filters by name, info-hash, or tags as you type; `Enter` to confirm, `Esc` to clear).
+
+* **Torrent Actions**:
+  * `p`: Pause selected torrent(s).
+  * `r`: Resume selected torrent(s).
+  * `d` or `x`: Delete/remove selected torrent(s) (prompts for confirmation; press `D` to also delete files from disk).
+  * `a`: Force reannounce selected torrent(s) to trackers.
+
+* **Sorting & Columns**:
+  * `o` or `s`: Cycle sort column (Name, Status, Progress, Size, Download Rate, Upload Rate, Peers, ETA, Ratio).
+  * `R`: Reverse sort order (Ascending <-> Descending).
+  * Quick sort hotkeys: `n` (Name), `P` (Progress), `D` (Down Speed), `U` (Up Speed), `Z` (Size), `E` (ETA).
+  * `c`: Open interactive Column Visibility modal (press column key or Space to toggle, `↑`/`↓` to navigate, `Esc`/`Enter`/`q` to close).
+
+* **Torrent Inspector (`Enter` / `i`)**:
+  * `1`: Summary tab (state, hash, ratio, piece stats, save path, tags, error info).
+  * `2`: Files tab (file tree with index, path, size, progress bar, download priority).
+  * `3`: Trackers tab (tiers, announce URLs, status, scrape counts, next announce).
+  * `4`: Peers tab (peer IP, client version, transfer rates, progress, flags).
+  * `Tab` / `Shift+Tab`: Cycle inspector tabs.
+  * `Esc` or `i`: Return to main list view.
+
+* **Command Prompt (`:`)**:
+  * `:q` or `:quit`: Exit dashboard.
+  * `:pause [all]`: Pause selected or all torrents.
+  * `:resume [all]`: Resume selected or all torrents.
+  * `:rm [--delete-files]`: Remove selected torrents.
+  * `:add <url|magnet|path>`: Add a torrent directly from inside the dashboard.
+  * `:filter <query>`: Apply query filter (e.g. `:filter total_size.gt=1G`).
+  * `:search <term>`: Search torrents by name/hash/tags.
+  * `:clear`: Clear active filters and search queries.
+  * `:sort <col> [asc|desc]`: Set sort column and direction.
+  * `:col <+col|-col|reset>`: Show, hide, or reset visible columns.
+  * `:move <destination>`: Move storage of selected torrent.
+  * `:help`: Open interactive help cheat sheet.
+
+* **General**:
+  * `?` or `h`: Open / close help cheat sheet.
+  * `Esc`: Cancel prompt / clear search / close inspector modal.
+  * `q` or `Ctrl+C`: Exit dashboard.
+
 **Examples:**
 
 ```shell
-# Launch live dashboard
+# Launch interactive live dashboard
 spritzle top
 
 # Update every 0.5 seconds for downloading torrents only
 spritzle top -i 0.5 -q state=downloading
+
+# Plain output mode for pipes or background monitoring
+spritzle top --plain
 ```
 
 ### `info` - Show Detailed Torrent Information
