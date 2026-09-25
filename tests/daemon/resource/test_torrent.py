@@ -996,6 +996,217 @@ async def test_torrent_trackers_crud(cli):
     assert re_data["status"] == "reannounced"
 
 
+def test_validate_torrent_url_unit():
+    import socket
+    from unittest.mock import patch
+    from aiohttp import web
+    from spritzle.daemon.resource.torrent import validate_torrent_url
+
+    # Magnet uri
+    assert validate_torrent_url("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567")
+
+    # Unsupported scheme
+    with pytest.raises(web.HTTPBadRequest) as exc:
+        validate_torrent_url("ftp://example.com/test.torrent")
+    assert "Unsupported URL scheme" in exc.value.reason
+
+    # Missing hostname
+    with pytest.raises(web.HTTPBadRequest) as exc:
+        validate_torrent_url("http:///test.torrent")
+    assert "missing hostname" in exc.value.reason
+
+    # Localhost
+    with pytest.raises(web.HTTPBadRequest):
+        validate_torrent_url("http://localhost/test.torrent", allow_loopback=False)
+
+    # Loopback IP
+    assert validate_torrent_url("http://127.0.0.1/test.torrent", allow_loopback=True)
+    with pytest.raises(web.HTTPBadRequest):
+        validate_torrent_url("http://127.0.0.1/test.torrent", allow_loopback=False)
+
+    # Private IP
+    with pytest.raises(web.HTTPBadRequest):
+        validate_torrent_url("http://192.168.1.1/test.torrent")
+
+    # Link local IP
+    with pytest.raises(web.HTTPBadRequest):
+        validate_torrent_url("http://169.254.1.1/test.torrent")
+
+    # Multicast IP
+    with pytest.raises(web.HTTPBadRequest):
+        validate_torrent_url("http://224.0.0.1/test.torrent")
+
+    # DNS resolving to private IP
+    with patch("socket.getaddrinfo", return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.1", 80))]):
+        with pytest.raises(web.HTTPBadRequest) as exc:
+            validate_torrent_url("http://private.example.com/test.torrent")
+        assert "resolves to a disallowed address" in exc.value.reason
+
+    # DNS resolution failure
+    with patch("socket.getaddrinfo", side_effect=socket.gaierror("lookup failed")):
+        assert validate_torrent_url("http://unresolvable.example.com/test.torrent")
+
+
+def test_get_torrent_list_by_query_extended():
+    from aiohttp import web
+    from spritzle.daemon.resource.torrent import get_torrent_list_by_query
+
+    statuses = [
+        {"info_hash": "a" * 40, "name": "archlinux", "is_finished": True, "progress": 1.0, "spritzle.tags": ["linux", "iso"]},
+        {"info_hash": "b" * 40, "name": "debian", "is_finished": False, "progress": 0.5, "spritzle.tags": ["linux", "deb"]},
+    ]
+
+    # Non-string key or value
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({123: "val"}, statuses)
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"name": 123}, statuses)
+
+    # Empty statuses list
+    assert get_torrent_list_by_query({"name": "archlinux"}, []) == []
+
+    # Invalid regex pattern
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"name": "["}, statuses)
+
+    # Boolean invalid string
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"is_finished": "maybe"}, statuses)
+
+    # Numeric invalid float
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"progress": "not_a_number"}, statuses)
+
+    # Numeric invalid operator
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"progress.like": "1.0"}, statuses)
+
+    # List operators: ne, in
+    res_in = get_torrent_list_by_query({"spritzle.tags.in": "deb, rpm"}, statuses)
+    assert res_in == ["b" * 40]
+
+    res_ne = get_torrent_list_by_query({"spritzle.tags.ne": "iso"}, statuses)
+    assert res_ne == ["b" * 40]
+
+    # List invalid operator
+    with pytest.raises(web.HTTPBadRequest):
+        get_torrent_list_by_query({"spritzle.tags.gt": "linux"}, statuses)
+
+
+async def test_torrent_trackers_validation_and_errors(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    body = await resp.json()
+    info_hash = body["info_hash"]
+
+    # POST tracker validation errors
+    # 1. Non-dict body
+    resp = await cli.post(f"/torrent/{info_hash}/trackers", data="not a dict")
+    assert resp.status == 400
+
+    # 2. Missing or invalid url
+    resp = await cli.post(f"/torrent/{info_hash}/trackers", json={"tier": 0})
+    assert resp.status == 400
+
+    # 3. Unsupported scheme
+    resp = await cli.post(f"/torrent/{info_hash}/trackers", json={"url": "ftp://bad.com/announce"})
+    assert resp.status == 400
+
+    # 4. Invalid tier
+    resp = await cli.post(f"/torrent/{info_hash}/trackers", json={"url": "http://ok.com/announce", "tier": "abc"})
+    assert resp.status == 400
+    resp = await cli.post(f"/torrent/{info_hash}/trackers", json={"url": "http://ok.com/announce", "tier": -1})
+    assert resp.status == 400
+
+    # PUT trackers validation errors
+    # 1. Non-list body
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json="not a list")
+    assert resp.status == 400
+
+    # 2. Item not dict
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json=["http://bad"])
+    assert resp.status == 400
+
+    # 3. Item missing url or unsupported scheme
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json=[{"tier": 0}])
+    assert resp.status == 400
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json=[{"url": "ftp://bad"}])
+    assert resp.status == 400
+    resp = await cli.put(f"/torrent/{info_hash}/trackers", json=[{"url": "http://ok", "tier": "invalid"}])
+    assert resp.status == 400
+
+    # DELETE tracker validation errors
+    # 1. Missing url and index
+    resp = await cli.delete(f"/torrent/{info_hash}/trackers")
+    assert resp.status == 400
+
+    # 2. Delete index out of range
+    resp = await cli.delete(f"/torrent/{info_hash}/trackers?index=999")
+    assert resp.status == 404
+
+    # 3. Delete index invalid int
+    resp = await cli.delete(f"/torrent/{info_hash}/trackers?index=abc")
+    assert resp.status == 400
+
+    # 4. Delete URL not found
+    resp = await cli.delete(f"/torrent/{info_hash}/trackers?url=http://nonexistent.tracker/announce")
+    assert resp.status == 404
+
+    # 5. Delete by index 0 (add a tracker first)
+    await cli.post(f"/torrent/{info_hash}/trackers", json={"url": "http://ok.com/announce", "tier": 0})
+    resp = await cli.delete(f"/torrent/{info_hash}/trackers?index=0")
+    assert resp.status == 200
+
+    # Reannounce nonexistent hash
+    resp = await cli.post("/torrent/" + "0" * 40 + "/reannounce")
+    assert resp.status == 404
+
+
+async def test_torrent_files_validation_errors(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # PUT files with non-dict/non-list
+    resp = await cli.put(f"/torrent/{info_hash}/files", json="not a dict or list")
+    assert resp.status == 400
+
+    # PUT files with list containing non-int/non-dict
+    resp = await cli.put(f"/torrent/{info_hash}/files", json=["string_not_allowed"])
+    assert resp.status == 400
+
+    # PUT files with dict having non-numeric key
+    resp = await cli.put(f"/torrent/{info_hash}/files", json={"bad_key": 0})
+    assert resp.status == 400
+
+    # PUT files with invalid priority value
+    resp = await cli.put(f"/torrent/{info_hash}/files", json={"0": "not_an_int"})
+    assert resp.status == 400
+
+
+async def test_disallowed_and_invalid_torrent_methods(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    info_hash = (await resp.json())["info_hash"]
+
+    # Invalid method on valid torrent
+    resp = await cli.post(f"/torrent/{info_hash}/invalid_torrent_method")
+    assert resp.status == 400
+
+    # Method on nonexistent torrent
+    resp = await cli.post("/torrent/" + "0" * 40 + "/pause")
+    assert resp.status == 404
+
+    # set_max_uploads with invalid/negative number
+    resp = await cli.post(f"/torrent/{info_hash}/set_max_uploads", json={"max_uploads": -5})
+    assert resp.status == 400
+    resp = await cli.post(f"/torrent/{info_hash}/set_max_uploads", json={"max_uploads": "abc"})
+    assert resp.status == 400
+
+
 
 
 
