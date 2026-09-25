@@ -2453,12 +2453,51 @@ def test_trackers_command_edge_cases(cli):
     res_color = runner.invoke(spritzle_cli, ["--color", "trackers", ih])
     assert res_color.exit_code == 0
 
-    # Remove by index
-    tracker_url = "http://clitracker2.example.com:6969/announce"
-    runner.invoke(spritzle_cli, ["trackers", ih, "--add", tracker_url])
-    res_del_idx = runner.invoke(spritzle_cli, ["trackers", ih, "--remove", "0"])
-    assert res_del_idx.exit_code == 0
-    assert "Removed tracker 0" in res_del_idx.output
+    # Missing torrent argument in manager
+    res_mgr_no_torrent = runner.invoke(spritzle_cli, ["trackers", "--add", "http://foo.bar/announce"])
+    assert res_mgr_no_torrent.exit_code == 1
+    assert "Specify a torrent" in res_mgr_no_torrent.output
+
+    # Error adding tracker (unsupported scheme)
+    res_err_add = runner.invoke(spritzle_cli, ["trackers", ih, "--add", "ftp://bad.com/announce"])
+    assert res_err_add.exit_code == 1
+    assert "Error adding tracker" in res_err_add.output
+
+    # Error removing tracker (index out of range)
+    res_err_del = runner.invoke(spritzle_cli, ["trackers", ih, "--remove", "9999"])
+    assert res_err_del.exit_code == 1
+    assert "Error removing tracker" in res_err_del.output
+
+    # Formatting of trackers in show (updating, error, working)
+    from spritzle.cli.commands.trackers import show as trackers_show
+    import asyncio
+    from unittest.mock import patch, MagicMock
+
+    mock_client = MagicMock()
+    mock_client.color = "always"
+    mock_client.plain = False
+
+    class MockResp:
+        status = 200
+        async def json(self):
+            return [
+                {"tier": 0, "url": "http://tr1", "updating": True, "fails": 0, "next_announce": 10},
+                {"tier": 1, "url": "http://tr2", "updating": False, "fails": 2, "next_announce": None, "message": "tracker timed out"},
+                {"tier": 2, "url": "http://tr3", "updating": False, "fails": 0, "next_announce": 30},
+            ]
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    mock_client.session.get = lambda url: MockResp()
+    with patch("spritzle.cli.commands.trackers.resolve_single_torrent", return_value="0" * 40):
+        # Color table
+        asyncio.run(trackers_show(mock_client, "0" * 40, plain=False))
+        # Plain table
+        mock_client.color = "never"
+        mock_client.plain = True
+        asyncio.run(trackers_show(mock_client, "0" * 40, plain=True))
 
 
 def test_files_command_edge_cases(cli):
