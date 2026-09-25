@@ -5,7 +5,7 @@ import click
 
 from rich.table import Table
 
-from spritzle.cli.display import get_console, print_error, should_use_color
+from spritzle.cli.display import BRAND_ACCENT, get_console, print_error, should_use_color
 
 EXAMPLES: Dict[str, List[str]] = {
     "add": [
@@ -171,8 +171,8 @@ def command(ctx, command_name: Optional[str] = None):
     if not command_name:
         if is_color:
             console = get_console(getattr(root_ctx.obj, "color", None))
-            console.print("[bold cyan]Spritzle[/bold cyan] [dim]- Modern BitTorrent Client[/dim]\n")
-            console.print("[bold]Usage:[/bold] [cyan]spritzle[/cyan] [dim][OPTIONS][/dim] [bold cyan]COMMAND[/bold cyan] [dim][ARGS]...[/dim]\n")
+            console.print(f"[bold {BRAND_ACCENT}]Spritzle[/bold {BRAND_ACCENT}] [dim]- Modern BitTorrent Client[/dim]\n")
+            console.print(f"[bold]Usage:[/bold] [{BRAND_ACCENT}]spritzle[/{BRAND_ACCENT}] [dim][OPTIONS][/dim] [bold {BRAND_ACCENT}]COMMAND[/bold {BRAND_ACCENT}] [dim][ARGS]...[/dim]\n")
 
             opt_table = Table(box=None, padding=(0, 2), show_header=False)
             opt_table.add_column(style="green", no_wrap=True)
@@ -183,18 +183,18 @@ def command(ctx, command_name: Optional[str] = None):
                     opts += " / " + ", ".join(param.secondary_opts)
                 opt_table.add_row(opts, param.help or "")
             opt_table.add_row("--help", "Show this message and exit.")
-            console.print("[bold cyan]Options:[/bold cyan]")
+            console.print(f"[bold {BRAND_ACCENT}]Options:[/bold {BRAND_ACCENT}]")
             console.print(opt_table)
             console.print("")
 
             cmd_table = Table(box=None, padding=(0, 2), show_header=False)
-            cmd_table.add_column(style="bold cyan", no_wrap=True)
+            cmd_table.add_column(style=f"bold {BRAND_ACCENT}", no_wrap=True)
             cmd_table.add_column(style="default")
             for name in sorted(root_cmd.list_commands(root_ctx)):
                 sc = root_cmd.get_command(root_ctx, name)
                 if sc and not sc.hidden:
                     cmd_table.add_row(name, sc.short_help or "")
-            console.print("[bold cyan]Commands:[/bold cyan]")
+            console.print(f"[bold {BRAND_ACCENT}]Commands:[/bold {BRAND_ACCENT}]")
             console.print(cmd_table)
             console.print("\n[dim]Tip: Run 'spritzle help <command>' for command-specific options and examples.[/dim]")
             return
@@ -214,7 +214,7 @@ def command(ctx, command_name: Optional[str] = None):
     if is_color:
         console = get_console(getattr(root_ctx.obj, "color", None))
         args_str = " ".join(f"[{p.name.upper()}]" if not p.required else p.name.upper() for p in sub_cmd.params if isinstance(p, click.Argument))
-        console.print(f"[bold]Usage:[/bold] [cyan]spritzle {command_name}[/cyan] [dim][OPTIONS][/dim] {args_str}".strip())
+        console.print(f"[bold]Usage:[/bold] [{BRAND_ACCENT}]spritzle {command_name}[/{BRAND_ACCENT}] [dim][OPTIONS][/dim] {args_str}".strip())
         if sub_cmd.help:
             console.print(f"\n  {sub_cmd.help.strip()}\n")
         elif sub_cmd.short_help:
@@ -231,7 +231,7 @@ def command(ctx, command_name: Optional[str] = None):
                     o_str += " / " + ", ".join(param.secondary_opts)
                 opt_table.add_row(o_str, param.help or "")
             opt_table.add_row("--help", "Show this message and exit.")
-            console.print("[bold cyan]Options:[/bold cyan]")
+            console.print(f"[bold {BRAND_ACCENT}]Options:[/bold {BRAND_ACCENT}]")
             console.print(opt_table)
     else:
         help_text = sub_cmd.get_help(sub_ctx)
@@ -241,7 +241,7 @@ def command(ctx, command_name: Optional[str] = None):
     if examples:
         if is_color:
             console = get_console(getattr(root_ctx.obj, "color", None))
-            console.print("\n[bold cyan]Examples:[/bold cyan]")
+            console.print(f"\n[bold {BRAND_ACCENT}]Examples:[/bold {BRAND_ACCENT}]")
             for ex in examples:
                 console.print(f"  [green]$[/green] {ex}")
         else:

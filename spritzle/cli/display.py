@@ -11,6 +11,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+# Spritzle Brand Palette (matches official docs/assets/logo.svg)
+BRAND_PRIMARY = "#9c27b0"  # Vibrant Purple (Main droplet)
+BRAND_ACCENT = "#b55dc4"   # Luminous Orchid (Headers & highlights)
+BRAND_DARK = "#701c7f"     # Deep Violet (Badge backgrounds & borders)
+HEADER_STYLE = f"bold {BRAND_ACCENT}"
+
 
 def get_box_style(theme: Optional[str] = None) -> box.Box:
     """Return appropriate Rich box style based on active theme."""
@@ -284,7 +290,7 @@ def render_rich_table(
         caption_style="none",
         box=resolved_box,
         border_style=resolved_border,
-        header_style="bold cyan",
+        header_style=HEADER_STYLE,
         show_header=bool(headers),
         pad_edge=True,
     )
@@ -326,15 +332,15 @@ def render_post_add_card(
         grid.add_row("Save Path", escape(save_path))
         lookup_ref = name if name and name != info_hash else info_hash
         grid.add_row("", "")
-        grid.add_row("[bold cyan]Track progress[/bold cyan]", "")
-        grid.add_row("  List all", "[cyan]spritzle list[/cyan]")
-        grid.add_row("  Details", f"[cyan]spritzle info {escape(lookup_ref)}[/cyan]")
+        grid.add_row(f"[{HEADER_STYLE}]Track progress[/{HEADER_STYLE}]", "")
+        grid.add_row("  List all", f"[{BRAND_ACCENT}]spritzle list[/{BRAND_ACCENT}]")
+        grid.add_row("  Details", f"[{BRAND_ACCENT}]spritzle info {escape(lookup_ref)}[/{BRAND_ACCENT}]")
 
         box_style = get_box_style(theme)
         border_style = get_border_style(theme)
         panel = Panel(
             grid,
-            title=f"[bold green]✔[/bold green] Added [bold]{escape(display_name)}[/bold] ([cyan]{escape(short_hash)}[/cyan])",
+            title=f"[bold green]✔[/bold green] Added [bold]{escape(display_name)}[/bold] ([{BRAND_ACCENT}]{escape(short_hash)}[/{BRAND_ACCENT}])",
             border_style=border_style,
             box=box_style,
             padding=(1, 2),
@@ -438,16 +444,16 @@ def render_info_card(
     grid.add_column()
 
     grid.add_row("State", state_pill)
-    grid.add_row("Info Hash", f"[cyan]{info_hash}[/cyan]" if is_color else info_hash)
+    grid.add_row("Info Hash", f"[{BRAND_ACCENT}]{info_hash}[/{BRAND_ACCENT}]" if is_color else info_hash)
     if added_str != "--":
         grid.add_row("Added", added_str)
     if completed_str:
         grid.add_row("Completed", completed_str)
     if tags_str != "<none>":
-        grid.add_row("Tags", f"[magenta]{escape(tags_str)}[/magenta]" if is_color else tags_str)
+        grid.add_row("Tags", f"[{BRAND_ACCENT}]{escape(tags_str)}[/{BRAND_ACCENT}]" if is_color else tags_str)
 
     grid.add_row("", "")
-    grid.add_row("[bold cyan]Transfer[/bold cyan]", "")
+    grid.add_row(f"[{HEADER_STYLE}]Transfer[/{HEADER_STYLE}]", "")
     grid.add_row(
         "  Progress",
         f"{prog_disp}  [dim]({size_disp})[/dim]" if is_color else f"{prog_disp} ({size_disp})",
@@ -463,7 +469,7 @@ def render_info_card(
     grid.add_row("  Share Ratio", ratio_str)
 
     grid.add_row("", "")
-    grid.add_row("[bold cyan]Swarm[/bold cyan]", "")
+    grid.add_row(f"[{HEADER_STYLE}]Swarm[/{HEADER_STYLE}]", "")
     grid.add_row(
         "  Peers",
         f"{num_peers} connected [dim](seeds: {num_seeds})[/dim]"
@@ -473,7 +479,7 @@ def render_info_card(
     grid.add_row("  Pieces", pieces_disp)
 
     grid.add_row("", "")
-    grid.add_row("[bold cyan]Storage[/bold cyan]", "")
+    grid.add_row(f"[{HEADER_STYLE}]Storage[/{HEADER_STYLE}]", "")
     grid.add_row("  Save Path", escape(save_path))
 
     if err_str:
@@ -495,7 +501,7 @@ def render_info_card(
             caption_style="none",
             box=box_style,
             border_style=border_style,
-            header_style="bold cyan",
+            header_style=HEADER_STYLE,
             show_header=True,
             pad_edge=True,
         )
@@ -528,11 +534,11 @@ def render_info_card(
             caption_style="none",
             box=box_style,
             border_style=border_style,
-            header_style="bold cyan",
+            header_style=HEADER_STYLE,
             show_header=True,
             pad_edge=True,
         )
-        peer_table.add_column("IP Address", style="cyan", no_wrap=True)
+        peer_table.add_column("IP Address", style=BRAND_ACCENT, no_wrap=True)
         peer_table.add_column("Client", style="dim", no_wrap=True)
         peer_table.add_column("Down Speed", justify="right", no_wrap=True)
         peer_table.add_column("Up Speed", justify="right", no_wrap=True)
@@ -571,7 +577,7 @@ def render_info_card(
             caption_style="none",
             box=box_style,
             border_style=border_style,
-            header_style="bold cyan",
+            header_style=HEADER_STYLE,
             show_header=True,
             pad_edge=True,
         )
@@ -626,7 +632,7 @@ def render_status_card(
 
     grid.add_row(
         "Remote",
-        f"[bold cyan]{escape(remote_name)}[/bold cyan]  {status_pill}  {latency_pill}"
+        f"[bold {BRAND_ACCENT}]{escape(remote_name)}[/bold {BRAND_ACCENT}]  {status_pill}  {latency_pill}"
         if is_color
         else f"{remote_name}  online  {latency_ms} ms",
     )
@@ -686,7 +692,7 @@ def render_stats_cards(
     grid.add_column(ratio=1)
 
     # Torrents & Transfer Section
-    grid.add_row("[bold cyan]Torrents[/bold cyan]", "", "[bold cyan]Transfer & Bandwidth[/bold cyan]", "")
+    grid.add_row(f"[bold {BRAND_ACCENT}]Torrents[/bold {BRAND_ACCENT}]", "", f"[bold {BRAND_ACCENT}]Transfer & Bandwidth[/bold {BRAND_ACCENT}]", "")
     grid.add_row(
         "  Downloading", str(summary_data["torrents"]["downloading"]),
         "  Downloaded", str(summary_data["transfer"]["downloaded"]),
@@ -709,7 +715,7 @@ def render_stats_cards(
     )
 
     grid.add_row("", "", "", "")
-    grid.add_row("[bold cyan]Swarm & Network[/bold cyan]", "", "[bold cyan]DHT Status[/bold cyan]", "")
+    grid.add_row(f"[bold {BRAND_ACCENT}]Swarm & Network[/bold {BRAND_ACCENT}]", "", f"[bold {BRAND_ACCENT}]DHT Status[/bold {BRAND_ACCENT}]", "")
     grid.add_row(
         "  Connected Peers", str(summary_data["peers"]["connected"]),
         "  Status", dht_status,
@@ -766,7 +772,7 @@ def render_empty_list_card(
     grid.add_row("")
     grid.add_row("To add a torrent, run:")
     grid.add_row(
-        "  [cyan]spritzle add <path | url | magnet | info-hash>[/cyan]"
+        f"  [{BRAND_ACCENT}]spritzle add <path | url | magnet | info-hash>[/{BRAND_ACCENT}]"
         if is_color
         else "  spritzle add <path | url | magnet | info-hash>"
     )
@@ -850,13 +856,13 @@ def render_kv_table(
         caption_style="none",
         box=resolved_box,
         border_style=resolved_border,
-        header_style="bold cyan",
+        header_style=HEADER_STYLE,
         show_header=True,
         min_width=min_w,
     )
 
     for _ in range(num_columns):
-        table.add_column(key_header, style="cyan", no_wrap=True)
+        table.add_column(key_header, style=BRAND_ACCENT, no_wrap=True)
         table.add_column(value_header, no_wrap=(num_columns > 1))
 
     for r in range(rows_per_col):

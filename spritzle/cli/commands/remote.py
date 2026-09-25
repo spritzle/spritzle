@@ -34,6 +34,7 @@ from tabulate import tabulate
 
 from spritzle.cli.completion_helpers import complete_remotes
 from spritzle.cli.display import (
+    HEADER_STYLE,
     format_latency,
     get_border_style,
     get_box_style,
@@ -377,7 +378,7 @@ def remote_status(client, name: Optional[str], json_output: bool, plain: bool):
     table = Table(
         box=get_box_style(theme),
         border_style=get_border_style(theme),
-        header_style="bold cyan",
+        header_style=HEADER_STYLE,
         caption="[green]*[/green] default remote" if has_default else None,
         caption_style="none",
     )
@@ -463,7 +464,7 @@ def remote_list(client, json_output: bool, plain: bool):
     table = Table(
         box=get_box_style(theme),
         border_style=get_border_style(theme),
-        header_style="bold cyan",
+        header_style=HEADER_STYLE,
         caption="[green]*[/green] default remote" if has_default else None,
         caption_style="none",
     )

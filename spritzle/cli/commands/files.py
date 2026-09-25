@@ -7,6 +7,7 @@ from tabulate import tabulate
 
 from spritzle.cli.completion_helpers import complete_torrent_identifiers
 from spritzle.cli.display import (
+    HEADER_STYLE,
     format_bytes,
     get_border_style,
     get_box_style,
@@ -247,7 +248,7 @@ async def show(client, torrent, header=True, json_output=False, plain=False, **k
             border_style=get_border_style(theme),
             show_header=header,
             caption_style="none",
-            header_style="bold cyan",
+            header_style=HEADER_STYLE,
         )
         table.add_column("Index", justify="right", style="dim", no_wrap=True)
         table.add_column("Priority", justify="left", no_wrap=True)

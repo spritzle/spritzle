@@ -24,6 +24,10 @@ from rich.table import Table
 from rich.text import Text
 
 from spritzle.cli.display import (
+    BRAND_ACCENT,
+    BRAND_DARK,
+    BRAND_PRIMARY,
+    HEADER_STYLE,
     format_bytes,
     format_datetime,
     format_eta,
@@ -463,7 +467,7 @@ def render_single_watch_panel(data: Dict[str, Any], is_color: bool = True) -> Pa
     table.add_row("Peers:", peers_disp)
     table.add_row("ETA:", eta_disp)
 
-    title = f"[bold]{escape(name)}[/bold] ([cyan]{escape(short_hash)}[/cyan])" if is_color else f"{name} ({short_hash})"
+    title = f"[bold]{escape(name)}[/bold] ([{BRAND_ACCENT}]{escape(short_hash)}[/{BRAND_ACCENT}])" if is_color else f"{name} ({short_hash})"
     return Panel(
         table,
         title=title,
@@ -1098,7 +1102,7 @@ def _build_filter_bar_text(state: DashboardState, is_color: bool = True) -> Text
         is_active = state.filter_tab == tab_id
         if is_active:
             if is_color:
-                bar.append(f" [{key}:{label}] ", style="bold white on blue")
+                bar.append(f" [{key}:{label}] ", style=f"bold white on {BRAND_DARK}")
             else:
                 bar.append(f" *[{label}]* ")
         else:
@@ -1141,7 +1145,7 @@ def _build_interactive_table(
     """Build the main selectable torrents table."""
     table = Table(
         box=None if not is_color else Table.grid().box,
-        header_style="bold cyan",
+        header_style=HEADER_STYLE,
         show_header=True,
         expand=True,
         caption_style="none",
@@ -1210,7 +1214,7 @@ def _build_interactive_table(
 
         # Cursor and checkbox prefix
         if is_selected:
-            cursor_str = "[bold cyan]▸[/bold cyan] " if is_color else "> "
+            cursor_str = f"[bold {BRAND_ACCENT}]▸[/bold {BRAND_ACCENT}] " if is_color else "> "
         else:
             cursor_str = "  "
 
@@ -1227,7 +1231,7 @@ def _build_interactive_table(
                 else (escape("[ ] ") if state.selected_hashes else "")
             )
         prefix = f"{cursor_str}{check_str}"
-        name_disp = f"[bold cyan]{escape(name)}[/bold cyan]" if (is_selected and is_color) else escape(name)
+        name_disp = f"[bold {BRAND_ACCENT}]{escape(name)}[/bold {BRAND_ACCENT}]" if (is_selected and is_color) else escape(name)
 
         row_cells: List[str] = []
         for col_key in state.visible_columns:
@@ -1290,7 +1294,7 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
     ]
     for tab_id, label in tabs:
         if tab_id == current_tab:
-            tabs_header.append(f" [{label}] ", style="bold white on blue" if is_color else "bold")
+            tabs_header.append(f" [{label}] ", style=f"bold white on {BRAND_DARK}" if is_color else "bold")
         else:
             tabs_header.append(f"  {label}  ", style="dim" if is_color else "")
 
@@ -1326,7 +1330,7 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
         added_str = format_datetime(data.get("added_time"))
         completed_str = format_datetime(data.get("completed_time")) if data.get("completed_time") else "--"
 
-        grid.add_row("Status:", format_state_pill(st, use_color=is_color, peers=num_peers), "Info Hash:", f"[cyan]{info_hash}[/cyan]" if is_color else info_hash)
+        grid.add_row("Status:", format_state_pill(st, use_color=is_color, peers=num_peers), "Info Hash:", f"[{BRAND_ACCENT}]{info_hash}[/{BRAND_ACCENT}]" if is_color else info_hash)
         grid.add_row("Progress:", f"{format_progress(progress, human=True, width=15, use_color=is_color)}", "Save Path:", escape(str(save_path)))
         grid.add_row("Downloaded:", f"{format_bytes(total_done)} / {format_bytes(total_wanted)}", "Peers / Seeds:", f"{num_peers} peers ({num_seeds} seeds)")
         grid.add_row("Speed:", f"{format_speed(dl_rate, use_color=is_color)}  {format_speed(ul_rate, use_color=is_color, is_upload=True)}", "Ratio:", f"{ratio:.2f}")
@@ -1340,7 +1344,7 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
         content = grid
 
     elif current_tab == "files":
-        f_table = Table(box=box.SIMPLE, show_header=True, header_style="bold cyan", expand=True)
+        f_table = Table(box=box.SIMPLE, show_header=True, header_style=HEADER_STYLE, expand=True)
         f_table.add_column("#", width=4, justify="right")
         f_table.add_column("Path", ratio=1, no_wrap=True)
         f_table.add_column("Size", width=10, justify="right")
@@ -1366,7 +1370,7 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
         content = f_table
 
     elif current_tab == "trackers":
-        t_table = Table(box=box.SIMPLE, show_header=True, header_style="bold cyan", expand=True)
+        t_table = Table(box=box.SIMPLE, show_header=True, header_style=HEADER_STYLE, expand=True)
         t_table.add_column("Tier", width=6, justify="right")
         t_table.add_column("URL", ratio=1, no_wrap=True)
         t_table.add_column("Status", width=12)
@@ -1388,7 +1392,7 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
         content = t_table
 
     elif current_tab == "peers":
-        p_table = Table(box=box.SIMPLE, show_header=True, header_style="bold cyan", expand=True)
+        p_table = Table(box=box.SIMPLE, show_header=True, header_style=HEADER_STYLE, expand=True)
         p_table.add_column("IP:Port", width=22, no_wrap=True)
         p_table.add_column("Client", ratio=1, no_wrap=True)
         p_table.add_column("Down Speed", width=12, justify="right")
@@ -1424,14 +1428,14 @@ def _build_inspector_panel(state: DashboardState, is_color: bool = True) -> Pane
         ),
         title=f"[bold]Torrent Inspector: {escape(name)}[/bold]" if is_color else f"Torrent Inspector: {name}",
         subtitle="[dim]Press Esc/i to return │ Tab/1-4: Switch Tabs[/dim]",
-        border_style="cyan" if is_color else "none",
+        border_style=BRAND_PRIMARY if is_color else "none",
     )
 
 
 def _build_help_panel(is_color: bool = True) -> Panel:
     """Build the keybindings and commands cheat sheet."""
     grid = Table.grid(padding=(0, 2))
-    grid.add_column(style="bold cyan", width=16)
+    grid.add_column(style=f"bold {BRAND_ACCENT}", width=16)
     grid.add_column(style="white")
 
     grid.add_row("[bold yellow]Navigation[/bold yellow]", "")
@@ -1484,7 +1488,7 @@ def _build_help_panel(is_color: bool = True) -> Panel:
 
 def _build_columns_panel(state: DashboardState, is_color: bool = True) -> Panel:
     """Build the column customization modal."""
-    table = Table(box=box.SIMPLE, show_header=True, header_style="bold cyan", expand=True)
+    table = Table(box=box.SIMPLE, show_header=True, header_style=HEADER_STYLE, expand=True)
     table.add_column("Key", width=6, justify="center")
     table.add_column("Column", width=18)
     table.add_column("Status", width=12)
@@ -1505,7 +1509,7 @@ def _build_columns_panel(state: DashboardState, is_color: bool = True) -> Panel:
         table,
         title="[bold]Customize Visible Columns[/bold]" if is_color else "Customize Visible Columns",
         subtitle="[dim]Press key or Space to toggle │ ↑/↓: Move │ Esc/Enter/q: Close[/dim]",
-        border_style="cyan" if is_color else "none",
+        border_style=BRAND_PRIMARY if is_color else "none",
     )
 
 
@@ -1530,7 +1534,7 @@ def _build_footer_status(state: DashboardState, is_color: bool = True) -> Any:
             else ""
         )
         prompt_txt = (
-            f":[bold cyan]{pre}[/bold cyan][reverse]{cur}[/reverse][bold cyan]{post}[/bold cyan]"
+            f":[bold {BRAND_ACCENT}]{pre}[/bold {BRAND_ACCENT}][reverse]{cur}[/reverse][bold {BRAND_ACCENT}]{post}[/bold {BRAND_ACCENT}]"
             if is_color
             else f":{state.command_buffer}"
         )
@@ -1551,7 +1555,7 @@ def _build_footer_status(state: DashboardState, is_color: bool = True) -> Any:
         if state.selected_hashes:
             count = len(state.selected_hashes)
             hint = (
-                f"[bold cyan]{count} selected[/bold cyan] [dim]│ Space:Deselect  *:All/None  p:Pause  r:Resume  d:Delete  Esc:Clear[/dim]"
+                f"[bold {BRAND_ACCENT}]{count} selected[/bold {BRAND_ACCENT}] [dim]│ Space:Deselect  *:All/None  p:Pause  r:Resume  d:Delete  Esc:Clear[/dim]"
                 if is_color
                 else f"{count} selected | Space:Deselect  *:All/None  p:Pause  r:Resume  d:Delete  Esc:Clear"
             )
@@ -1606,7 +1610,7 @@ def build_dashboard_renderable(
         # Non-interactive / backward-compatible table rendering
         table = Table(
             box=None if not is_color else Table.grid().box,
-            header_style="bold cyan",
+            header_style=HEADER_STYLE,
             show_header=True,
             expand=True,
             caption_style="none",
