@@ -2310,6 +2310,34 @@ def test_reannounce_command(cli):
     assert res.exit_code == 0
     assert "reannounced successfully" in res.output
 
+    # Quiet mode
+    res_q = runner.invoke(spritzle_cli, ["reannounce", ih, "-Q"])
+    assert res_q.exit_code == 0
+    assert ih in res_q.output
+
+    # All torrents
+    res_all = runner.invoke(spritzle_cli, ["reannounce", "--all"])
+    assert res_all.exit_code == 0
+    assert "Reannounced" in res_all.output
+
+    # By query
+    res_query = runner.invoke(spritzle_cli, ["reannounce", "-q", "name=tmprandomfile"])
+    assert res_query.exit_code == 0
+
+    # No args (must specify torrent, --query, or --all)
+    res_empty = runner.invoke(spritzle_cli, ["reannounce"])
+    assert res_empty.exit_code == 1
+    assert "Specify a torrent" in res_empty.output
+
+    # Query with no matches
+    res_no_match = runner.invoke(spritzle_cli, ["reannounce", "-q", "name=nomatch"])
+    assert res_no_match.exit_code == 0
+    assert "No matching torrents found" in res_no_match.output
+
+    # Nonexistent torrent
+    res_none = runner.invoke(spritzle_cli, ["reannounce", "0" * 40])
+    assert res_none.exit_code == 1
+
 
 def test_settings_profile_and_interface_command(cli):
     runner = CliRunner()
