@@ -1,4 +1,5 @@
 import asyncio
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,10 +8,22 @@ from rich.console import Console
 from spritzle.cli.dashboard import (
     DashboardState,
     FilterTab,
+    KeyPressWatcher,
+    _sleep_or_quit,
     build_dashboard_renderable,
     execute_command,
+    fetch_session_stats,
+    fetch_torrent_data,
+    fetch_torrent_detail,
+    fetch_torrent_files,
+    fetch_torrent_peers,
+    fetch_torrent_trackers,
+    fetch_torrents_with_status,
     handle_key_input,
     parse_keys_from_bytes,
+    render_single_watch_panel,
+    run_dashboard,
+    watch_single_torrent,
 )
 
 
@@ -782,30 +795,30 @@ def test_dashboard_execute_command_full(sample_torrents):
 
         # Pause all
         await execute_command(":pause all", client, state, quit_event)
-        assert "Paused all" in state.status_message
+        assert "Paused all" in (state.status_message or "")
 
         # Resume all
         await execute_command(":resume all", client, state, quit_event)
-        assert "Resumed all" in state.status_message
+        assert "Resumed all" in (state.status_message or "")
 
         # Pause and resume selected
         state.selected_hashes.add("a" * 40)
         await execute_command(":pause", client, state, quit_event)
-        assert "Paused 1" in state.status_message
+        assert "Paused 1" in (state.status_message or "")
 
         state.selected_hashes.add("a" * 40)
         await execute_command(":resume", client, state, quit_event)
-        assert "Resumed 1" in state.status_message
+        assert "Resumed 1" in (state.status_message or "")
 
         # Reannounce
         state.selected_hashes.add("a" * 40)
         await execute_command(":reannounce", client, state, quit_event)
-        assert "Reannounced 1" in state.status_message
+        assert "Reannounced 1" in (state.status_message or "")
 
         # Delete with --delete-files
         state.selected_hashes.add("a" * 40)
         await execute_command(":rm --delete-files", client, state, quit_event)
-        assert "Removed 1" in state.status_message
+        assert "Removed 1" in (state.status_message or "")
 
         # Delete prompt
         state.selected_hashes.add("b" * 40)
@@ -816,12 +829,12 @@ def test_dashboard_execute_command_full(sample_torrents):
         # Add command without args
         await execute_command(":add", client, state, quit_event)
         assert state.status_is_error is True
-        assert "Usage" in state.status_message
+        assert "Usage" in (state.status_message or "")
 
         # Add command with invalid file
         await execute_command(":add /nonexistent/file.torrent", client, state, quit_event)
         assert state.status_is_error is True
-        assert "File not found" in state.status_message
+        assert "File not found" in (state.status_message or "")
 
         # Filter command
         await execute_command(":filter state.eq=downloading", client, state, quit_event)
@@ -844,7 +857,7 @@ def test_dashboard_execute_command_full(sample_torrents):
 
         # Sort command
         await execute_command(":sort", client, state, quit_event)
-        assert "Available columns" in state.status_message
+        assert "Available columns" in (state.status_message or "")
 
         await execute_command(":sort progress asc", client, state, quit_event)
         assert state.sort_column == "progress"
@@ -852,7 +865,7 @@ def test_dashboard_execute_command_full(sample_torrents):
 
         await execute_command(":sort invalid_column", client, state, quit_event)
         assert state.status_is_error is True
-        assert "Unknown column" in state.status_message
+        assert "Unknown column" in (state.status_message or "")
 
         # Col command
         await execute_command(":col", client, state, quit_event)
@@ -865,7 +878,7 @@ def test_dashboard_execute_command_full(sample_torrents):
         assert "eta" not in state.visible_columns
 
         await execute_command(":col reset", client, state, quit_event)
-        assert "reset" in state.status_message
+        assert "reset" in (state.status_message or "")
 
         await execute_command(":col invalid", client, state, quit_event)
         assert state.status_is_error is True
@@ -1007,6 +1020,641 @@ def test_dashboard_fetch_and_run_functions(sample_torrents):
         # Test run_dashboard once
         await run_dashboard(client, once=True, plain=True)
         await run_dashboard(client, once=True, plain=False, color_opt=True, fullscreen=False)
+
+    asyncio.run(_test())
+
+
+def test_dashboard_inspector_tabs(sample_torrents):
+    state = DashboardState()
+    state.raw_torrents = sample_torrents
+    state.cursor_active = True
+    state.selected_index = 0
+    state.view_mode = "inspector"
+    state.inspector_data = dict(sample_torrents[0])
+    state.inspector_data["last_error"] = "Tracker down"
+
+    # 0. Inspector summary tab (color and non-color)
+    state.inspector_tab = "summary"
+    render_summary_color = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_summary_color is not None
+    render_summary_plain = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False)
+    assert render_summary_plain is not None
+
+    # 1. Inspector files tab (empty and populated)
+    state.inspector_tab = "files"
+    state.inspector_files = []
+    render_empty_files = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_empty_files is not None
+
+    state.inspector_files = [
+        {"path": "file1.iso", "size": 1000000, "progress": 0.5, "priority": 1},
+        {"path": "file2.nfo", "size": 1000, "progress": 1.0, "priority": 0},
+    ]
+    render_files = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_files is not None
+
+    # 2. Inspector trackers tab (empty and populated)
+    state.inspector_tab = "trackers"
+    state.inspector_trackers = []
+    render_empty_tr = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_empty_tr is not None
+
+    state.inspector_trackers = [
+        {"tier": 0, "url": "http://tr1.org/announce", "status": "working", "seeds": 10, "peers": 20, "next_announce": 15},
+    ]
+    render_tr = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_tr is not None
+
+    # 3. Inspector peers tab (empty and populated)
+    state.inspector_tab = "peers"
+    state.inspector_peers = []
+    render_empty_peers = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_empty_peers is not None
+
+    state.inspector_peers = [
+        {"ip": "1.2.3.4:5000", "client": "Deluge 2.1.1", "download_rate": 1024, "upload_rate": 2048, "progress": 0.9, "flags": "u"},
+    ]
+    render_peers = build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True)
+    assert render_peers is not None
+
+
+def test_dashboard_key_handlers_extended(sample_torrents):
+    state = DashboardState()
+    state.raw_torrents = sample_torrents
+    client = MagicMock()
+    quit_event = asyncio.Event()
+    tasks = set()
+
+    async def _test():
+        # 1. Filter tabs direct numeric keys and cycling
+        await handle_key_input("5", client, state, quit_event, tasks)
+        assert state.filter_tab == FilterTab.ACTIVE
+        await handle_key_input("6", client, state, quit_event, tasks)
+        assert state.filter_tab == FilterTab.ERROR
+        await handle_key_input("7", client, state, quit_event, tasks)
+        assert state.filter_tab == FilterTab.CHECKING
+        await handle_key_input("tab", client, state, quit_event, tasks)
+        await handle_key_input("shift_tab", client, state, quit_event, tasks)
+
+        # 2. Sort column direct keys
+        await handle_key_input("o", client, state, quit_event, tasks)
+        await handle_key_input("s", client, state, quit_event, tasks)
+        await handle_key_input("R", client, state, quit_event, tasks)
+        await handle_key_input("n", client, state, quit_event, tasks)
+        assert state.sort_column == "name"
+        await handle_key_input("P", client, state, quit_event, tasks)
+        assert state.sort_column == "progress"
+        await handle_key_input("D", client, state, quit_event, tasks)
+        assert state.sort_column == "download_rate"
+        await handle_key_input("U", client, state, quit_event, tasks)
+        assert state.sort_column == "upload_rate"
+        await handle_key_input("Z", client, state, quit_event, tasks)
+        assert state.sort_column == "size"
+        await handle_key_input("E", client, state, quit_event, tasks)
+        assert state.sort_column == "eta"
+
+        # 3. Actions without targets
+        state.cursor_active = False
+        state.selected_hashes.clear()
+        for k in ("p", "r", "d", "a"):
+            await handle_key_input(k, client, state, quit_event, tasks)
+            assert state.status_is_error is True
+            assert "No torrent selected" in (state.status_message or "")
+
+        # 4. Actions with target selected
+        state.filter_tab = FilterTab.ALL
+        state.cursor_active = True
+        state.selected_index = 0
+        state.selected_hashes = {sample_torrents[0]["info_hash"]}
+
+        # Action: pause (p)
+        await handle_key_input("p", client, state, quit_event, tasks)
+        if tasks:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+
+        # Action: resume (r)
+        await handle_key_input("r", client, state, quit_event, tasks)
+        if tasks:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+
+        # Action: reannounce (a)
+        await handle_key_input("a", client, state, quit_event, tasks)
+        if tasks:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+
+        # Action: delete prompt (d)
+        await handle_key_input("d", client, state, quit_event, tasks)
+        assert state.confirm_prompt is not None
+        assert state.confirm_callback is not None
+        assert state.confirm_delete_callback is not None
+        await state.confirm_callback()
+        await state.confirm_delete_callback()
+
+    asyncio.run(_test())
+
+
+def test_parse_keys_from_bytes_utf8():
+    assert parse_keys_from_bytes("é".encode("utf-8")) == ["é"]
+    assert parse_keys_from_bytes("€".encode("utf-8")) == ["€"]
+    assert parse_keys_from_bytes("🚀".encode("utf-8")) == ["🚀"]
+    # Single invalid byte leading to UnicodeDecodeError
+    assert parse_keys_from_bytes(b"\xc3\x28") == []
+
+
+def test_dashboard_render_none_state(sample_torrents):
+    p1 = build_dashboard_renderable(sample_torrents, {}, is_color=True, state=None)
+    assert p1 is not None
+    p2 = build_dashboard_renderable(sample_torrents, {}, is_color=False, state=None)
+    assert p2 is not None
+    p3 = build_dashboard_renderable([], {}, is_color=True, state=None)
+    assert p3 is not None
+    p4 = build_dashboard_renderable([], {}, is_color=False, state=None)
+    assert p4 is not None
+
+
+def test_render_single_watch_panel(sample_torrents):
+    t = dict(sample_torrents[0])
+    p1 = render_single_watch_panel(t, is_color=True)
+    assert p1 is not None
+    p2 = render_single_watch_panel(t, is_color=False)
+    assert p2 is not None
+
+    t["download_rate"] = 0
+    t["total_wanted"] = 100
+    t["total_done"] = 100
+    p3 = render_single_watch_panel(t, is_color=True)
+    assert p3 is not None
+
+
+def test_confirm_mode_keys():
+    async def _test():
+        state = DashboardState()
+        client = MagicMock()
+        quit_event = asyncio.Event()
+        tasks = set()
+
+        # 1. Confirm 'y'
+        cb = AsyncMock()
+        state.confirm_prompt = "Confirm?"
+        state.confirm_callback = cb
+        await handle_key_input("y", client, state, quit_event, tasks)
+        assert state.confirm_prompt is None
+        if tasks:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+        cb.assert_awaited_once()
+
+        # 2. Confirm 'd'
+        cb_del = AsyncMock()
+        state.confirm_prompt = "Confirm?"
+        state.confirm_delete_callback = cb_del
+        await handle_key_input("d", client, state, quit_event, tasks)
+        assert state.confirm_prompt is None
+        if tasks:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+        cb_del.assert_awaited_once()
+
+        # 3. Confirm 'n'
+        state.confirm_prompt = "Confirm?"
+        await handle_key_input("n", client, state, quit_event, tasks)
+        assert state.confirm_prompt is None
+        assert state.status_message == "Action cancelled"
+
+    asyncio.run(_test())
+
+
+def test_fetch_helpers():
+    class DummyContext:
+        def __init__(self, resp):
+            self.resp = resp
+
+        async def __aenter__(self):
+            return self.resp
+
+        async def __aexit__(self, *args):
+            pass
+
+    class DummyResp:
+        def __init__(self, status, json_data):
+            self.status = status
+            self._json = json_data
+
+        async def json(self):
+            if isinstance(self._json, Exception):
+                raise self._json
+            return self._json
+
+    client = MagicMock()
+    client.url = lambda p: f"http://test/{p}"
+
+    async def _test():
+        # fetch_torrent_data
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, {"name": "test"})))
+        assert (await fetch_torrent_data(client, "hash1")) == {"name": "test"}
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(404, {})))
+        assert (await fetch_torrent_data(client, "hash1")) is None
+        client.session.get = MagicMock(side_effect=Exception("network error"))
+        assert (await fetch_torrent_data(client, "hash1")) is None
+
+        # fetch_torrent_detail
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, {"name": "test"})))
+        assert (await fetch_torrent_detail(client, "hash1")) == {"name": "test"}
+        client.session.get = MagicMock(side_effect=Exception("error"))
+        assert (await fetch_torrent_detail(client, "hash1")) == {}
+
+        # fetch_torrent_files
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, [{"path": "a"}])))
+        assert (await fetch_torrent_files(client, "hash1")) == [{"path": "a"}]
+        client.session.get = MagicMock(side_effect=Exception("error"))
+        assert (await fetch_torrent_files(client, "hash1")) == []
+
+        # fetch_torrent_trackers
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, [{"url": "http://trk"}])))
+        assert (await fetch_torrent_trackers(client, "hash1")) == [{"url": "http://trk"}]
+        client.session.get = MagicMock(side_effect=Exception("error"))
+        assert (await fetch_torrent_trackers(client, "hash1")) == []
+
+        # fetch_torrent_peers
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, [{"ip": "1.2.3.4"}])))
+        assert (await fetch_torrent_peers(client, "hash1")) == [{"ip": "1.2.3.4"}]
+        client.session.get = MagicMock(side_effect=Exception("error"))
+        assert (await fetch_torrent_peers(client, "hash1")) == []
+
+        # fetch_session_stats
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, {"num_peers": 5})))
+        assert (await fetch_session_stats(client)) == {"num_peers": 5}
+        client.session.get = MagicMock(side_effect=Exception("error"))
+        assert (await fetch_session_stats(client)) == {}
+
+        # fetch_torrents_with_status (keys path)
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, [{"info_hash": "a"}])) )
+        res = await fetch_torrents_with_status(client, query=["name=test"])
+        assert res == [{"info_hash": "a"}]
+
+        # fetch_torrents_with_status (keys empty list)
+        client.session.get = MagicMock(return_value=DummyContext(DummyResp(200, [])))
+        res_empty = await fetch_torrents_with_status(client)
+        assert res_empty == []
+
+        # fetch_torrents_with_status (fallback to list of info_hashes)
+        call_count = 0
+        def get_mock(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return DummyContext(DummyResp(200, ["hash1"]))  # keys query returns list of strings
+            elif call_count == 2:
+                return DummyContext(DummyResp(200, ["hash1"]))  # legacy query returns list of strings
+            else:
+                return DummyContext(DummyResp(200, {"info_hash": "hash1", "name": "found"}))
+        client.session.get = MagicMock(side_effect=get_mock)
+        res_fallback = await fetch_torrents_with_status(client)
+        assert len(res_fallback) == 1
+        assert res_fallback[0]["name"] == "found"
+
+    asyncio.run(_test())
+
+
+def test_watch_single_torrent_flow(sample_torrents):
+    client = MagicMock()
+
+    async def _test():
+        # 1. Not found (interactive and non-interactive)
+        with patch("spritzle.cli.dashboard.fetch_torrent_data", AsyncMock(return_value=None)):
+            await watch_single_torrent(client, "dummy_hash", color_opt=True, once=True)
+            await watch_single_torrent(client, "dummy_hash", color_opt=False, once=True)
+
+        # 2. Found downloading once
+        with patch("spritzle.cli.dashboard.fetch_torrent_data", AsyncMock(return_value=sample_torrents[0])):
+            await watch_single_torrent(client, "dummy_hash", color_opt=True, once=True)
+            await watch_single_torrent(client, "dummy_hash", color_opt=False, once=True)
+
+        # 3. Found finished
+        finished_data = dict(sample_torrents[0])
+        finished_data["progress"] = 1.0
+        finished_data["state"] = "seeding"
+        with patch("spritzle.cli.dashboard.fetch_torrent_data", AsyncMock(return_value=finished_data)):
+            await watch_single_torrent(client, "dummy_hash", color_opt=True, once=False)
+            await watch_single_torrent(client, "dummy_hash", color_opt=False, once=False)
+
+        # 4. CancelledError
+        with patch("spritzle.cli.dashboard.fetch_torrent_data", AsyncMock(side_effect=asyncio.CancelledError())):
+            await watch_single_torrent(client, "dummy_hash", color_opt=True, once=False)
+            await watch_single_torrent(client, "dummy_hash", color_opt=False, once=False)
+
+    asyncio.run(_test())
+
+
+def test_interactive_dashboard_run(sample_torrents):
+    client = MagicMock()
+
+    async def _test():
+        with patch("spritzle.cli.dashboard.fetch_torrents_with_status", AsyncMock(return_value=sample_torrents)), \
+             patch("spritzle.cli.dashboard.fetch_session_stats", AsyncMock(return_value={"num_peers": 10})):
+            # 1. Plain non-interactive mode with once=True
+            await run_dashboard(client, query=["name=test"], once=True, color_opt=False, plain=True)
+            # Plain mode with empty list
+            with patch("spritzle.cli.dashboard.fetch_torrents_with_status", AsyncMock(return_value=[])):
+                await run_dashboard(client, once=True, color_opt=False, plain=True)
+
+            # 2. Interactive mode with once=True
+            await run_dashboard(client, once=True, color_opt=True, fullscreen=True)
+
+            # 3. Interrupted
+            with patch("spritzle.cli.dashboard.fetch_torrents_with_status", AsyncMock(side_effect=KeyboardInterrupt())):
+                await run_dashboard(client, once=False, color_opt=False, plain=True)
+
+    asyncio.run(_test())
+
+
+def test_sleep_or_quit():
+    async def _test():
+        # 1. No quit event
+        res = await _sleep_or_quit(0.01, None)
+        assert res is False
+
+        # 2. Already set quit event
+        ev = asyncio.Event()
+        ev.set()
+        assert (await _sleep_or_quit(0.01, ev)) is True
+
+        # 3. Short interval, not set
+        ev.clear()
+        assert (await _sleep_or_quit(0.01, ev)) is False
+
+        # 4. Longer interval with quit set mid-sleep
+        ev.clear()
+        async def _set_after():
+            await asyncio.sleep(0.02)
+            ev.set()
+        asyncio.create_task(_set_after())
+        res = await _sleep_or_quit(0.1, ev)
+        assert res is True
+
+    asyncio.run(_test())
+
+
+def test_key_press_watcher():
+    async def _test():
+        ev = asyncio.Event()
+        q = asyncio.Queue()
+
+        watcher = KeyPressWatcher(quit_event=ev, key_queue=q)
+        # Test signal handling
+        watcher._on_signal()
+        assert ev.is_set()
+
+        # Test on_stdin with simulated data
+        watcher._fd = 1
+        with patch("os.read", return_value=b"q"):
+            watcher._on_stdin()
+        assert not q.empty()
+        assert q.get_nowait() == "q"
+
+        # Test on_stdin with EOF
+        loop_mock = MagicMock()
+        watcher._loop = loop_mock
+        with patch("os.read", return_value=b""):
+            watcher._on_stdin()
+        loop_mock.remove_reader.assert_called_with(1)
+
+        # Test cleanup
+        watcher._sigint_installed = True
+        watcher._sigterm_installed = True
+        watcher._restorer = MagicMock()
+        watcher._cleanup()
+        assert watcher._fd is None
+
+    asyncio.run(_test())
+
+
+def test_dashboard_rendering_modes(sample_torrents):
+    state = DashboardState()
+    state.raw_torrents = sample_torrents
+
+    # 1. Search query active in filter bar
+    state.search_query = "arch"
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True) is not None
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False) is not None
+
+    # 2. Custom query active in filter bar
+    state.custom_query = "downloading"
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True) is not None
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False) is not None
+
+    # 3. Selected hashes active in filter bar
+    state.selected_hashes = {sample_torrents[0]["info_hash"]}
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True) is not None
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False) is not None
+
+    # 4. Command mode footer
+    state.command_mode = True
+    state.command_buffer = "pause all"
+    state.command_cursor = 5
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True) is not None
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False) is not None
+
+    # 5. Search mode footer
+    state.command_mode = False
+    state.search_mode = True
+    state.search_buffer = "test"
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=True) is not None
+    assert build_dashboard_renderable(sample_torrents, {}, state=state, is_color=False) is not None
+
+
+def test_dashboard_commands_and_actions(sample_torrents, tmp_path):
+    class DummyContext:
+        def __init__(self, status=200, text="ok"):
+            self.status = status
+            self._text = text
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def text(self):
+            return self._text
+
+    client = MagicMock()
+    client.url = lambda p: f"http://test/{p}"
+    client.session.post = MagicMock(return_value=DummyContext(200, "ok"))
+
+    async def _test():
+        state = DashboardState()
+        state.raw_torrents = sample_torrents
+        state.selected_index = 0
+        state.cursor_active = True
+        quit_event = asyncio.Event()
+
+        # 1. :pause all & :resume all
+        await execute_command(":pause all", client, state, quit_event)
+        assert "Paused all" in (state.status_message or "")
+        await execute_command(":resume all", client, state, quit_event)
+        assert "Resumed all" in (state.status_message or "")
+
+        # 2. :sort commands
+        await execute_command(":sort", client, state, quit_event)
+        assert "Available columns" in (state.status_message or "")
+        await execute_command(":sort progress asc", client, state, quit_event)
+        assert state.sort_column == "progress"
+        assert state.sort_ascending is True
+        await execute_command(":sort invalid_col", client, state, quit_event)
+        assert state.status_is_error is True
+
+        # 3. :col commands
+        await execute_command(":col", client, state, quit_event)
+        assert state.view_mode == "columns"
+        await execute_command(":col reset", client, state, quit_event)
+        await execute_command(":col +seeds", client, state, quit_event)
+        assert "seeds" in state.visible_columns
+        await execute_command(":col -seeds", client, state, quit_event)
+        assert "seeds" not in state.visible_columns
+        await execute_command(":col -nonexistent", client, state, quit_event)
+        assert state.status_is_error is True
+        await execute_command(":col invalid", client, state, quit_event)
+        assert state.status_is_error is True
+
+        # 4. :filter & :search & :clear
+        await execute_command(":filter name=test", client, state, quit_event)
+        assert state.custom_query == "name=test"
+        await execute_command(":filter clear", client, state, quit_event)
+        assert state.custom_query is None
+        await execute_command(":search arch", client, state, quit_event)
+        assert state.search_query == "arch"
+        await execute_command(":search clear", client, state, quit_event)
+        assert state.search_query == ""
+        await execute_command(":clear", client, state, quit_event)
+        assert state.search_query == ""
+        assert state.custom_query is None
+
+        # 5. :move command
+        await execute_command(":move", client, state, quit_event)
+        assert state.status_is_error is True
+        # Target selected move
+        await execute_command(":move /tmp/new_path", client, state, quit_event)
+        assert "Moved storage" in (state.status_message or "")
+
+        # 6. :add command
+        await execute_command(":add", client, state, quit_event)
+        assert state.status_is_error is True
+        # add URL
+        await execute_command(":add https://example.com/test.torrent", client, state, quit_event)
+        assert "Torrent added successfully" in (state.status_message or "")
+        # add nonexistent file
+        await execute_command(":add /tmp/does_not_exist_torrent", client, state, quit_event)
+        assert "File not found" in (state.status_message or "")
+        # add real file
+        fake_torrent = tmp_path / "test.torrent"
+        fake_torrent.write_bytes(b"dummy torrent content")
+        await execute_command(f":add {fake_torrent}", client, state, quit_event)
+        assert "successfully" in (state.status_message or "")
+
+        # 7. :rm with flags
+        await execute_command(":rm --delete-files", client, state, quit_event)
+        assert "files deleted" in (state.status_message or "")
+
+    asyncio.run(_test())
+
+
+def test_key_press_watcher_aenter():
+    async def _test():
+        ev = asyncio.Event()
+        q = asyncio.Queue()
+        r_fd, w_fd = os.pipe()
+        try:
+            with patch("os.isatty", return_value=True), \
+                 patch("termios.tcgetattr", return_value=[0, 0, 0, 0, 0, 0, [0] * 32]), \
+                 patch("tty.setcbreak"), \
+                 patch("termios.tcsetattr"):
+                watcher = KeyPressWatcher(quit_event=ev, fd=r_fd, key_queue=q)
+                async with watcher:
+                    assert watcher._fd == r_fd
+                    # Trigger restorer
+                    if watcher._restorer:
+                        watcher._restorer()
+        finally:
+            os.close(r_fd)
+            os.close(w_fd)
+
+    asyncio.run(_test())
+
+
+def test_dashboard_key_handlers_modes_navigation(sample_torrents):
+    state = DashboardState()
+    state.raw_torrents = sample_torrents
+    client = MagicMock()
+    quit_event = asyncio.Event()
+    tasks = set()
+
+    async def _test():
+        # 1. Command mode cursor and history navigation
+        state.command_mode = True
+        state.command_buffer = "hello"
+        state.command_cursor = 5
+        state.command_history = ["cmd1", "cmd2"]
+        state.command_history_idx = -1
+
+        await handle_key_input("backspace", client, state, quit_event, tasks)
+        assert state.command_buffer == "hell"
+        await handle_key_input("left", client, state, quit_event, tasks)
+        assert state.command_cursor == 3
+        await handle_key_input("delete", client, state, quit_event, tasks)
+        assert state.command_buffer == "hel"
+        await handle_key_input("home", client, state, quit_event, tasks)
+        assert state.command_cursor == 0
+        await handle_key_input("right", client, state, quit_event, tasks)
+        assert state.command_cursor == 1
+        await handle_key_input("end", client, state, quit_event, tasks)
+        assert state.command_cursor == 3
+        await handle_key_input("up", client, state, quit_event, tasks)
+        assert state.command_buffer == "cmd2"
+        await handle_key_input("up", client, state, quit_event, tasks)
+        assert state.command_buffer == "cmd1"
+        await handle_key_input("down", client, state, quit_event, tasks)
+        assert state.command_buffer == "cmd2"
+        await handle_key_input("down", client, state, quit_event, tasks)
+        assert state.command_buffer == ""
+
+        # 2. Inspector mode tab navigation
+        state.command_mode = False
+        state.view_mode = "inspector"
+        state.inspector_tab = "summary"
+        await handle_key_input("2", client, state, quit_event, tasks)
+        assert state.inspector_tab == "files"
+        await handle_key_input("3", client, state, quit_event, tasks)
+        assert state.inspector_tab == "trackers"
+        await handle_key_input("4", client, state, quit_event, tasks)
+        assert state.inspector_tab == "peers"
+        await handle_key_input("1", client, state, quit_event, tasks)
+        assert state.inspector_tab == "summary"
+        await handle_key_input("tab", client, state, quit_event, tasks)
+        assert state.inspector_tab == "files"
+        await handle_key_input("shift_tab", client, state, quit_event, tasks)
+        assert state.inspector_tab == "summary"
+        await handle_key_input("right", client, state, quit_event, tasks)
+        assert state.inspector_tab == "files"
+        await handle_key_input("left", client, state, quit_event, tasks)
+        assert state.inspector_tab == "summary"
+        await handle_key_input("escape", client, state, quit_event, tasks)
+        assert state.view_mode == "list"
+
+        # 3. List navigation page_up, page_down, star
+        state.view_mode = "list"
+        state.filter_tab = FilterTab.ALL
+        state.cursor_active = True
+        state.selected_index = 0
+        await handle_key_input("page_down", client, state, quit_event, tasks)
+        await handle_key_input("page_up", client, state, quit_event, tasks)
+        await handle_key_input("*", client, state, quit_event, tasks)
+        assert len(state.selected_hashes) > 0
+        await handle_key_input("*", client, state, quit_event, tasks)
+        assert len(state.selected_hashes) == 0
 
     asyncio.run(_test())
 

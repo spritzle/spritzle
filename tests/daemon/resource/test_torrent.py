@@ -1206,6 +1206,128 @@ async def test_disallowed_and_invalid_torrent_methods(cli):
     resp = await cli.post(f"/torrent/{info_hash}/set_max_uploads", json={"max_uploads": "abc"})
     assert resp.status == 400
 
+    # pause and resume method endpoints
+    resp = await cli.post(f"/torrent/{info_hash}/pause")
+    assert resp.status == 200
+    resp = await cli.post(f"/torrent/{info_hash}/resume")
+    assert resp.status == 200
+
+    # clear_error method endpoint
+    core = cli.app[torrent.APP_KEY_CORE]
+    core.torrent_data[info_hash] = {"last_error": "Some tracker error"}
+    resp = await cli.post(f"/torrent/{info_hash}/clear_error")
+    assert resp.status == 200
+    assert "last_error" not in core.torrent_data[info_hash]
+
+    # Non-list JSON body
+    resp = await cli.post(f"/torrent/{info_hash}/pause", json={"dict": "not_allowed"})
+    assert resp.status == 400
+
+    # Malformed JSON
+    resp = await cli.post(f"/torrent/{info_hash}/pause", data=b"{malformed json")
+    assert resp.status == 400
+
+
+async def test_get_torrent_files_and_peers_helpers():
+    # 1. Invalid handle files helper
+    invalid_handle = MagicMock()
+    invalid_handle.is_valid.return_value = False
+    assert torrent.get_torrent_files(invalid_handle) == []
+
+    # 2. Peers helper error handling
+    invalid_handle.get_peer_info.side_effect = Exception("failed to get peers")
+    assert torrent.get_torrent_peers(invalid_handle) == []
+
+    # 3. Peers fallback identification (handshake and connecting)
+    class DummyPeer:
+        def __init__(self, flags, pid=None):
+            self.ip = ("127.0.0.1", 6881)
+            self.client = ""
+            self.pid = pid
+            self.flags = flags
+            self.down_speed = 0
+            self.up_speed = 0
+            self.progress = 0.5
+            self.total_download = 0
+            self.total_upload = 0
+            self.source = 0
+
+    handshake_peer = DummyPeer(flags=64)
+    connecting_peer = DummyPeer(flags=128)
+    unknown_peer = DummyPeer(flags=0)
+
+    mock_handle = MagicMock()
+    mock_handle.get_peer_info.return_value = [handshake_peer, connecting_peer, unknown_peer]
+    mock_handle.get_peer_info.side_effect = None
+    res = torrent.get_torrent_peers(mock_handle)
+    assert len(res) == 3
+    assert res[0]["client"] == "<handshaking>"
+    assert res[1]["client"] == "<connecting>"
+    assert res[2]["client"] == "<unknown>"
+
+
+async def test_delete_torrent_bulk_error_handling(cli):
+    from unittest.mock import AsyncMock, patch
+    from spritzle.daemon.torrent import AlertException
+
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    ih = (await resp.json())["info_hash"]
+
+    core = cli.app[torrent.APP_KEY_CORE]
+
+    # 1. AlertException
+    mock_alert = MagicMock()
+    mock_alert.message.return_value = "Alert failure"
+    with patch.object(core.torrent, "remove", AsyncMock(side_effect=AlertException(mock_alert))):
+        del_resp = await cli.delete("/torrent", json=[ih])
+        assert del_resp.status == 200
+
+    # Re-add torrent
+    resp = await cli.post("/torrent", json=post)
+    ih = (await resp.json())["info_hash"]
+
+    # 2. TimeoutError and nonexistent torrent in same bulk delete
+    with patch.object(core.torrent, "remove", AsyncMock(side_effect=asyncio.TimeoutError())):
+        del_resp = await cli.delete("/torrent", json=[ih, "0" * 40])
+        assert del_resp.status == 200
+
+    # Re-add torrent
+    resp = await cli.post("/torrent", json=post)
+    ih = (await resp.json())["info_hash"]
+
+    # 3. Generic Exception
+    with patch.object(core.torrent, "remove", AsyncMock(side_effect=RuntimeError("disk error"))):
+        del_resp = await cli.delete("/torrent", json=[ih])
+        assert del_resp.status == 200
+
+
+async def test_delete_tracker_via_json_body_and_file_helper_exceptions(cli):
+    post = create_torrent_post_data("random_one_file.torrent", save_path="/tmp")
+    resp = await cli.post("/torrent", json=post)
+    assert resp.status == 201
+    ih = (await resp.json())["info_hash"]
+
+    # Delete tracker via JSON body
+    del_resp = await cli.delete(f"/torrent/{ih}/trackers", json={"url": "nonexistent_tracker_url"})
+    assert del_resp.status in (200, 400, 404)
+
+    # get_torrent_files exceptions on file_progress and get_file_priorities
+    mock_h = MagicMock()
+    mock_ti = MagicMock()
+    mock_h.is_valid.return_value = True
+    mock_h.torrent_file.return_value = mock_ti
+    mock_ti.num_files.return_value = 1
+    mock_ti.files().file_size.return_value = 100
+    mock_ti.files().file_path.return_value = "file.iso"
+    mock_h.file_progress.side_effect = Exception("progress failed")
+    mock_h.get_file_priorities.side_effect = Exception("priorities failed")
+    res = torrent.get_torrent_files(mock_h)
+    assert len(res) == 1
+    assert res[0]["done"] == 0
+    assert res[0]["priority"] == 4
+
 
 
 

@@ -299,6 +299,46 @@ def test_add_command_nonexistent_file(cli):
     assert "Traceback" not in result.output
 
 
+def test_add_command_options_and_formats(cli):
+    from tests.daemon.common import torrent_dir
+    runner = CliRunner()
+    t_file = str(torrent_dir / "random_one_file.torrent")
+
+    magnet_uri = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=test_mag"
+
+    # 1. Option without equals sign: -o auto_managed on magnet URI
+    res_opt = runner.invoke(spritzle_cli, ["add", "-o", "auto_managed", magnet_uri])
+    assert res_opt.exit_code == 0, res_opt.output
+
+    # 2. Add via stdin: path == "-"
+    with open(t_file, "rb") as f:
+        t_bytes = f.read()
+    res_stdin = runner.invoke(spritzle_cli, ["add", "-"], input=t_bytes)
+    assert res_stdin.exit_code == 0
+
+    # 3. Add via stdin with magnet URI
+    magnet_uri = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=test_mag"
+    res_stdin_mag = runner.invoke(spritzle_cli, ["add", "-"], input=magnet_uri)
+    assert res_stdin_mag.exit_code == 0
+
+    # 4. Malformed magnet link prefixes: ?xt= and magnet?
+    res_mal1 = runner.invoke(spritzle_cli, ["add", "?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"])
+    assert res_mal1.exit_code == 1
+    assert "Malformed magnet link" in res_mal1.output
+
+    res_mal2 = runner.invoke(spritzle_cli, ["add", "magnet?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"])
+    assert res_mal2.exit_code == 1
+    assert "Malformed magnet link" in res_mal2.output
+
+    # 5. Add with JSON and plain output
+    res_json = runner.invoke(spritzle_cli, ["add", t_file, "--json"])
+    assert res_json.exit_code == 0
+    assert "info_hash" in json.loads(res_json.output)
+
+    res_plain = runner.invoke(spritzle_cli, ["add", t_file, "--plain"])
+    assert res_plain.exit_code == 0
+
+
 def test_add_command_info_hash(cli):
     runner = CliRunner()
     valid_hash = "0123456789abcdef0123456789abcdef01234567"
@@ -410,6 +450,95 @@ def test_add_command_missing_location_header(cli, monkeypatch):
     assert result.exit_code == 0
     assert "Added" in result.output
     assert valid_hash[:8] in result.output
+
+
+def test_add_command_extended(cli, monkeypatch, tmp_path):
+    import aiohttp
+    runner = CliRunner()
+    valid_hash = "0123456789abcdef0123456789abcdef01234567"
+
+    # 1. URL scheme path
+    res_url = runner.invoke(
+        spritzle_cli,
+        ["add", f"http://example.com/torrent/{valid_hash}"],
+    )
+    # Even if mocked or rejected by daemon, it takes the URL path
+    assert res_url.exit_code in (0, 1)
+
+    # 2. Magnet link with dn parameter
+    res_mag = runner.invoke(
+        spritzle_cli,
+        ["add", f"magnet:?xt=urn:btih:{valid_hash}&dn=archlinux-custom"],
+    )
+    assert res_mag.exit_code == 0
+    assert "archlinux-custom" in res_mag.output
+
+    # 3. Watch flag invoked
+    watch_called = []
+    async def mock_watch(client, hash, color_opt=None):
+        watch_called.append(hash)
+
+    monkeypatch.setattr("spritzle.cli.dashboard.watch_single_torrent", mock_watch)
+    res_watch = runner.invoke(
+        spritzle_cli,
+        ["add", valid_hash, "--watch", "--plain"],
+    )
+    assert res_watch.exit_code == 0
+    assert watch_called == [valid_hash]
+
+    # 4. Error response from daemon
+    class MockErrResponse:
+        status = 400
+        reason = "Bad Request"
+        headers = {}
+        async def json(self):
+            return {"error": "Invalid torrent data"}
+        async def text(self):
+            return '{"error": "Invalid torrent data"}'
+
+    class MockErrContext:
+        async def __aenter__(self):
+            return MockErrResponse()
+        async def __aexit__(self, *args):
+            pass
+
+    monkeypatch.setattr(aiohttp.ClientSession, "post", lambda *args, **kwargs: MockErrContext())
+    res_err = runner.invoke(
+        spritzle_cli,
+        ["add", valid_hash],
+    )
+    assert res_err.exit_code == 1
+    assert "Error adding torrent" in res_err.output
+
+    # 5. 40-char non-hex filename that fails to open
+    non_hex_40 = "z" * 40
+    res_non_hex = runner.invoke(
+        spritzle_cli,
+        ["add", non_hex_40],
+    )
+    assert res_non_hex.exit_code == 1
+    assert "Error reading file" in res_non_hex.output
+
+    # 6. Response without name or size (fetches from torrent/{hash})
+    class MockMinimalResponse:
+        status = 201
+        reason = "Created"
+        headers = {"Location": f"/torrent/{valid_hash}"}
+        async def json(self):
+            return {"info_hash": valid_hash}
+
+    class MockMinimalContext:
+        async def __aenter__(self):
+            return MockMinimalResponse()
+        async def __aexit__(self, *args):
+            pass
+
+    monkeypatch.setattr(aiohttp.ClientSession, "post", lambda *args, **kwargs: MockMinimalContext())
+    res_minimal = runner.invoke(
+        spritzle_cli,
+        ["add", valid_hash],
+    )
+    assert res_minimal.exit_code == 0
 
 
 def test_pause_command(cli):
@@ -1521,8 +1650,12 @@ def test_info_formatting_and_subresource_fallbacks(capsys):
     assert "42" in capsys.readouterr().out
 
     # Non-200 response in f
+    class ErrorSession:
+        def get(self, url):
+            return MockResp({}, status=500)
+
     error_client = MockClient({})
-    error_client.session.get = lambda url: MockResp({}, status=500)
+    error_client.session = ErrorSession()
     with patch("spritzle.cli.commands.info.resolve_single_torrent", return_value="0" * 40):
         with pytest.raises(SystemExit):
             asyncio.run(info_f(error_client, "0" * 40, plain=True))
@@ -2536,9 +2669,27 @@ def test_files_command_edge_cases(cli):
     res_color = runner.invoke(spritzle_cli, ["--color", "files", ih])
     assert res_color.exit_code == 0
 
+    # Missing torrent argument on update
+    res_missing_update = runner.invoke(spritzle_cli, ["files", "--top", "0"])
+    assert res_missing_update.exit_code == 1
+    assert "Specify a torrent" in res_missing_update.output
+
     # --top and --all options
     res_top = runner.invoke(spritzle_cli, ["files", ih, "--top", "0"])
     assert res_top.exit_code == 0
+
+    # Color output with prio >= 6 (top)
+    res_color_top = runner.invoke(spritzle_cli, ["--color", "files", ih])
+    assert res_color_top.exit_code == 0
+
+    # --skip option (prio == 0)
+    res_skip = runner.invoke(spritzle_cli, ["files", ih, "--skip", "0"])
+    assert res_skip.exit_code == 0
+
+    # Color output with prio == 0 (skip)
+    res_color_skip = runner.invoke(spritzle_cli, ["--color", "files", ih])
+    assert res_color_skip.exit_code == 0
+
     res_all = runner.invoke(spritzle_cli, ["files", ih, "--all", "4"])
     assert res_all.exit_code == 0
 

@@ -83,7 +83,10 @@ async def test_debug_middleware_redacts_api_key(caplog):
     from spritzle.daemon.keys import APP_KEY_LOG
 
     app = web.Application(middlewares=[debug_middleware])
-    app[APP_KEY_LOG] = logging.getLogger("spritzle.test")
+    test_logger = logging.getLogger("test_debug_middleware_redaction")
+    test_logger.setLevel(logging.DEBUG)
+    test_logger.propagate = True
+    app[APP_KEY_LOG] = test_logger
 
     async def dummy_handler(request):
         return web.Response(text="ok")
@@ -93,7 +96,7 @@ async def test_debug_middleware_redacts_api_key(caplog):
     client = test_utils.TestClient(test_utils.TestServer(app))
     await client.start_server()
     try:
-        with caplog.at_level("DEBUG"):
+        with caplog.at_level(logging.DEBUG):
             resp = await client.get(
                 "/test",
                 headers={

@@ -487,7 +487,6 @@ def test_remote_errors_and_edge_cases(cli, core, tmp_path):
 
 
 def test_run_coroutine_new_loop():
-    import asyncio
     from unittest.mock import patch
     from spritzle.cli.commands.remote import run_coroutine
 

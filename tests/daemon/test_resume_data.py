@@ -338,6 +338,60 @@ async def test_save_torrent_multi_waiter_cancellation_isolation(core):
     await core.stop()
 
 
+def test_decode_bencoded_value_and_atomic_write(tmp_path):
+    from pathlib import Path
+    from unittest.mock import patch
+    from spritzle.daemon.resume_data import decode_bencoded_value, _atomic_write_file
+
+    # test latin-1 fallback
+    assert decode_bencoded_value(b"\xff") == "\xff"
+    # test list and dict recursion
+    assert decode_bencoded_value([b"hello", {b"k": b"v"}]) == ["hello", {"k": "v"}]
+    assert decode_bencoded_value(123) == 123
+
+    # atomic write with deleted condition
+    f = tmp_path / "test.txt"
+    _atomic_write_file(f, b"hello", lambda: True)
+    assert not f.exists()
+
+    # atomic write with exception during write
+    with patch.object(Path, "replace", side_effect=OSError("disk error")):
+        with pytest.raises(OSError):
+            _atomic_write_file(f, b"hello", lambda: False)
+
+
+async def test_on_save_resume_data_failed_alert(core):
+    await core.start()
+    ih = "11" * 20
+    fut = asyncio.Future()
+    core.resume_data.resume_data_futures[ih] = {fut}
+
+    class DummyFailedAlert:
+        torrent_name = "test_torrent"
+        class Error:
+            def message(self):
+                return "save failed"
+        error = Error()
+        class Handle:
+            def info_hash(self):
+                return ih
+        handle = Handle()
+
+    await core.resume_data.on_save_resume_data_failed_alert(DummyFailedAlert())
+    assert fut.done()
+    assert fut.result() is False
+    await core.stop()
+
+
+async def test_resume_data_load_cleans_tmp_files(core):
+    tmp_file = core.state_dir / ".test.123_456.tmp"
+    tmp_file.write_bytes(b"temp data")
+    assert tmp_file.exists()
+
+    await core.resume_data.load()
+    assert not tmp_file.exists()
+
+
 
 
 

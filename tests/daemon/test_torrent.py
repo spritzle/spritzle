@@ -124,4 +124,23 @@ async def test_concurrent_remove_timeout_does_not_break_other_callers(loop, mock
     assert task1.done()
 
 
+async def test_torrent_remove_no_timeout_and_delete_failed(loop, mock_alert):
+    from spritzle.daemon.torrent import AlertException
+    core = Mock(alert=mock_alert)
+    torrent = Torrent(core)
+    info_hash = "1234567890"
+    torrent_handle = Mock(**{"info_hash.return_value": info_hash})
+
+    # Call with timeout=None and delete_files
+    task = loop.create_task(torrent.remove(torrent_handle, options=lt.options_t.delete_files, timeout=None))
+    await asyncio.sleep(0)
+    # Push removed alert
+    await core.alert.push_alert("torrent_removed_alert", info_hash=info_hash)
+    # Push delete failed alert
+    fail_alert = Mock(info_hash=info_hash)
+    await torrent._on_torrent_delete_failed_alert(fail_alert)
+    with pytest.raises(AlertException):
+        await task
+
+
 
