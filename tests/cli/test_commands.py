@@ -1308,6 +1308,42 @@ def test_daemon_config_positional_arguments(cli):
     assert d == {"auth_timeout": 240}
 
 
+def test_daemon_config_reload_and_errors(cli):
+    runner = CliRunner()
+
+    # Reload normal
+    res = runner.invoke(spritzle_cli, ["daemon-config", "--reload"])
+    assert res.exit_code == 0
+    assert "no changes detected" in res.output
+
+    # Reload color
+    res_color = runner.invoke(spritzle_cli, ["--color", "daemon-config", "--reload"])
+    assert res_color.exit_code == 0
+
+    # Reload json
+    res_json = runner.invoke(spritzle_cli, ["daemon-config", "--reload", "--json"])
+    assert res_json.exit_code == 0
+    assert json.loads(res_json.output)["reloaded"] is False
+
+    # Reload plain
+    res_plain = runner.invoke(spritzle_cli, ["daemon-config", "--reload", "--plain"])
+    assert res_plain.exit_code == 0
+
+    # Nonexistent key
+    res_err = runner.invoke(spritzle_cli, ["daemon-config", "nonexistent_option"])
+    assert res_err.exit_code == 1
+    assert "Config key 'nonexistent_option' not found." in res_err.output
+
+    # Single key color
+    res_single_color = runner.invoke(spritzle_cli, ["--color", "daemon-config", "save_resume_data_interval"])
+    assert res_single_color.exit_code == 0, res_single_color.output
+
+    # Single key plain
+    res_single_plain = runner.invoke(spritzle_cli, ["daemon-config", "save_resume_data_interval", "--plain"])
+    assert res_single_plain.exit_code == 0
+    assert "save_resume_data_interval" in res_single_plain.output
+
+
 def test_info_command(cli):
     runner = CliRunner()
 
@@ -1370,6 +1406,102 @@ def test_info_command(cli):
     res_err = runner.invoke(spritzle_cli, ["info", ih, "--plain"])
     assert res_err.exit_code == 0
     assert "Storage device write failure" in res_err.output
+
+    # Nonexistent torrent
+    res_nonexistent = runner.invoke(spritzle_cli, ["info", "0" * 40])
+    assert res_nonexistent.exit_code == 1
+    assert "No torrent found matching" in res_nonexistent.output
+
+
+def test_info_formatting_and_subresource_fallbacks(capsys):
+    import asyncio
+    from unittest.mock import patch
+    import pytest
+    from spritzle.cli.commands.info import f as info_f
+
+    class MockResp:
+        def __init__(self, data, status=200):
+            self._data = data
+            self.status = status
+            self.reason = "OK"
+
+        async def json(self):
+            return self._data
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class MockSession:
+        def __init__(self, full_data):
+            self.full_data = full_data
+
+        def get(self, url):
+            if "files" in url:
+                return MockResp([{"index": 0, "progress": 1.0, "size": 1024, "path": "file.txt"}])
+            if "peers" in url:
+                return MockResp([{"ip": "1.2.3.4:5678", "client": "Deluge 2.1.1", "down_speed": 1000, "up_speed": 500, "progress": 0.75}])
+            if "trackers" in url:
+                return MockResp([
+                    {"tier": 0, "url": "http://tr1", "updating": True},
+                    {"tier": 0, "url": "http://tr2", "fails": 2},
+                    {"tier": 0, "url": "http://tr3", "is_working": True},
+                    {"tier": 0, "url": "http://tr4"},
+                ])
+            return MockResp(self.full_data)
+
+    class MockClient:
+        def __init__(self, full_data):
+            self.session = MockSession(full_data)
+            self.color = "never"
+            self.plain = True
+
+        def url(self, path):
+            return f"http://127.0.0.1/{path}"
+
+    full_payload = {
+        "name": "archlinux-test",
+        "state": "downloading",
+        "total_pieces": None,
+        "completed_time": 1700000000,
+        "spritzle.tags": "single_tag_string",
+        "error": {"value": 1, "message": "Custom disk error"},
+    }
+    client = MockClient(full_payload)
+    with patch("spritzle.cli.commands.info.resolve_single_torrent", return_value="0" * 40):
+        asyncio.run(info_f(client, "0" * 40, plain=True))
+
+    captured = capsys.readouterr().out
+    assert "archlinux-test" in captured
+    assert "Connected Peers (1):" in captured
+    assert "Deluge 2.1.1" in captured
+    assert "Trackers:" in captured
+    assert "updating" in captured
+    assert "working" in captured
+    assert "Custom disk error" in captured
+    assert "Completed" in captured
+    assert "single_tag_string" in captured
+
+    # Test errc dict and errc int
+    full_payload["error"] = None
+    full_payload["errc"] = {"value": 5, "message": "Read error"}
+    with patch("spritzle.cli.commands.info.resolve_single_torrent", return_value="0" * 40):
+        asyncio.run(info_f(client, "0" * 40, plain=True))
+    assert "Read error" in capsys.readouterr().out
+
+    full_payload["errc"] = 42
+    with patch("spritzle.cli.commands.info.resolve_single_torrent", return_value="0" * 40):
+        asyncio.run(info_f(client, "0" * 40, plain=True))
+    assert "42" in capsys.readouterr().out
+
+    # Non-200 response in f
+    error_client = MockClient({})
+    error_client.session.get = lambda url: MockResp({}, status=500)
+    with patch("spritzle.cli.commands.info.resolve_single_torrent", return_value="0" * 40):
+        with pytest.raises(SystemExit):
+            asyncio.run(info_f(error_client, "0" * 40, plain=True))
 
 
 def test_info_display_with_peers():
@@ -1534,6 +1666,30 @@ def test_cli_config_json_and_plain(tmp_path):
     res_err = runner.invoke(spritzle_cli, ["--config", cfg_dir, "config", "nonexistent"])
     assert res_err.exit_code == 1
     assert "not found" in res_err.output
+
+    # Single key color
+    res_single_color = runner.invoke(
+        spritzle_cli, ["--color", "--config", cfg_dir, "config", "plain"]
+    )
+    assert res_single_color.exit_code == 0
+    assert "plain" in res_single_color.output
+
+    # Single key plain
+    res_single_plain = runner.invoke(
+        spritzle_cli, ["--config", cfg_dir, "config", "plain", "--plain"]
+    )
+    assert res_single_plain.exit_code == 0
+    assert "plain" in res_single_plain.output
+
+    # Error saving CLI configuration in apply_set
+    from unittest.mock import patch
+    from spritzle.cli.config import CLIConfig
+    with patch.object(CLIConfig, "__setitem__", side_effect=OSError("Read-only filesystem")):
+        res_fail = runner.invoke(
+            spritzle_cli, ["--config", cfg_dir, "config", "theme", "dark"]
+        )
+        assert res_fail.exit_code == 1
+        assert "Error saving CLI configuration" in res_fail.output
 
 
 def test_cli_config_ignores_and_preserves_remotes(tmp_path):
