@@ -326,3 +326,175 @@ def test_remote_set_key_preserves_tls_flags(cli, core, tmp_path):
     assert updated_remote["fingerprint"] == "aa:bb:cc:dd"
 
 
+def test_format_uptime_and_normalize_url():
+    import click
+    from spritzle.cli.commands.remote import format_uptime, normalize_url
+
+    assert format_uptime(45) == "45s"
+    assert format_uptime(125) == "2m 5s"
+    assert format_uptime(3665) == "1h 1m"
+    assert format_uptime(90000) == "1d 1h"
+
+    assert normalize_url("127.0.0.1:8080") == "http://127.0.0.1:8080"
+    assert normalize_url("http://localhost:8080/") == "http://localhost:8080"
+    assert normalize_url("https://remote.example.com") == "https://remote.example.com"
+
+    with pytest.raises(click.ClickException):
+        normalize_url("://invalid_url")
+
+
+def test_remote_errors_and_edge_cases(cli, core, tmp_path):
+    from spritzle.cli.config import RemotesConfig
+
+    runner = CliRunner()
+    cfg = RemotesConfig(config_dir=tmp_path)
+    raw_key, _ = core.key_manager.create_key(name="test")
+    daemon_url = f"http://127.0.0.1:{cli.server.port}"
+
+    # Empty remotes list / status
+    res_no_remotes = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "status"],
+    )
+    assert res_no_remotes.exit_code == 1
+    assert "No remotes configured." in res_no_remotes.output
+
+    # Add remote
+    res_add = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "add", "box1", daemon_url, "--key", raw_key],
+    )
+    assert res_add.exit_code == 0
+
+    # Add without force fails
+    res_dup = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "add", "box1", daemon_url, "--key", raw_key],
+    )
+    assert res_dup.exit_code == 1
+    assert "already exists" in res_dup.output
+
+    # Add with force succeeds
+    res_force = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "add", "box1", daemon_url, "--key", raw_key, "--force"],
+    )
+    assert res_force.exit_code == 0
+
+    # Add with interactive key prompt
+    res_prompt = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "add", "box2", daemon_url],
+        input=f"{raw_key}\n",
+    )
+    assert res_prompt.exit_code == 0
+
+    # Add unreachable remote fails
+    res_unreach = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "add", "dead", "http://127.0.0.1:1", "--key", raw_key],
+    )
+    assert res_unreach.exit_code == 1
+
+    # Show nonexistent remote
+    res_no_show = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "show", "nonexistent"],
+    )
+    assert res_no_show.exit_code == 1
+    assert "does not exist" in res_no_show.output
+
+    # Show plain
+    res_show_plain = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "show", "box1", "--plain"],
+    )
+    assert res_show_plain.exit_code == 0
+    assert "Property" in res_show_plain.output
+    assert "Value" in res_show_plain.output
+    assert "box1" in res_show_plain.output
+
+    # Use nonexistent remote
+    res_use_no = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "use", "nonexistent"],
+    )
+    assert res_use_no.exit_code == 1
+    assert "does not exist" in res_use_no.output
+
+    # Remove nonexistent remote
+    res_rm_no = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "remove", "nonexistent"],
+    )
+    assert res_rm_no.exit_code == 1
+    assert "does not exist" in res_rm_no.output
+
+    # Set key for nonexistent remote
+    res_set_no = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "set-key", "nonexistent", "dummy_key"],
+    )
+    assert res_set_no.exit_code == 1
+    assert "does not exist" in res_set_no.output
+
+    # Set key with connection failure
+    cfg.load()
+    cfg.set_remote("deadbox", "http://127.0.0.1:1", "spz_d_dead", "key")
+    res_set_dead = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "set-key", "deadbox", "newkey"],
+    )
+    assert res_set_dead.exit_code == 1
+
+    # Set key with interactive prompt
+    res_set_prompt = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "set-key", "box1"],
+        input=f"{raw_key}\n",
+    )
+    assert res_set_prompt.exit_code == 0, res_set_prompt.output
+
+    # Set key with identity mismatch
+    cfg.set_remote("fakebox", daemon_url, "spz_d_different_id", raw_key)
+    res_mismatch = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "set-key", "fakebox", raw_key],
+    )
+    assert res_mismatch.exit_code == 1
+    assert "Daemon identity mismatch" in res_mismatch.output
+
+    # Status auth_failed check
+    cfg.set_remote("bad_auth_box", daemon_url, core.identity.daemon_id, "spritzle_bad_key")
+    res_bad_auth = runner.invoke(
+        spritzle_cli,
+        ["-c", str(tmp_path), "remote", "status", "bad_auth_box", "--json"],
+    )
+    assert res_bad_auth.exit_code == 0
+    bad_auth_data = json.loads(res_bad_auth.output)
+    assert bad_auth_data["status"] == "auth_failed"
+
+    # Status with multiple states rendered in rich table (online, auth_failed, id_mismatch, offline)
+    res_rich_multi = runner.invoke(
+        spritzle_cli,
+        ["--color", "-c", str(tmp_path), "remote", "status"],
+    )
+    assert res_rich_multi.exit_code == 0
+    assert "online" in res_rich_multi.output
+    assert "auth_failed" in res_rich_multi.output
+    assert "id_mismatch" in res_rich_multi.output
+    assert "offline" in res_rich_multi.output
+
+
+def test_run_coroutine_new_loop():
+    import asyncio
+    from unittest.mock import patch
+    from spritzle.cli.commands.remote import run_coroutine
+
+    async def sample():
+        return 42
+
+    with patch("asyncio.get_event_loop", side_effect=RuntimeError("no loop")):
+        assert run_coroutine(sample()) == 42
+
+
