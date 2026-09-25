@@ -1822,6 +1822,54 @@ def test_status_command(cli):
     assert "daemon_id" in data
     assert "num_torrents" in data
 
+    # Color output
+    res_color = runner.invoke(spritzle_cli, ["--color", "status"])
+    assert res_color.exit_code == 0
+
+    # format_uptime unit test
+    from spritzle.cli.commands.status import format_uptime as status_format_uptime
+    assert status_format_uptime(30) == "30s"
+    assert status_format_uptime(90) == "1m 30s"
+    assert status_format_uptime(3700) == "1h 1m"
+    assert status_format_uptime(100000) == "1d 3h"
+
+
+def test_status_command_auth_and_server_error(tmp_path):
+    from spritzle.cli.config import RemotesConfig
+    from unittest.mock import patch
+
+    RemotesConfig(config_dir=tmp_path).set_remote(
+        "bad_auth", "http://127.0.0.1:8080", "dummy_id", "spritzle_invalid_key"
+    )
+
+    class MockResp401:
+        status = 401
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    class MockResp500:
+        status = 500
+        reason = "Server Error"
+        async def json(self):
+            return {"message": "Internal failure"}
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    runner = CliRunner()
+    with patch("aiohttp.ClientSession.get", return_value=MockResp401()):
+        res = runner.invoke(spritzle_cli, ["-c", str(tmp_path), "-r", "bad_auth", "status"])
+        assert res.exit_code == 1
+        assert "Authentication failed" in res.output
+
+    with patch("aiohttp.ClientSession.get", return_value=MockResp500()):
+        res500 = runner.invoke(spritzle_cli, ["-c", str(tmp_path), "-r", "bad_auth", "status"])
+        assert res500.exit_code == 1
+        assert "Daemon returned HTTP 500" in res500.output
+
 
 def test_completion_command():
     """Test the 'completion' command for various shells."""
