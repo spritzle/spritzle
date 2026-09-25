@@ -8,7 +8,8 @@
   - Type checking: `uv run ty check`
 - **CLI & Daemon Extra Decoupling**: The base package is a pure-Python HTTP client without native dependencies. The daemon runtime requires native `libtorrent`, installed via the `daemon` extra (`spritzle[daemon]`). Never add `libtorrent` imports to `spritzle/cli/`.
 - **No External / Real Torrents in Tests**: Never use real torrent files, live magnet links, or public tracker URLs in tests or test scripts. Always use the local fixture torrent files in `tests/daemon/torrents/` (e.g. `testtorrent1.torrent`, `random_one_file.torrent`) with network features (`enable_dht`, `enable_lsd`, `enable_upnp`, `enable_natpmp`) disabled in test sessions to ensure tests are strictly offline and never utilize public internet swarms, bandwidth, or external tracker infrastructure.
-- Tests involve real libtorrent sessions; expect full runs to take ~60–90 seconds.
+- **Dangling test futures on shutdown**: When testing resume-data alert handling or concurrency with manually injected mock `Future` instances in `core.resume_data.resume_data_futures`, always resolve or clear them before invoking `core.stop()`. Otherwise, `resume_data.stop()` calls `save_all()`, which awaits all pending futures and blocks until the 30-second timeout expires.
+- Tests involve real libtorrent sessions; expect full runs to take ~3–5 seconds with parallel workers (-n auto), or ~15–20 seconds sequentially.
 
 ## 2. Concurrency & Libtorrent Rules
 - **Multi-waiter alerts**: When multiple callers await a libtorrent alert, track per-caller futures in a `set`. Never share a single future directly if a caller cancellation could abort it for other callers.

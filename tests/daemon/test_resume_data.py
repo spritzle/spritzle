@@ -276,6 +276,7 @@ async def test_write_data_does_not_pop_newer_future(core, tmp_path):
     assert core.resume_data.resume_data_futures.get(info_hash) is new_fut
     assert new_fut.done() is False
 
+    core.resume_data.resume_data_futures.clear()
     await core.stop()
 
 

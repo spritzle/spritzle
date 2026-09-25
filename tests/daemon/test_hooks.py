@@ -83,8 +83,8 @@ async def test_hooks_blocking():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         p = Path(tmpdir, "foobar")
-        # Sleep for 1 second
-        p.write_bytes(b"#!/bin/sh\nsleep 1")
+        # Sleep for 0.1 second
+        p.write_bytes(b"#!/bin/sh\nsleep 0.1")
         p.chmod(0o777)
         h = Hooks(tmpdir)
 
@@ -93,7 +93,7 @@ async def test_hooks_blocking():
 
         async def set_flag():
             nonlocal flag
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
             flag = True
 
         asyncio.create_task(set_flag())

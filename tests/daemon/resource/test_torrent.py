@@ -452,6 +452,8 @@ async def test_delete_torrent_alert_exception_handling(cli, monkeypatch):
         for _ in range(10):
             core.session.wait_for_alert(100)
             core.session.pop_alerts()
+            if not handle.is_valid():
+                break
         assert not handle.is_valid()
         raise AlertException(Mock(message=lambda: "Failed to delete files"))
 

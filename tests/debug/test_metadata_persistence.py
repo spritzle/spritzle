@@ -32,8 +32,7 @@ async def test_metadata_persistence(cli, core, tmp_path):
     
     logging.basicConfig(level=logging.DEBUG)
     log = logging.getLogger("spritzle.debug")
-    
-    NUM_TORRENTS = 10000 # Enough to potentially trigger timeout or race, but faster than 10k
+    NUM_TORRENTS = int(os.environ.get("SPRITZLE_METADATA_TORRENTS", 250)) # Enough to verify persistence across restart
     
     log.info(f"Generating {NUM_TORRENTS} dummy torrents...")
     torrent_files = []

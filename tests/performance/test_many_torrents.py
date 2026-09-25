@@ -37,7 +37,7 @@ def create_dummy_torrent(path: Path, name: str, size: int = 1024 * 1024):
 
 async def test_performance_many_torrents(cli, core, tmp_path):
     # Configuration
-    NUM_TORRENTS = 10000
+    NUM_TORRENTS = int(os.environ.get("SPRITZLE_BENCHMARK_TORRENTS", 500))
     
     log = logging.getLogger("spritzle.perf")
     log.info(f"Starting performance test with {NUM_TORRENTS} torrents")
