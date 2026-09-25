@@ -1,5 +1,12 @@
-Spritzle
-========
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Spritzle Logo" width="220">
+</p>
+
+<p align="center">
+  <strong>A lightweight, high-performance BitTorrent client &amp; REST daemon built on libtorrent.</strong>
+</p>
+
+---
 
 Spritzle is a lightweight bittorrent client built around libtorrent. It aims
 to provide a simple REST interface to libtorrent. Any additional

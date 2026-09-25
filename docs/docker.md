@@ -1,4 +1,4 @@
-# Running Spritzle in Docker
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> Running Spritzle in Docker
 
 Spritzle provides an official lightweight container image for `spritzled`, tailored for homelab, NAS, and seedbox environments.
 

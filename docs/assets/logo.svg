@@ -7,6 +7,17 @@
       .stroked-path {
         vector-effect: non-scaling-stroke;
       }
+      .logotype {
+        fill: #1F2937;
+      }
+      @media (prefers-color-scheme: dark) {
+        .logotype {
+          fill: #F3F4F6;
+        }
+        .blend-shape {
+          mix-blend-mode: screen;
+        }
+      }
     </style>
   </defs>
   <g id="spritzle-cluster">
@@ -63,5 +74,5 @@
   </g>
 
   <!-- Logotype Text -->
-  <text x="120" y="166" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.5" fill="#1F2937">spritzle</text>
+  <text x="120" y="166" class="logotype" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.5">spritzle</text>
 </svg>

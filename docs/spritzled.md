@@ -1,4 +1,4 @@
-# spritzled - Spritzle Daemon
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> spritzled - Spritzle Daemon
 
 `spritzled` is the daemon service for Spritzle. It manages the underlying [libtorrent](https://libtorrent.org) session, manages torrent state and resume data, handles the hook alert dispatch system, and exposes an HTTP REST API for clients (such as the `spritzle` CLI or web interfaces).
 

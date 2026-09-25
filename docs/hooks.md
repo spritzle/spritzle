@@ -1,5 +1,4 @@
-Hooks
-=====
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> Hooks System
 
 Spritzle is made highly extensible by the use of hooks. Hooks can currently
 be executed in one way:

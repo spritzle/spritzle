@@ -1,4 +1,4 @@
-# Managing Remote Daemons & API Keys
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> Managing Remote Daemons & API Keys
 
 Spritzle CLI supports managing multiple remote or local daemon instances through named **remotes**. Each remote associates a friendly name with a daemon URL, an API key, and the daemon's persistent instance identity.
 

@@ -1,5 +1,4 @@
-Design
-======
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> Architecture & Design
 
 Files & Layout
 --------------

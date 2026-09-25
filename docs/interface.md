@@ -1,5 +1,4 @@
-Interface
-=========
+# <img src="assets/logo-icon.svg" alt="Spritzle" width="28" height="28" align="center" /> REST API Interface
 
 The main interface to spritzle is REST based. This allows access from almost
 any language or environment.
