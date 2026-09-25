@@ -1974,7 +1974,8 @@ def test_build_dashboard_renderable_subtitle():
 
 
 def test_dashboard_row_single_line():
-    from rich.console import Console
+    from rich.console import Console, Group
+    from rich.table import Table
     from spritzle.cli.dashboard import build_dashboard_renderable
 
     items = [
@@ -2005,7 +2006,9 @@ def test_dashboard_row_single_line():
     for width in (60, 80, 100, 120):
         c = Console(width=width, height=30)
         panel = build_dashboard_renderable(items, {}, is_color=True)
+        assert isinstance(panel.renderable, Group)
         table = panel.renderable.renderables[2]
+        assert isinstance(table, Table)
         for col in table.columns:
             assert col.no_wrap is True
 
@@ -2032,6 +2035,7 @@ def test_dashboard_renderable_fullscreen_height():
 
 
 def test_dashboard_colors_dht_and_upload():
+    from rich.console import Group
     from spritzle.cli.dashboard import build_dashboard_renderable
     from spritzle.cli.display import format_speed
 
@@ -2041,6 +2045,7 @@ def test_dashboard_colors_dht_and_upload():
 
     stats = {"dht.dht_nodes": 50}
     panel = build_dashboard_renderable([], stats, is_color=True)
+    assert isinstance(panel.renderable, Group)
     header_str = str(panel.renderable.renderables[0])
     assert "[magenta]● 50 nodes[/magenta]" in header_str
     assert "[bold blue]" in header_str

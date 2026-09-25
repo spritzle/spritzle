@@ -76,8 +76,8 @@ uv run pytest
 Documentation
 -------------
 
-* [spritzled Daemon Guide](docs/spritzled.md): Daemon CLI options, configuration keys, systemd service setup, and token generation.
-* [spritzle CLI Guide](docs/spritzle.md): Command-line client usage, subcommands reference, authentication, and bash completion.
+* [spritzled Daemon Guide](docs/spritzled.md): Daemon CLI options, configuration keys, systemd service setup, and API key management.
+* [spritzle CLI Guide](docs/spritzle.md): Command-line client usage, subcommands reference, authentication, and shell completion.
 * [Remote Daemons & API Keys](docs/remotes.md): Remote profiles, zero-config local discovery, and daemon identity verification.
 * [REST API Interface](docs/interface.md): Full HTTP REST API reference and examples.
 * [Hooks System](docs/hooks.md): Custom scripting with libtorrent status alerts.

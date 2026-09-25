@@ -1,4 +1,6 @@
 [report]
 show_missing = True
 [run]
-omit = spritzle/tests/*
+omit =
+    tests/*
+    spritzle/tests/*
