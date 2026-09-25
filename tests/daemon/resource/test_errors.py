@@ -89,3 +89,37 @@ async def test_debug_middleware_non_utf8_binary_body(cli):
     assert resp.status == 400
 
 
+def test_spritzle_errors():
+    from spritzle.daemon.error import SpritzleError, InvalidEncodingError, InvalidHook
+
+    err = SpritzleError("base error")
+    assert str(err) == "base error"
+    assert isinstance(err, Exception)
+
+    enc_err = InvalidEncodingError("encoding failed")
+    assert isinstance(enc_err, SpritzleError)
+    assert str(enc_err) == "encoding failed"
+
+    hook_err = InvalidHook("hook missing")
+    assert isinstance(hook_err, SpritzleError)
+    assert str(hook_err) == "hook missing"
+
+
+async def test_delete_core():
+    from spritzle.daemon.resource.core import delete_core
+    from unittest.mock import MagicMock, patch
+
+    mock_req = MagicMock()
+    with patch("asyncio.get_running_loop") as mock_loop:
+        fake_loop = MagicMock()
+        mock_loop.return_value = fake_loop
+        resp = await delete_core(mock_req)
+        assert resp.status == 200
+        fake_loop.call_soon.assert_called_once()
+        callback = fake_loop.call_soon.call_args[0][0]
+        with pytest.raises(aiohttp.web.GracefulExit):
+            callback()
+
+
+
+

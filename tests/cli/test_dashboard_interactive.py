@@ -670,3 +670,97 @@ def test_dashboard_cursor_active_passive_behavior(sample_torrents):
 
     asyncio.run(_test())
 
+
+def test_dashboard_interactive_submodes_and_keys(sample_torrents):
+    async def _test():
+        state = DashboardState()
+        state.raw_torrents = sample_torrents
+        client = MagicMock()
+        quit_event = asyncio.Event()
+        bg_tasks = set()
+
+        # 1. Command Mode navigation and editing
+        state.command_mode = True
+        state.command_buffer = "pause"
+        state.command_cursor = 5
+        state.command_history = ["list", "resume"]
+
+        await handle_key_input("left", client, state, quit_event, bg_tasks)
+        assert state.command_cursor == 4
+        await handle_key_input("right", client, state, quit_event, bg_tasks)
+        assert state.command_cursor == 5
+        await handle_key_input("home", client, state, quit_event, bg_tasks)
+        assert state.command_cursor == 0
+        await handle_key_input("end", client, state, quit_event, bg_tasks)
+        assert state.command_cursor == 5
+        await handle_key_input("delete", client, state, quit_event, bg_tasks)
+        assert state.command_buffer == "pause"
+        await handle_key_input("home", client, state, quit_event, bg_tasks)
+        await handle_key_input("delete", client, state, quit_event, bg_tasks)
+        assert state.command_buffer == "ause"
+        await handle_key_input("up", client, state, quit_event, bg_tasks)
+        assert state.command_buffer == "resume"
+        await handle_key_input("down", client, state, quit_event, bg_tasks)
+        assert state.command_buffer == ""
+        await handle_key_input("escape", client, state, quit_event, bg_tasks)
+        assert state.command_mode is False
+
+        # 2. Search Mode editing and cancel
+        state.search_mode = True
+        state.search_buffer = "arch"
+        await handle_key_input("backspace", client, state, quit_event, bg_tasks)
+        assert state.search_buffer == "arc"
+        await handle_key_input("x", client, state, quit_event, bg_tasks)
+        assert state.search_buffer == "arcx"
+        await handle_key_input("escape", client, state, quit_event, bg_tasks)
+        assert state.search_mode is False
+        assert state.search_buffer == ""
+
+        # 3. Columns View navigation & toggle
+        state.view_mode = "columns"
+        state.column_cursor = 1
+        await handle_key_input("down", client, state, quit_event, bg_tasks)
+        assert state.column_cursor == 2
+        await handle_key_input("j", client, state, quit_event, bg_tasks)
+        assert state.column_cursor == 3
+        await handle_key_input("up", client, state, quit_event, bg_tasks)
+        assert state.column_cursor == 2
+        await handle_key_input("k", client, state, quit_event, bg_tasks)
+        assert state.column_cursor == 1
+        await handle_key_input("escape", client, state, quit_event, bg_tasks)
+        assert state.view_mode == "list"
+
+        # 4. Confirmation Prompt Mode
+        called = False
+        async def on_confirm():
+            nonlocal called
+            called = True
+
+        state.confirm_prompt = "Delete torrent?"
+        state.confirm_delete_callback = on_confirm
+        await handle_key_input("d", client, state, quit_event, bg_tasks)
+        assert state.confirm_prompt is None
+        await asyncio.sleep(0.01)
+        assert called is True
+
+        # Cancel confirmation
+        state.confirm_prompt = "Cancel?"
+        await handle_key_input("n", client, state, quit_event, bg_tasks)
+        assert state.confirm_prompt is None
+        assert state.status_message == "Action cancelled"
+
+        # 5. Inspector with full sub-details
+        state.view_mode = "inspector"
+        state.inspector_data = sample_torrents[0]
+        state.inspector_files = [{"index": 0, "path": "file1.iso", "size": 1024, "progress": 1.0, "priority": 4}]
+        state.inspector_peers = [{"ip": "1.2.3.4:5678", "client": "Deluge", "down_speed": 500000, "up_speed": 100000, "progress": 0.8}]
+        state.inspector_trackers = [{"tier": 0, "url": "http://tracker.example.com", "updating": False, "fails": 0}]
+        panel = build_dashboard_renderable(sample_torrents, {}, is_color=True, height=40, state=state)
+        assert panel is not None
+
+        panel_plain = build_dashboard_renderable(sample_torrents, {}, is_color=False, height=40, state=state)
+        assert panel_plain is not None
+
+    asyncio.run(_test())
+
+

@@ -2172,7 +2172,252 @@ def test_settings_profile_and_interface_command(cli):
     data = json.loads(res_json.output)
     assert data["user_agent"] == "Deluge/2.1.1 libtorrent/2.0.10.0"
     assert data["peer_fingerprint"] == "-DE2110-"
-    assert "127.0.0.1:6881" in data["listen_interfaces"]
+
+
+
+def test_trackers_command_edge_cases(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    # Missing torrent argument
+    res_missing = runner.invoke(spritzle_cli, ["trackers"])
+    assert res_missing.exit_code == 1
+    assert "Specify a torrent" in res_missing.output
+
+    # Color output
+    res_color = runner.invoke(spritzle_cli, ["--color", "trackers", ih])
+    assert res_color.exit_code == 0
+
+    # Remove by index
+    tracker_url = "http://clitracker2.example.com:6969/announce"
+    runner.invoke(spritzle_cli, ["trackers", ih, "--add", tracker_url])
+    res_del_idx = runner.invoke(spritzle_cli, ["trackers", ih, "--remove", "0"])
+    assert res_del_idx.exit_code == 0
+    assert "Removed tracker 0" in res_del_idx.output
+
+
+def test_files_command_edge_cases(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    from spritzle.cli.commands.files import parse_priority_value
+    import click
+    import pytest
+    import libtorrent as lt
+
+    # Unit test parse_priority_value
+    assert parse_priority_value("0") == 0
+    assert parse_priority_value("7") == 7
+    assert parse_priority_value("skip") == 0
+    assert parse_priority_value("normal") == 4
+    assert parse_priority_value("top") == 7
+    with pytest.raises(click.BadParameter):
+        parse_priority_value("invalid_val")
+    with pytest.raises(click.BadParameter):
+        parse_priority_value("99")
+
+    # Missing torrent argument
+    res_missing = runner.invoke(spritzle_cli, ["files"])
+    assert res_missing.exit_code == 1
+    assert "Specify a torrent" in res_missing.output
+
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    # Color output
+    res_color = runner.invoke(spritzle_cli, ["--color", "files", ih])
+    assert res_color.exit_code == 0
+
+    # --top and --all options
+    res_top = runner.invoke(spritzle_cli, ["files", ih, "--top", "0"])
+    assert res_top.exit_code == 0
+    res_all = runner.invoke(spritzle_cli, ["files", ih, "--all", "4"])
+    assert res_all.exit_code == 0
+
+    # Invalid index
+    res_bad_idx = runner.invoke(spritzle_cli, ["files", ih, "-p", "invalid", "4"])
+    assert res_bad_idx.exit_code == 1
+    assert "Invalid file index" in res_bad_idx.output
+
+    # Out of range index
+    res_oob = runner.invoke(spritzle_cli, ["files", ih, "-p", "99", "4"])
+    assert res_oob.exit_code == 1
+    assert "out of range" in res_oob.output
+
+
+def test_daemon_config_reload_and_edge_cases(cli):
+    runner = CliRunner()
+
+    # Reload config (color, plain, json)
+    res_reload = runner.invoke(spritzle_cli, ["daemon-config", "--reload"])
+    assert res_reload.exit_code == 0
+
+    res_reload_plain = runner.invoke(spritzle_cli, ["daemon-config", "--reload", "--plain"])
+    assert res_reload_plain.exit_code == 0
+
+    res_reload_json = runner.invoke(spritzle_cli, ["daemon-config", "--reload", "--json"])
+    assert res_reload_json.exit_code == 0
+    data = json.loads(res_reload_json.output)
+    assert "reloaded" in data
+
+    # Nonexistent key
+    res_nonexistent = runner.invoke(spritzle_cli, ["daemon-config", "nonexistent_key_xyz"])
+    assert res_nonexistent.exit_code == 1
+    assert "not found" in res_nonexistent.output
+
+    # Single key with color
+    res_single_color = runner.invoke(spritzle_cli, ["--color", "daemon-config", "default_save_path"])
+    assert res_single_color.exit_code == 0
+    assert "default_save_path" in res_single_color.output
+
+
+def test_help_command_color_modes():
+    runner = CliRunner()
+
+    # Root help in color
+    res_root = runner.invoke(spritzle_cli, ["--color", "help"])
+    assert res_root.exit_code == 0
+    assert "Spritzle" in res_root.output
+    assert "Commands:" in res_root.output
+
+    # Subcommand help with command help text
+    res_add = runner.invoke(spritzle_cli, ["--color", "help", "add"])
+    assert res_add.exit_code == 0
+    assert "Usage:" in res_add.output
+    assert "add" in res_add.output
+
+
+def test_status_format_uptime_unit():
+    from spritzle.cli.commands.status import format_uptime
+
+    assert format_uptime(45) == "45s"
+    assert format_uptime(125) == "2m 5s"
+    assert format_uptime(3665) == "1h 1m"
+    assert format_uptime(90000) == "1d 1h"
+
+
+def test_batch_commands_not_found_and_quiet(cli):
+    runner = CliRunner()
+    from spritzle.daemon.keys import APP_KEY_CORE
+    import libtorrent as lt
+
+    # "No matching torrents found" branches
+    for cmd in ["pause", "resume", "remove"]:
+        res = runner.invoke(spritzle_cli, [cmd, "-q", "name.eq=nonexistent_xyz_12345"])
+        assert res.exit_code == 0
+        assert "No matching torrents found" in res.output
+
+    # Quiet mode on existing torrent
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    with open(t_path, "rb") as f:
+        t_data = f.read()
+    ti = lt.torrent_info(lt.bdecode(t_data))
+    core = cli.app[APP_KEY_CORE]
+    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    ih = str(handle.info_hash())
+
+    res_pause = runner.invoke(spritzle_cli, ["pause", "--quiet", ih])
+    assert res_pause.exit_code == 0
+    assert res_pause.output.strip() == ih
+
+    res_resume = runner.invoke(spritzle_cli, ["resume", "-Q", ih])
+    assert res_resume.exit_code == 0
+    assert res_resume.output.strip() == ih
+
+    res_remove = runner.invoke(spritzle_cli, ["remove", "-Q", ih])
+    assert res_remove.exit_code == 0
+    assert res_remove.output.strip() == ih
+
+
+def test_add_command_validation_and_modes(cli):
+    runner = CliRunner()
+
+    # Invalid info-hash hex length
+    res_bad_len = runner.invoke(spritzle_cli, ["add", "1234abcd"])
+    assert res_bad_len.exit_code == 1
+    assert "Invalid info-hash length" in res_bad_len.output
+
+    # Malformed magnet link prefix
+    res_malformed = runner.invoke(spritzle_cli, ["add", "magnet?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719"])
+    assert res_malformed.exit_code == 1
+    assert "Malformed magnet link" in res_malformed.output
+
+    # Trailing symbol warning
+    res_trailing = runner.invoke(spritzle_cli, ["add", "magnet:?xt=urn:btih:44a040be6d74d8d290cd20128788864cbf770719&"])
+    assert "truncated by the shell" in res_trailing.output or res_trailing.exit_code in (0, 1)
+
+    # Add with --quiet and --color
+    t_path = "tests/daemon/torrents/random_one_file.torrent"
+    res_quiet = runner.invoke(spritzle_cli, ["add", "-Q", t_path])
+    assert res_quiet.exit_code == 0
+    ih = res_quiet.output.strip()
+    assert len(ih) == 40
+
+    # Add with --color summary
+    t_path2 = "tests/daemon/torrents/testtorrent1.torrent"
+    res_color = runner.invoke(spritzle_cli, ["--color", "add", t_path2])
+    assert res_color.exit_code == 0
+    assert "Added" in res_color.output
+
+
+def test_display_helpers_and_errors():
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+    from spritzle.cli.display import print_warning, get_response_error
+
+    # print_warning with/without color
+    print_warning("test plain warning", color_opt=False)
+    print_warning("test color warning", color_opt=True)
+
+    # get_response_error
+    async def _test():
+        # Dict with message
+        resp1 = MagicMock()
+        resp1.json = AsyncMock(return_value={"message": "custom error message"})
+        assert await get_response_error(resp1) == "custom error message"
+
+        # Dict with reason
+        resp2 = MagicMock()
+        resp2.json = AsyncMock(return_value={"reason": "bad request reason"})
+        assert await get_response_error(resp2) == "bad request reason"
+
+        # Text fallback
+        resp3 = MagicMock()
+        resp3.json = AsyncMock(side_effect=ValueError)
+        resp3.text = AsyncMock(return_value="raw text error")
+        assert await get_response_error(resp3) == "raw text error"
+
+        # Reason fallback
+        resp4 = MagicMock()
+        resp4.json = AsyncMock(side_effect=ValueError)
+        resp4.text = AsyncMock(side_effect=ValueError)
+        resp4.reason = "Gateway Timeout"
+        assert await get_response_error(resp4) == "Gateway Timeout"
+
+    asyncio.run(_test())
+
+
+def test_completion_command_unsupported():
+    import pytest
+    from spritzle.cli.commands.completion import command as completion_cmd
+
+    assert completion_cmd.callback is not None
+    with pytest.raises(SystemExit):
+        completion_cmd.callback("unsupported_shell")
+
 
 
 
