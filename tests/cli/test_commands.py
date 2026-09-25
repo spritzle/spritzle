@@ -37,11 +37,35 @@ def test_stats_command(cli):
     Test the 'stats' command.
     """
     runner = CliRunner()
-    result = runner.invoke(
-        spritzle_cli, ["stats"]
-    )
+    result = runner.invoke(spritzle_cli, ["stats"])
     assert result.exit_code == 0
-    print(result.output)
+
+    # Plain and raw
+    res_plain = runner.invoke(spritzle_cli, ["stats", "--plain"])
+    assert res_plain.exit_code == 0
+    assert "Torrents: Downloading" in res_plain.output
+
+    res_raw = runner.invoke(spritzle_cli, ["stats", "--plain", "--raw"])
+    assert res_raw.exit_code == 0
+
+    # JSON output
+    res_json = runner.invoke(spritzle_cli, ["stats", "--json"])
+    assert res_json.exit_code == 0
+    assert "torrents" in json.loads(res_json.output)
+
+    # Color output
+    res_color = runner.invoke(spritzle_cli, ["--color", "stats"])
+    assert res_color.exit_code == 0
+
+    # All stats variants
+    res_all_plain = runner.invoke(spritzle_cli, ["stats", "--all", "--plain"])
+    assert res_all_plain.exit_code == 0
+
+    res_all_json = runner.invoke(spritzle_cli, ["stats", "--all", "--json"])
+    assert res_all_json.exit_code == 0
+
+    res_all_color = runner.invoke(spritzle_cli, ["--color", "stats", "--all"])
+    assert res_all_color.exit_code == 0
 
 
 def test_client_url_formatting(tmp_path):
