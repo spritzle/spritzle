@@ -122,7 +122,7 @@ class Client(object):
                 connector = aiohttp.TCPConnector(ssl=False)
             elif self.fingerprint:
                 fp_bytes = bytes.fromhex(self.fingerprint.replace(":", "").strip())
-                connector = aiohttp.TCPConnector(fingerprint=fp_bytes)
+                connector = aiohttp.TCPConnector(ssl=aiohttp.Fingerprint(fp_bytes))
             elif self.ca_cert:
                 ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
                 connector = aiohttp.TCPConnector(ssl=ssl_ctx)

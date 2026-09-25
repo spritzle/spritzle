@@ -128,7 +128,7 @@ def complete_torrent_identifiers(
                 connector = aiohttp.TCPConnector(ssl=False)
             elif client.fingerprint:
                 fp_bytes = bytes.fromhex(client.fingerprint.replace(":", "").strip())
-                connector = aiohttp.TCPConnector(fingerprint=fp_bytes)
+                connector = aiohttp.TCPConnector(ssl=aiohttp.Fingerprint(fp_bytes))
             elif client.ca_cert:
                 ssl_ctx = ssl.create_default_context(cafile=client.ca_cert)
                 connector = aiohttp.TCPConnector(ssl=ssl_ctx)

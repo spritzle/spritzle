@@ -91,7 +91,7 @@ async def query_daemon_status(
         connector = aiohttp.TCPConnector(ssl=False)
     elif fingerprint:
         fp_bytes = bytes.fromhex(fingerprint.replace(":", "").strip())
-        connector = aiohttp.TCPConnector(fingerprint=fp_bytes)
+        connector = aiohttp.TCPConnector(ssl=aiohttp.Fingerprint(fp_bytes))
     elif ca_cert:
         ssl_ctx = ssl.create_default_context(cafile=ca_cert)
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
