@@ -212,3 +212,74 @@ def test_spritzle_completion_command():
     # Unsupported shell returns error
     res_err = runner.invoke(spritzle_cli, ["completion", "powershell"])
     assert res_err.exit_code != 0
+
+
+def test_complete_profiles():
+    from spritzle.cli.completion_helpers import PROFILES, complete_profiles
+
+    items = complete_profiles(None, None, "")
+    assert len(items) == len(PROFILES)
+    values = [i.value for i in items]
+    assert "deluge-2.1.1" in values
+
+    deluge_items = complete_profiles(None, None, "del")
+    assert [i.value for i in deluge_items] == ["deluge-2.1.1"]
+
+
+def test_complete_torrent_identifiers_extra_branches(tmp_path, monkeypatch):
+    from unittest.mock import MagicMock, patch
+    from spritzle.cli.completion_helpers import complete_torrent_identifiers
+
+    # 1. ctx.obj present with empty base_url/token
+    mock_ctx = MagicMock()
+    mock_client = MagicMock()
+    mock_client.base_url = ""
+    mock_client.token = ""
+    mock_ctx.obj = mock_client
+    assert complete_torrent_identifiers(mock_ctx, None, "") == []
+
+    # 2. Client TLS settings and non-dict items
+    mock_client.base_url = "http://127.0.0.1:8080"
+    mock_client.token = "test"
+    mock_client.insecure = True
+    mock_client.fingerprint = "aa:bb"
+    mock_client.ca_cert = "/dev/null"
+    mock_client.url = lambda *args: "http://127.0.0.1:8080/torrent"
+
+    class MockResp:
+        status = 200
+        async def json(self):
+            return ["0123456789abcdef0123456789abcdef01234567"]
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    class MockSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        def get(self, *args, **kwargs):
+            return MockResp()
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    import aiohttp
+    monkeypatch.setattr(aiohttp, "ClientSession", MockSession)
+
+    items = complete_torrent_identifiers(mock_ctx, None, "")
+    assert len(items) == 1
+    assert items[0].value == "0123456789abcdef0123456789abcdef01234567"
+
+    # With fingerprint
+    mock_client.insecure = False
+    mock_client.fingerprint = "00" * 32
+    assert len(complete_torrent_identifiers(mock_ctx, None, "")) == 1
+
+    # With ca_cert
+    mock_client.fingerprint = None
+    import ssl
+    real_ctx = ssl.create_default_context()
+    with patch("ssl.create_default_context", return_value=real_ctx):
+        assert len(complete_torrent_identifiers(mock_ctx, None, "")) == 1
