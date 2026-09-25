@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="38 10 125 105" width="100%" height="100%">
+  <defs>
+    <style>
+      .blend-shape {
+        mix-blend-mode: multiply;
+      }
+      .stroked-path {
+        vector-effect: non-scaling-stroke;
+      }
+    </style>
+  </defs>
+  <g id="spritzle-cluster">
+    <!-- 1. Main Droplet -->
+    <g id="drop-large" transform="translate(51, 19) scale(0.25) rotate(39, 140, 175)">
+      <path class="blend-shape stroked-path"
+        d="M 140 35 C 175 85, 260 152, 260 222 C 260 280, 206 308, 154 308 C 86 308, 50 268, 50 215 C 50 155, 110 85, 140 35 Z"
+        fill="#9C27B0"
+        opacity="0.88"
+        stroke="#701C7F"
+        stroke-width="1"
+        stroke-linejoin="round"
+      />
+      <path class="blend-shape"
+        d="M 140 35 C 105 85, 50 155, 50 215 C 50 268, 86 308, 154 308 C 176 308, 204 292, 194 242 C 180 170, 122 142, 140 35 Z"
+        fill="#B55DC4"
+        opacity="0.80"
+      />
+    </g>
+
+    <!-- 2. Medium Droplet -->
+    <g id="drop-medium" opacity="0.7" transform="translate(108, 16) scale(0.18) rotate(39, 140, 175)">
+      <path class="blend-shape stroked-path"
+        d="M 140 35 C 175 85, 260 152, 260 222 C 260 280, 206 308, 154 308 C 86 308, 50 268, 50 215 C 50 155, 110 85, 140 35 Z"
+        fill="#9C27B0"
+        opacity="0.88"
+        stroke="#701C7F"
+        stroke-width="1"
+        stroke-linejoin="round"
+      />
+      <path class="blend-shape"
+        d="M 140 35 C 105 85, 50 155, 50 215 C 50 268, 86 308, 154 308 C 176 308, 204 292, 194 242 C 180 170, 122 142, 140 35 Z"
+        fill="#B55DC4"
+        opacity="0.80"
+      />
+    </g>
+
+    <!-- 3. Small Droplet -->
+    <g id="drop-small" opacity="0.6" transform="translate(110, 72) scale(0.12) rotate(39, 140, 175)">
+      <path class="blend-shape stroked-path"
+        d="M 140 35 C 175 85, 260 152, 260 222 C 260 280, 206 308, 154 308 C 86 308, 50 268, 50 215 C 50 155, 110 85, 140 35 Z"
+        fill="#9C27B0"
+        opacity="0.88"
+        stroke="#701C7F"
+        stroke-width="1"
+        stroke-linejoin="round"
+      />
+      <path class="blend-shape"
+        d="M 140 35 C 105 85, 50 155, 50 215 C 50 268, 86 308, 154 308 C 176 308, 204 292, 194 242 C 180 170, 122 142, 140 35 Z"
+        fill="#B55DC4"
+        opacity="0.80"
+      />
+    </g>
+  </g>
+</svg>
