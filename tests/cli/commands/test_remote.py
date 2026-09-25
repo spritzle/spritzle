@@ -25,6 +25,7 @@ from click.testing import CliRunner
 import pytest
 
 from spritzle.daemon.resource.auth import auth_middleware
+from spritzle.cli.display import strip_ansi
 from spritzle.cli.main import cli as spritzle_cli
 
 
@@ -68,7 +69,7 @@ def test_remote_add_and_list(cli, core, tmp_path):
     assert res_rich.exit_code == 0
     assert "╭" in res_rich.output
     assert "seedbox" in res_rich.output
-    assert "* default remote" in res_rich.output
+    assert "* default remote" in strip_ansi(res_rich.output)
 
     # List remotes (json)
     res_json = runner.invoke(
@@ -190,7 +191,7 @@ def test_remote_status(cli, core, tmp_path):
     assert "╭" in res_all.output
     assert "box" in res_all.output
     assert "online" in res_all.output
-    assert "* default remote" in res_all.output
+    assert "* default remote" in strip_ansi(res_all.output)
 
     # Check status of all remotes (plain)
     res_plain = runner.invoke(

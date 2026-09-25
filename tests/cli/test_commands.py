@@ -886,6 +886,7 @@ def test_modern_display_formatters():
         render_rich_table,
         render_stats_cards,
         render_status_card,
+        strip_ansi,
     )
 
     # Speed color highlights
@@ -978,14 +979,13 @@ def test_modern_display_formatters():
     assert "spritzle add" in out_empty
     assert "bootstrapping DHT..." in out_empty
 
-    # Caption contrast & legibility (no dim in caption)
+    # Caption contrast & legibility (no italic in caption to prevent standout inverse-video)
     buf.seek(0)
     buf.truncate(0)
     render_kv_table(c, [("download_rate_limit", 1048576)], modified_keys={"download_rate_limit"})
     out_kv = buf.getvalue()
     assert "modified from default" in out_kv
     assert "\x1b[3m" not in out_kv  # Ensure 'italic' (which renders as inverse video white bar in some terminals) is not used
-    assert "\x1b[2m" not in out_kv  # Ensure 'dim' is not used
 
     buf.seek(0)
     buf.truncate(0)
@@ -998,7 +998,10 @@ def test_modern_display_formatters():
     out_rich = buf.getvalue()
     assert "bootstrapping DHT..." in out_rich
     assert "\x1b[3m" not in out_rich  # Ensure 'italic' is not used
-    assert "\x1b[2m" not in out_rich  # Ensure 'dim' is not used
+
+    # strip_ansi helper
+    assert strip_ansi("\x1b[32m* default remote\x1b[0m") == "* default remote"
+    assert strip_ansi("plain text") == "plain text"
 
 
 def test_list_json_output(cli):

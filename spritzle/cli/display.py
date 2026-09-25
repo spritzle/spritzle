@@ -55,6 +55,11 @@ def get_console(color_opt: Optional[bool] = None, stderr: bool = False) -> Conso
     )
 
 
+def strip_ansi(text: str) -> str:
+    """Strip ANSI escape codes from styled terminal output."""
+    return Text.from_ansi(text).plain
+
+
 def format_speed(
     bps: Union[int, float],
     human: bool = True,

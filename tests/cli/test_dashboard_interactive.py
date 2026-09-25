@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from rich.console import Console
 
+from spritzle.cli.display import strip_ansi
 from spritzle.cli.dashboard import (
     DashboardState,
     FilterTab,
@@ -580,8 +581,8 @@ def test_build_dashboard_renderable_with_state(sample_torrents):
     output_sel = cap.get()
     assert "[x]" in output_sel
     assert "[ ]" in output_sel
-    assert "Selected: 1" in output_sel
-    assert "1 selected" in output_sel
+    assert "Selected: 1" in strip_ansi(output_sel)
+    assert "1 selected" in strip_ansi(output_sel)
     state.selected_hashes.clear()
 
     # 2. Inspector View
