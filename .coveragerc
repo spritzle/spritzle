@@ -1,6 +1,8 @@
 [report]
 show_missing = True
+
 [run]
+source = spritzle
 omit =
     tests/*
     spritzle/tests/*
