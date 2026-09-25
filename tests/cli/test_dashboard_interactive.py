@@ -764,3 +764,252 @@ def test_dashboard_interactive_submodes_and_keys(sample_torrents):
     asyncio.run(_test())
 
 
+def test_dashboard_execute_command_full(sample_torrents):
+    async def _test():
+        state = DashboardState()
+        state.raw_torrents = sample_torrents
+        client = MagicMock()
+        client.url = lambda path: f"http://localhost/{path}"
+        client.session = MagicMock()
+        quit_event = asyncio.Event()
+
+        # Quit
+        await execute_command(":q", client, state, quit_event)
+        assert quit_event.is_set()
+
+        # Empty command
+        await execute_command("   ", client, state, quit_event)
+
+        # Pause all
+        await execute_command(":pause all", client, state, quit_event)
+        assert "Paused all" in state.status_message
+
+        # Resume all
+        await execute_command(":resume all", client, state, quit_event)
+        assert "Resumed all" in state.status_message
+
+        # Pause and resume selected
+        state.selected_hashes.add("a" * 40)
+        await execute_command(":pause", client, state, quit_event)
+        assert "Paused 1" in state.status_message
+
+        state.selected_hashes.add("a" * 40)
+        await execute_command(":resume", client, state, quit_event)
+        assert "Resumed 1" in state.status_message
+
+        # Reannounce
+        state.selected_hashes.add("a" * 40)
+        await execute_command(":reannounce", client, state, quit_event)
+        assert "Reannounced 1" in state.status_message
+
+        # Delete with --delete-files
+        state.selected_hashes.add("a" * 40)
+        await execute_command(":rm --delete-files", client, state, quit_event)
+        assert "Removed 1" in state.status_message
+
+        # Delete prompt
+        state.selected_hashes.add("b" * 40)
+        await execute_command(":rm", client, state, quit_event)
+        assert state.confirm_prompt is not None
+        assert state.confirm_callback is not None
+
+        # Add command without args
+        await execute_command(":add", client, state, quit_event)
+        assert state.status_is_error is True
+        assert "Usage" in state.status_message
+
+        # Add command with invalid file
+        await execute_command(":add /nonexistent/file.torrent", client, state, quit_event)
+        assert state.status_is_error is True
+        assert "File not found" in state.status_message
+
+        # Filter command
+        await execute_command(":filter state.eq=downloading", client, state, quit_event)
+        assert state.custom_query == "state.eq=downloading"
+        await execute_command(":filter clear", client, state, quit_event)
+        assert state.custom_query is None
+
+        # Search command
+        await execute_command(":search arch", client, state, quit_event)
+        assert state.search_query == "arch"
+        await execute_command(":search clear", client, state, quit_event)
+        assert state.search_query == ""
+
+        # Clear command
+        state.search_query = "something"
+        state.custom_query = "something"
+        await execute_command(":clear", client, state, quit_event)
+        assert state.search_query == ""
+        assert state.custom_query is None
+
+        # Sort command
+        await execute_command(":sort", client, state, quit_event)
+        assert "Available columns" in state.status_message
+
+        await execute_command(":sort progress asc", client, state, quit_event)
+        assert state.sort_column == "progress"
+        assert state.sort_ascending is True
+
+        await execute_command(":sort invalid_column", client, state, quit_event)
+        assert state.status_is_error is True
+        assert "Unknown column" in state.status_message
+
+        # Col command
+        await execute_command(":col", client, state, quit_event)
+        assert state.view_mode == "columns"
+
+        await execute_command(":col +eta", client, state, quit_event)
+        assert "eta" in state.visible_columns
+
+        await execute_command(":col -eta", client, state, quit_event)
+        assert "eta" not in state.visible_columns
+
+        await execute_command(":col reset", client, state, quit_event)
+        assert "reset" in state.status_message
+
+        await execute_command(":col invalid", client, state, quit_event)
+        assert state.status_is_error is True
+
+        # Move command
+        await execute_command(":move", client, state, quit_event)
+        assert state.status_is_error is True
+
+        # Help command
+        await execute_command(":help", client, state, quit_event)
+        assert state.view_mode == "help"
+
+        # Unknown command
+        await execute_command(":unknown_cmd", client, state, quit_event)
+        assert state.status_is_error is True
+
+    asyncio.run(_test())
+
+
+def test_dashboard_sort_keys(sample_torrents):
+    state = DashboardState()
+    state.raw_torrents = sample_torrents
+
+    columns_to_test = [
+        "name", "state", "progress", "size", "done",
+        "download_rate", "upload_rate", "peers", "seeds",
+        "eta", "ratio", "added"
+    ]
+    for col in columns_to_test:
+        state.sort_column = col
+        state.sort_ascending = True
+        items_asc = state.get_filtered_items()
+        assert len(items_asc) == len(sample_torrents)
+
+        state.sort_ascending = False
+        items_desc = state.get_filtered_items()
+        assert len(items_desc) == len(sample_torrents)
+
+
+def test_dashboard_fetch_and_run_functions(sample_torrents):
+    from spritzle.cli.dashboard import (
+        fetch_torrent_data,
+        fetch_torrent_detail,
+        fetch_torrent_files,
+        fetch_torrent_trackers,
+        fetch_torrent_peers,
+        fetch_session_stats,
+        fetch_torrents_with_status,
+        render_single_watch_panel,
+        watch_single_torrent,
+        run_dashboard,
+        _sleep_or_quit,
+        _build_filter_bar_text,
+        _build_help_panel,
+        _build_columns_panel,
+        _build_footer_status,
+    )
+
+    async def _test():
+        # Setup mock client
+        client = MagicMock()
+        client.url = lambda path: f"http://localhost/{path}"
+
+        # Context manager for responses
+        class MockResp:
+            def __init__(self, data, status=200):
+                self._data = data
+                self.status = status
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+            async def json(self):
+                return self._data
+            async def text(self):
+                return str(self._data)
+
+        # Mock GET endpoints
+        def mock_get(url, **kwargs):
+            if "torrent/" in url and "/files" in url:
+                return MockResp([{"index": 0, "path": "file1.iso"}])
+            elif "torrent/" in url and "/trackers" in url:
+                return MockResp([{"tier": 0, "url": "http://tracker.com"}])
+            elif "torrent/" in url and "/peers" in url:
+                return MockResp([{"ip": "1.2.3.4"}])
+            elif "detail=full" in url:
+                return MockResp(dict(sample_torrents[0]))
+            elif "session/stats" in url:
+                return MockResp({"dht.dht_nodes": 50, "peer.num_peers_connected": 5})
+            elif "torrent/" in url:
+                return MockResp(dict(sample_torrents[0]))
+            elif url.endswith("/torrent") or url.endswith("torrent"):
+                return MockResp([dict(sample_torrents[0])])
+            return MockResp({})
+
+        client.session.get = MagicMock(side_effect=mock_get)
+
+        # Test fetch functions
+        data = await fetch_torrent_data(client, "a" * 40)
+        assert data is not None
+        detail = await fetch_torrent_detail(client, "a" * 40)
+        assert detail is not None
+        files = await fetch_torrent_files(client, "a" * 40)
+        assert len(files) == 1
+        trackers = await fetch_torrent_trackers(client, "a" * 40)
+        assert len(trackers) == 1
+        peers = await fetch_torrent_peers(client, "a" * 40)
+        assert len(peers) == 1
+        stats = await fetch_session_stats(client)
+        assert stats.get("dht.dht_nodes") == 50
+        torrents = await fetch_torrents_with_status(client, query=["state=downloading"])
+        assert len(torrents) == 1
+
+        # Test render_single_watch_panel
+        panel_color = render_single_watch_panel(sample_torrents[0], is_color=True)
+        assert panel_color is not None
+        panel_plain = render_single_watch_panel(sample_torrents[0], is_color=False)
+        assert panel_plain is not None
+
+        # Test watch_single_torrent once
+        await watch_single_torrent(client, "a" * 40, once=True, color_opt=False)
+        await watch_single_torrent(client, "a" * 40, once=True, color_opt=True)
+
+        # Test _sleep_or_quit
+        quit_ev = asyncio.Event()
+        assert await _sleep_or_quit(0.01, None) is False
+        assert await _sleep_or_quit(0.01, quit_ev) is False
+        quit_ev.set()
+        assert await _sleep_or_quit(0.01, quit_ev) is True
+
+        # Test plain builder functions
+        state = DashboardState()
+        state.raw_torrents = sample_torrents
+        assert _build_filter_bar_text(state, is_color=False) is not None
+        assert _build_help_panel(is_color=False) is not None
+        assert _build_columns_panel(state, is_color=False) is not None
+        assert _build_footer_status(state, is_color=False) is not None
+
+        # Test run_dashboard once
+        await run_dashboard(client, once=True, plain=True)
+        await run_dashboard(client, once=True, plain=False, color_opt=True, fullscreen=False)
+
+    asyncio.run(_test())
+
+
+
+
