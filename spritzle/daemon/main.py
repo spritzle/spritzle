@@ -27,6 +27,7 @@ import sys
 
 import traceback
 from typing import Optional
+import warnings
 
 import aiohttp.web
 import click
@@ -186,6 +187,31 @@ def check_libtorrent() -> None:
         sys.exit(1)
 
 
+def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
+    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                category=DeprecationWarning,
+                message=".*There is no current event loop.*",
+            )
+            loop = asyncio.get_event_loop()
+            if loop is not None and not loop.is_closed():
+                return loop
+    except RuntimeError:
+        pass
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
+
+
 def run_daemon(
     host: str = "127.0.0.1",
     port: int = 17382,
@@ -201,11 +227,7 @@ def run_daemon(
         f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, state_dir={state_dir}, log_level={log_level}, debug={debug}, listen_interfaces={listen_interfaces}"
     )
 
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    loop = get_or_create_event_loop()
     loop.set_debug(debug)
 
     config = Config(config_dir=config_dir)

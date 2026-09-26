@@ -5,6 +5,7 @@ from pathlib import Path
 import pkgutil
 import sys
 from typing import Optional, Union
+import warnings
 
 from urllib.parse import urlparse
 
@@ -15,6 +16,31 @@ from spritzle.cli.completion_helpers import complete_remotes
 from spritzle.cli.config import CLIConfig, RemotesConfig
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
+
+
+def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
+    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                category=DeprecationWarning,
+                message=".*There is no current event loop.*",
+            )
+            loop = asyncio.get_event_loop()
+            if loop is not None and not loop.is_closed():
+                return loop
+    except RuntimeError:
+        pass
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
 
 
 class Client(object):
@@ -133,11 +159,7 @@ class Client(object):
                 self.session = session
                 await cmd(self, *args, **kwargs)
 
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        loop = get_or_create_event_loop()
         try:
             loop.run_until_complete(_do_command(cmd, *args, **kwargs))
         except (KeyboardInterrupt, asyncio.CancelledError):

@@ -98,7 +98,7 @@ class ResumeData(object):
         )
         self.save_loop_task = self.loop.create_task(self.save_loop())
 
-    async def stop(self):
+    async def stop(self, save: bool = True):
         log.debug("Resume data manager stopping...")
         if self.save_loop_task:
             self.save_loop_task.cancel()
@@ -106,7 +106,9 @@ class ResumeData(object):
                 await self.save_loop_task
             except asyncio.CancelledError:
                 pass
-        await self.save_all()
+            self.save_loop_task = None
+        if save:
+            await self.save_all()
         
         if self.pending_writes:
             log.debug(f"Waiting for {len(self.pending_writes)} pending resume data writes...")

@@ -183,7 +183,7 @@ class Core(object):
 
         log.debug("Core started.")
 
-    async def stop(self):
+    async def stop(self, save: bool = True):
         log.debug("Core stopping..")
         self._cleanup_signals()
         await self._stop_config_watcher()
@@ -193,15 +193,16 @@ class Core(object):
                 t.cancel()
             await asyncio.gather(*self._tasks, return_exceptions=True)
             self._tasks.clear()
-        if self.session is None:
-            return
         await self.hooks.stop()
-        await self.resume_data.stop()
-        await self.save_session_state()
-        self.session.pause()
+        await self.resume_data.stop(save=save)
+        if self.session is not None:
+            if save:
+                await self.save_session_state()
+            self.session.pause()
         await self.alert.stop()
-        del self.session
-        self.session = None
+        if self.session is not None:
+            del self.session
+            self.session = None
         log.debug("Core stopped..")
 
     def _on_config_changed(self, cfg: Config) -> None:

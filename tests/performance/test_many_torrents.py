@@ -181,61 +181,62 @@ async def test_performance_many_torrents(cli, core, tmp_path):
     
     start_load = time.monotonic()
     await new_core.start(settings)
-    duration_load = time.monotonic() - start_load
-    log.info(f"Loaded {NUM_TORRENTS} torrents in {duration_load:.4f}s")
-    
-    assert new_core.session is not None
-    assert len(new_core.session.get_torrents()) == NUM_TORRENTS
-    
-    # Update app to use new core
-    from spritzle.daemon.keys import APP_KEY_CORE
-    cli.app[APP_KEY_CORE] = new_core
-    
-    # Measure Bulk Pause (Sequential HTTP)
-    log.info("Pausing all torrents via HTTP...")
-    start_pause = time.monotonic()
-    
-    # We need the list of IDs again? We know they are generated deterministically or we can fetch.
-    # We can use the cached list 'tlist' from earlier, effectively.
-    # Or just fetch list again (fast now).
-    resp = await cli.get("/torrent")
-    all_ids = await resp.json()
-    
-    for tid in all_ids:
-        await cli.post(f"/torrent/{tid}/pause")
+    try:
+        duration_load = time.monotonic() - start_load
+        log.info(f"Loaded {NUM_TORRENTS} torrents in {duration_load:.4f}s")
         
-    duration_pause = time.monotonic() - start_pause
-    rate_pause = NUM_TORRENTS / duration_pause
-    log.info(f"Paused {NUM_TORRENTS} torrents in {duration_pause:.2f}s ({rate_pause:.2f} t/s)")
-    
-    # Measure Bulk Removal
-    log.info("Removing all torrents via HTTP (Bulk Endpoint)...")
-    start_remove = time.monotonic()
-    
-    resp = await cli.delete("/torrent", params={"delete_files": 1})
-    if resp.status != 200:
-        log.error(f"Failed to delete all torrents: {await resp.text()}")
-    assert resp.status == 200
-    
-    duration_remove = time.monotonic() - start_remove
-    log.info(f"Removed {NUM_TORRENTS} torrents in {duration_remove:.2f}s")
-    
-    # Verify empty
-    assert new_core.session is not None
-    assert len(new_core.session.get_torrents()) == 0
-    
-    # Report
-    print(f"\n--- Performance Report ({NUM_TORRENTS} torrents) ---")
-    print(f"Generation: {duration_gen:.2f}s")
-    print(f"Add:        {duration_add:.2f}s ({rate_add:.2f} t/s)")
-    print(f"List(All):  {duration_list:.4f}s")
-    print(f"List(Qry):  {duration_query:.4f}s")
-    print(f"SaveResume: {duration_save_resume:.4f}s")
-    print(f"Startup:    {duration_load:.4f}s")
-    print(f"BulkPause:  {duration_pause:.2f}s ({rate_pause:.2f} t/s)")
-    print(f"BulkRemove: {duration_remove:.2f}s")
-    print("------------------------------------------------")
-    
-    # Cleanup new_core
-    await new_core.stop()
+        assert new_core.session is not None
+        assert len(new_core.session.get_torrents()) == NUM_TORRENTS
+        
+        # Update app to use new core
+        from spritzle.daemon.keys import APP_KEY_CORE
+        cli.app[APP_KEY_CORE] = new_core
+        
+        # Measure Bulk Pause (Sequential HTTP)
+        log.info("Pausing all torrents via HTTP...")
+        start_pause = time.monotonic()
+        
+        # We need the list of IDs again? We know they are generated deterministically or we can fetch.
+        # We can use the cached list 'tlist' from earlier, effectively.
+        # Or just fetch list again (fast now).
+        resp = await cli.get("/torrent")
+        all_ids = await resp.json()
+        
+        for tid in all_ids:
+            await cli.post(f"/torrent/{tid}/pause")
+            
+        duration_pause = time.monotonic() - start_pause
+        rate_pause = NUM_TORRENTS / duration_pause
+        log.info(f"Paused {NUM_TORRENTS} torrents in {duration_pause:.2f}s ({rate_pause:.2f} t/s)")
+        
+        # Measure Bulk Removal
+        log.info("Removing all torrents via HTTP (Bulk Endpoint)...")
+        start_remove = time.monotonic()
+        
+        resp = await cli.delete("/torrent", params={"delete_files": 1})
+        if resp.status != 200:
+            log.error(f"Failed to delete all torrents: {await resp.text()}")
+        assert resp.status == 200
+        
+        duration_remove = time.monotonic() - start_remove
+        log.info(f"Removed {NUM_TORRENTS} torrents in {duration_remove:.2f}s")
+        
+        # Verify empty
+        assert new_core.session is not None
+        assert len(new_core.session.get_torrents()) == 0
+        
+        # Report
+        print(f"\n--- Performance Report ({NUM_TORRENTS} torrents) ---")
+        print(f"Generation: {duration_gen:.2f}s")
+        print(f"Add:        {duration_add:.2f}s ({rate_add:.2f} t/s)")
+        print(f"List(All):  {duration_list:.4f}s")
+        print(f"List(Qry):  {duration_query:.4f}s")
+        print(f"SaveResume: {duration_save_resume:.4f}s")
+        print(f"Startup:    {duration_load:.4f}s")
+        print(f"BulkPause:  {duration_pause:.2f}s ({rate_pause:.2f} t/s)")
+        print(f"BulkRemove: {duration_remove:.2f}s")
+        print("------------------------------------------------")
+    finally:
+        # Cleanup new_core
+        await new_core.stop()
 

@@ -152,7 +152,11 @@ class Alert(object):
 
         await asyncio.sleep(0)
         if self.pop_alerts_task:
-            await self.pop_alerts_task
+            try:
+                await self.pop_alerts_task
+            except asyncio.CancelledError:
+                pass
+            self.pop_alerts_task = None
         log.debug("Alert stopped.")
 
     def register_handler(self, alert_type, handler):

@@ -100,12 +100,12 @@ async def test_metadata_persistence(cli, core, tmp_path):
         "stop_tracker_timeout": 0,
     }
     await new_core.start(settings)
-    
-    assert new_core.session is not None
-    log.info(f"Loaded {len(new_core.session.get_torrents())} torrents.")
-    log.info(f"Loaded metadata for {len(new_core.torrent_data)} torrents.")
-    
-    assert len(new_core.torrent_data) == NUM_TORRENTS, "Missing metadata in memory after reload!"
-    
-    # Cleanup
-    await new_core.stop()
+    try:
+        assert new_core.session is not None
+        log.info(f"Loaded {len(new_core.session.get_torrents())} torrents.")
+        log.info(f"Loaded metadata for {len(new_core.torrent_data)} torrents.")
+        
+        assert len(new_core.torrent_data) == NUM_TORRENTS, "Missing metadata in memory after reload!"
+    finally:
+        # Cleanup
+        await new_core.stop()

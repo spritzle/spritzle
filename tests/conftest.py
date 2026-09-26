@@ -39,8 +39,10 @@ def core(loop, monkeypatch):
     }
     with patch.object(core, "start", partial(core.start, settings=settings)):
         yield core
-    if core.session is not None:
+    try:
         loop.run_until_complete(core.stop())
+    except Exception:
+        pass
     shutil.rmtree(str(state_dir), ignore_errors=True)
     shutil.rmtree(str(config_dir), ignore_errors=True)
     shutil.rmtree(str(downloads_dir), ignore_errors=True)

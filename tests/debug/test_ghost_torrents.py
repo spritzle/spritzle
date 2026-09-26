@@ -61,11 +61,8 @@ async def test_ghost_torrents(core, tmp_path):
         log.warning("Resume file not found!")
         
     # 4. Restart Core
-    # Stop current core (without saving again, to preserve our broken state)
-    # core.stop() calls saves. We need to bypass that or stop without saving.
-    # core.session.pause()
-    del core.session
-    core.session = None
+    # Stop current core without saving again, to preserve our broken state (deleted resume file)
+    await core.stop(save=False)
     
     log.info("Restarting core...")
     new_core = Core(core.config, core.state_dir)
@@ -76,22 +73,24 @@ async def test_ghost_torrents(core, tmp_path):
     
     # This calls load_session_state AND resume_data.load
     await new_core.start(settings)
-    
-    assert new_core.session is not None
-    torrents = new_core.session.get_torrents()
-    log.info(f"Torrents in session: {len(torrents)}")
-    
-    # If session.state restored it, count should be 1
-    if len(torrents) == 1:
-        log.info("Torrent restored from session state!")
-        t_hash = str(torrents[0].info_hash())
+    try:
+        assert new_core.session is not None
+        torrents = new_core.session.get_torrents()
+        log.info(f"Torrents in session: {len(torrents)}")
         
-        # Check if it is in torrent_data
-        if t_hash in new_core.torrent_data:
-            log.info("Torrent data successfully restored (empty) for ghost torrent.")
-            assert new_core.torrent_data[t_hash] == {}
+        # If session.state restored it, count should be 1
+        if len(torrents) == 1:
+            log.info("Torrent restored from session state!")
+            t_hash = str(torrents[0].info_hash())
+            
+            # Check if it is in torrent_data
+            if t_hash in new_core.torrent_data:
+                log.info("Torrent data successfully restored (empty) for ghost torrent.")
+                assert new_core.torrent_data[t_hash] == {}
+            else:
+                log.error("FAILURE: Torrent in session but missing from torrent_data (Ghost Torrent)")
+                pytest.fail("Ghost Torrent Detected - Consistency Check Failed")
         else:
-            log.error("FAILURE: Torrent in session but missing from torrent_data (Ghost Torrent)")
-            pytest.fail("Ghost Torrent Detected - Consistency Check Failed")
-    else:
-        log.info("Torrent NOT restored from session state. (This is good)")
+            log.info("Torrent NOT restored from session state. (This is good)")
+    finally:
+        await new_core.stop()
