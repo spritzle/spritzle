@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 import click
 
+from spritzle.cli.completion_helpers import complete_torrent_flags
 from spritzle.cli.display import (
     get_console,
     get_response_error,
@@ -31,6 +32,14 @@ from spritzle.cli.display import (
     ),
 )
 @click.option(
+    "--flag",
+    "-f",
+    type=str,
+    multiple=True,
+    shell_complete=complete_torrent_flags,
+    help="Torrent flag to set on add (e.g. paused, seed_mode). Can be specified multiple times.",
+)
+@click.option(
     "--tag",
     "-t",
     type=str,
@@ -48,14 +57,15 @@ from spritzle.cli.display import (
 @click.option("--json", "json_output", is_flag=True, default=False, help="Output as JSON.")
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
-def command(client, path, option, tag, quiet, watch, json_output, plain):
-    client.do_command(f, path, option, tag, quiet, watch, json_output, plain)
+def command(client, path, option, flag, tag, quiet, watch, json_output, plain):
+    client.do_command(f, path, option, flag, tag, quiet, watch, json_output, plain)
 
 
 async def f(
     client,
     path: str,
     option: Sequence[str],
+    flag: Sequence[str],
     tag: Sequence[str],
     quiet: bool = False,
     watch: bool = False,
@@ -63,6 +73,8 @@ async def f(
     plain: bool = False,
 ):
     data = {}
+    if flag:
+        data["flags"] = list(flag)
     for o in option:
         if "=" in o:
             k, v = o.split("=", 1)

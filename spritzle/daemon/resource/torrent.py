@@ -800,6 +800,68 @@ async def post_torrent_reannounce_endpoint(request):
     return web.json_response({"status": "reannounced", "info_hash": str(handle.info_hash())})
 
 
+def get_lt_torrent_flags() -> List[str]:
+    return [
+        f
+        for f in dir(lt.torrent_flags)
+        if not f.startswith("_") and f != "default_flags"
+    ]
+
+
+def parse_add_torrent_flags(flags_val: Any, default_flags: int = 0) -> int:
+    """Parse torrent flags from int, list of flag strings, comma-separated string, or dict."""
+    valid_flags = set(get_lt_torrent_flags())
+    if isinstance(flags_val, bool):
+        raise web.HTTPBadRequest(reason="flags cannot be a boolean value.")
+    if isinstance(flags_val, int):
+        return flags_val
+    if isinstance(flags_val, str):
+        if flags_val.strip().isdigit():
+            return int(flags_val.strip())
+        flag_names = [f.strip() for f in flags_val.split(",") if f.strip()]
+        res = 0
+        for f in flag_names:
+            if f not in valid_flags:
+                raise web.HTTPBadRequest(
+                    reason=f"'{f}' is not a valid libtorrent torrent_flag"
+                )
+            res |= int(getattr(lt.torrent_flags, f))
+        return res
+    if isinstance(flags_val, list):
+        res = 0
+        for f in flags_val:
+            if not isinstance(f, str):
+                raise web.HTTPBadRequest(
+                    reason=f"Flag item {f!r} must be a string name."
+                )
+            flag_name = f.strip()
+            if flag_name not in valid_flags:
+                raise web.HTTPBadRequest(
+                    reason=f"'{flag_name}' is not a valid libtorrent torrent_flag"
+                )
+            res |= int(getattr(lt.torrent_flags, flag_name))
+        return res
+    if isinstance(flags_val, dict):
+        res = default_flags
+        for k, v in flags_val.items():
+            if k not in valid_flags:
+                raise web.HTTPBadRequest(
+                    reason=f"'{k}' is not a valid libtorrent torrent_flag"
+                )
+            fvalue = int(getattr(lt.torrent_flags, k))
+            val_bool = bool(v)
+            if isinstance(v, str):
+                val_bool = v.strip().lower() in ("true", "1", "yes", "on")
+            if val_bool:
+                res |= fvalue
+            else:
+                res &= ~fvalue
+        return res
+    raise web.HTTPBadRequest(
+        reason=f"Unsupported type for flags: {type(flags_val).__name__}"
+    )
+
+
 @routes.post("/torrent")
 async def post_torrent(request):
     """
@@ -930,6 +992,15 @@ async def post_torrent(request):
     if "save_path" in post:
         post["save_path"] = canonical_save_path
 
+    if "flags" in post:
+        raw_flags = post.pop("flags")
+        default_val = int(getattr(magnet_params, "flags", 0)) if magnet_params is not None else 0
+        parsed_flags = parse_add_torrent_flags(raw_flags, default_flags=default_val)
+        if magnet_params is not None:
+            setattr(magnet_params, "flags", parsed_flags)
+        else:
+            atp_dict["flags"] = parsed_flags
+
     # We have already popped all spritzle specific options from post, merge it in
     atp: Union[Dict[str, Any], lt.add_torrent_params]
     if magnet_params is not None:
@@ -1017,14 +1088,6 @@ async def put_flags(request):
     handle.set_flags(flags, mask)
 
     return web.json_response()
-
-
-def get_lt_torrent_flags() -> List[str]:
-    return [
-        f
-        for f in dir(lt.torrent_flags)
-        if not f.startswith("_") and f != "default_flags"
-    ]
 
 
 def build_flags_dict(flags: int) -> Dict[str, bool]:

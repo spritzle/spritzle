@@ -64,6 +64,7 @@ Options:
 * `-w, --watch`: Stream live progress until completion or `Ctrl+C`.
 * `--json`: Output as JSON.
 * `--plain`: Force plain unstyled output.
+* `-f, --flag TEXT`: Set initial torrent flags on add (e.g. `paused`, `seed_mode`). Can be specified multiple times. Supports tab completion.
 * `-t, --tag TEXT`: Assign tags to the torrent (can be specified multiple times).
 * `-o, --option TEXT`: Key=value option passed to add_torrent parameters (can be specified multiple times).
 * `-Q, --quiet`: Print only the added info-hash.
@@ -73,6 +74,9 @@ Options:
 ```shell
 # Add from a local file (displays summary card with size, path, status, and track instructions)
 spritzle add archlinux-x86_64.iso.torrent
+
+# Add torrent in paused state
+spritzle add -f paused archlinux-x86_64.iso.torrent
 
 # Add and stream live progress until complete
 spritzle add --watch archlinux-x86_64.iso.torrent
@@ -668,6 +672,52 @@ spritzle status
 
 # Output status as JSON
 spritzle status --json
+```
+
+### `logs` - View Daemon Logs
+
+Displays or streams logs stored in the daemon's in-memory ring buffer.
+
+```shell
+spritzle logs [OPTIONS]
+```
+
+Options:
+* `-n, --lines, --limit INTEGER`: Number of log entries to retrieve (default: `50`).
+* `-l, --level [DEBUG|INFO|WARNING|ERROR|CRITICAL]`: Minimum log level filter.
+* `-q, --query, --regex TEXT`: Filter log messages matching a regex pattern.
+* `-s, --since TEXT`: Show logs newer than a relative duration (e.g. `60s`, `5m`, `1h`) or unix timestamp.
+* `-f, --follow`: Stream live log updates continuously.
+* `--clear`: Clear the daemon's in-memory log buffer.
+* `--json`: Output as JSON.
+* `--plain`: Force plain unstyled output.
+
+**Examples:**
+
+```shell
+# View recent daemon logs
+spritzle logs
+
+# Retrieve last 100 log lines
+spritzle logs -n 100
+
+# Filter for warnings and errors only
+spritzle logs -l warning
+
+# Search log messages for a specific pattern
+spritzle logs -q "torrent.*error"
+
+# View logs from the past 10 minutes
+spritzle logs -s 10m
+
+# Stream logs in real-time
+spritzle logs -f
+
+# Clear in-memory log buffer
+spritzle logs --clear
+
+# Output logs as JSON
+spritzle logs --json
 ```
 
 ### `completion` - Shell Completion Scripts

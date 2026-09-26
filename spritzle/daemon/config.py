@@ -195,6 +195,7 @@ class Config(collections.abc.MutableMapping[str, Any]):
     def save(self) -> None:
         """Atomically persist current configuration to disk."""
         if self.in_memory or self.config_file is None:
+            self._notify_change()
             return
         self.config_dir.mkdir(parents=True, exist_ok=True)
         if self._unparseable and self.config_file.exists():
@@ -220,6 +221,7 @@ class Config(collections.abc.MutableMapping[str, Any]):
             self._last_mtime_ns = self.config_file.stat().st_mtime_ns
         except OSError:
             self._last_mtime_ns = None
+        self._notify_change()
 
     def reset(self) -> None:
         """Reset all configuration overrides back to defaults."""

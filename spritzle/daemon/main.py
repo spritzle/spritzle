@@ -36,6 +36,7 @@ from .resource.auth import routes as auth_routes
 from .resource.auth import auth_middleware
 from .resource.config import routes as config_routes
 from .resource.core import routes as core_routes
+from .resource.log import routes as log_routes
 from .resource.session import routes as session_routes
 from .resource.torrent import routes as torrent_routes
 
@@ -140,6 +141,12 @@ def setup_app(app, core, log):
     app[APP_KEY_IDENTITY] = core.identity
     app[APP_KEY_KEY_MANAGER] = core.key_manager
 
+    from .logger import get_log_buffer_handler
+
+    buffer_handler = get_log_buffer_handler()
+    if buffer_handler not in log.handlers:
+        log.addHandler(buffer_handler)
+
     app.middlewares.extend([error_middleware, debug_middleware])
 
     async def on_startup(app):
@@ -160,6 +167,7 @@ def setup_app(app, core, log):
     app.router.add_routes(auth_routes)
     app.router.add_routes(config_routes)
     app.router.add_routes(core_routes)
+    app.router.add_routes(log_routes)
     app.router.add_routes(session_routes)
     app.router.add_routes(torrent_routes)
 

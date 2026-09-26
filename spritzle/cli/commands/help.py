@@ -11,6 +11,8 @@ EXAMPLES: Dict[str, List[str]] = {
     "add": [
         "spritzle add /path/to/file.torrent",
         "spritzle add --watch archlinux-x86_64.iso.torrent",
+        "spritzle add -f paused archlinux-x86_64.iso.torrent",
+        "spritzle add -f paused -f seed_mode archlinux-x86_64.iso.torrent",
         "spritzle add http://example.com/file.torrent",
         "spritzle add 'magnet:?xt=urn:btih:...'",
         "spritzle add <info-hash>",
@@ -18,6 +20,17 @@ EXAMPLES: Dict[str, List[str]] = {
         "spritzle add -o save_path=/mnt/downloads /path/to/file.torrent",
         "spritzle add -Q /path/to/file.torrent",
         "echo 'magnet:?xt=urn:btih:...' | spritzle add -",
+    ],
+    "logs": [
+        "spritzle logs",
+        "spritzle logs -n 100",
+        "spritzle logs -l warning",
+        "spritzle logs -q 'torrent.*error'",
+        "spritzle logs -s 5m",
+        "spritzle logs --follow",
+        "spritzle logs --clear",
+        "spritzle logs --json",
+        "spritzle logs --plain",
     ],
     "list": [
         "spritzle list",

@@ -76,6 +76,8 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 | `save_resume_data_interval` | int | `60` | Interval in seconds between automatic background resume data flushes. |
 | `config_watch_interval` | float | `2.0` | Interval in seconds between file watcher polling checks for `daemon.toml` modifications. Set to `0` or negative to disable file watching. |
 | `listen_interfaces` | string | `""` | Network interfaces and ports to bind for BitTorrent swarm traffic (e.g. `tun0:6881`). When defined, overrides libtorrent defaults on startup and config reload. |
+| `log_level` | string | `"INFO"` | Logging verbosity level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Dynamically applied on config change or reload. |
+| `log_buffer_size` | int | `1000` | Maximum number of structured log records stored in the in-memory ring buffer served by `GET /log` and `spritzle logs`. |
 | `state_dir` | string | `""` | Directory for persistent daemon state (resume data, keys, identity). When not specified, defaults to `$SPRITZLE_STATE_DIR` or `~/.local/share/spritzle/state`. |
 
 ### Configuration Reloading & Live Watching

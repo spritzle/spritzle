@@ -380,6 +380,12 @@ https://libtorrent.org/reference-Core.html#add_torrent_params for reference.
 
 The **spritzle.tags** key can also be passed as a list, containing spritzle tags which should apply to this torrent.
 
+The **flags** key can be used to set initial libtorrent torrent flags upon addition. Supported formats include:
+* List of flag names (strings): `["paused", "seed_mode", "auto_managed"]`
+* Comma-separated string: `"paused,auto_managed"`
+* Flag boolean mapping: `{"paused": true, "auto_managed": false}`
+* Bitmask integer: `16`
+
 Upon success, you will receive a 201 response and a dictionary containing `info_hash`, `name`, `size`, `save_path`, `state`, and `num_peers` in the body. The `Location` header will also be set in the response for the new torrent resource.
 
 ##### File Upload
@@ -732,6 +738,56 @@ $ http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770
 
 # Move storage directory
 $ echo '["/mnt/storage/downloads"]' | http POST http://localhost:17382/torrent/44a040be6d74d8d290cd20128788864cbf770719/move_storage "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+```
+
+Log
+---
+
+The log resource provides access to in-memory daemon log buffers.
+
+### /log
+#### GET
+
+Retrieve filtered log entries from the in-memory ring buffer.
+
+**Query Parameters:**
+* `level`: Minimum log level filter (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Case-insensitive.
+* `regex`: Regular expression to search log messages.
+* `since`: Unix epoch timestamp (float) or relative duration in seconds (e.g. `300` for last 5 minutes).
+* `limit`: Maximum number of entries to return (default: `100`, max: `1000`).
+
+**Response Body:**
+A list of log objects in chronological order:
+```json
+[
+  {
+    "timestamp": 1727328000.123456,
+    "time": "2026-09-26T09:30:00.123456Z",
+    "level": "INFO",
+    "logger": "spritzle",
+    "module": "resume_data",
+    "lineno": 91,
+    "message": "Resume data manager starting..."
+  }
+]
+```
+
+**Example**
+
+```shell
+$ http GET "http://localhost:17382/log?level=WARNING&limit=50" "Authorization: Bearer $TOKEN"
+HTTP/1.1 200 OK
+```
+
+#### DELETE
+
+Clears all entries in the daemon's in-memory log buffer.
+
+**Example**
+
+```shell
+$ http DELETE http://localhost:17382/log "Authorization: Bearer $TOKEN"
 HTTP/1.1 200 OK
 ```
 

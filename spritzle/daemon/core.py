@@ -208,6 +208,38 @@ class Core(object):
     def _on_config_changed(self, cfg: Config) -> None:
         self._validate_default_save_path()
         self.resume_data.notify_interval_changed()
+        self._update_logging_config()
+
+    def _update_logging_config(self) -> None:
+        raw_level = self.config.get("log_level")
+        if raw_level:
+            level_map = {
+                "DEBUG": logging.DEBUG,
+                "INFO": logging.INFO,
+                "WARNING": logging.WARNING,
+                "WARN": logging.WARNING,
+                "ERROR": logging.ERROR,
+                "CRITICAL": logging.CRITICAL,
+            }
+            if str(raw_level).upper() in level_map:
+                new_level = level_map[str(raw_level).upper()]
+                log_obj = logging.getLogger("spritzle")
+                log_obj.setLevel(new_level)
+                for h in log_obj.handlers:
+                    if isinstance(h, logging.StreamHandler) and type(h) is logging.StreamHandler:
+                        h.setLevel(new_level)
+
+        raw_size = self.config.get("log_buffer_size")
+        if raw_size is not None:
+            try:
+                size_int = int(raw_size)
+                if size_int > 0:
+                    from .logger import get_log_buffer_handler
+
+                    get_log_buffer_handler().set_max_size(size_int)
+            except (ValueError, TypeError):
+                pass
+
 
     def _validate_default_save_path(self) -> None:
         default_save_path = self.config.get("default_save_path")
