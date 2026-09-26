@@ -49,11 +49,13 @@ class Core(object):
         config: Config,
         state_dir: Optional[Union[Path, str]] = None,
         startup_listen_interfaces: Optional[str] = None,
+        startup_logfile: Optional[Union[Path, str]] = None,
     ):
         self.config = config
         self.start_time = time.time()
         self.session: Optional[lt.session] = None
         self.startup_listen_interfaces = startup_listen_interfaces
+        self.startup_logfile = startup_logfile
 
         self.hooks = Hooks(Path(self.config.path, "hooks"))
         if state_dir is not None:
@@ -96,6 +98,7 @@ class Core(object):
         self.alert.register_handler(
             "storage_moved_failed_alert", self.on_storage_moved_failed_alert
         )
+        self._update_logging_config()
 
     def get_default_settings(self) -> Dict[str, Any]:
         try:
@@ -228,6 +231,10 @@ class Core(object):
                 for h in log_obj.handlers:
                     if isinstance(h, logging.StreamHandler) and type(h) is logging.StreamHandler:
                         h.setLevel(new_level)
+        else:
+            log_obj = logging.getLogger("spritzle")
+            if log_obj.level == logging.NOTSET:
+                log_obj.setLevel(logging.INFO)
 
         raw_size = self.config.get("log_buffer_size")
         if raw_size is not None:
@@ -239,6 +246,72 @@ class Core(object):
                     get_log_buffer_handler().set_max_size(size_int)
             except (ValueError, TypeError):
                 pass
+
+        raw_logfile = self.config.get("log_file") or self.config.get("logfile")
+        self._update_file_handler(raw_logfile)
+
+    def _update_file_handler(self, logfile_setting: Optional[Any]) -> None:
+        target_logfile = (
+            self.startup_logfile
+            if self.startup_logfile is not None
+            else logfile_setting
+        )
+        log_obj = logging.getLogger("spritzle")
+        target_path: Optional[str] = None
+        if isinstance(target_logfile, (str, Path)) and str(target_logfile).strip():
+            target_path = str(Path(os.path.expanduser(str(target_logfile))).resolve())
+
+        aiohttp_loggers = (
+            "aiohttp.access",
+            "aiohttp.client",
+            "aiohttp.internal",
+            "aiohttp.server",
+            "aiohttp.web",
+            "aiohttp.websocket",
+        )
+
+        existing_handler = None
+        for h in list(log_obj.handlers):
+            if isinstance(h, logging.FileHandler):
+                if target_path and getattr(h, "baseFilename", None) == target_path:
+                    existing_handler = h
+                else:
+                    log_obj.removeHandler(h)
+                    for l_name in aiohttp_loggers:
+                        aio_log = logging.getLogger(l_name)
+                        if h in aio_log.handlers:
+                            aio_log.removeHandler(h)
+                    try:
+                        h.close()
+                    except Exception:
+                        pass
+
+        if target_path and not existing_handler:
+            from .logger import create_file_handler
+
+            try:
+                max_bytes = int(self.config.get("log_rotate_max_bytes", 10 * 1024 * 1024))
+            except (ValueError, TypeError):
+                max_bytes = 10 * 1024 * 1024
+            try:
+                backup_count = int(self.config.get("log_rotate_backup_count", 5))
+            except (ValueError, TypeError):
+                backup_count = 5
+
+            try:
+                new_handler = create_file_handler(
+                    target_path,
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
+                )
+                log_obj.addHandler(new_handler)
+                if log_obj.level == logging.DEBUG:
+                    for l_name in aiohttp_loggers:
+                        aio_log = logging.getLogger(l_name)
+                        if new_handler not in aio_log.handlers:
+                            aio_log.addHandler(new_handler)
+            except Exception as e:
+                log.error(f"Failed to create file log handler for '{target_path}': {e}")
 
 
     def _validate_default_save_path(self) -> None:

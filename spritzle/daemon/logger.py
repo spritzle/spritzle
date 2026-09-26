@@ -1,6 +1,8 @@
 from collections import deque
 from datetime import datetime, timezone
 import logging
+import os
+from pathlib import Path
 import re
 import threading
 from typing import Any, Dict, List, Optional, Union
@@ -104,11 +106,38 @@ def get_log_buffer_handler(max_size: int = 1000) -> LogBufferHandler:
     return _global_log_buffer_handler
 
 
+def create_file_handler(
+    logfile: Union[str, Path],
+    max_bytes: int = 10 * 1024 * 1024,
+    backup_count: int = 5,
+    formatter: Optional[logging.Formatter] = None,
+) -> logging.Handler:
+    path = Path(os.path.expanduser(str(logfile))).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if formatter is None:
+        formatter = logging.Formatter(
+            "[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d] %(message)s"
+        )
+    if max_bytes > 0:
+        from logging.handlers import RotatingFileHandler
+
+        handler: logging.Handler = RotatingFileHandler(
+            str(path), maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
+    else:
+        handler = logging.FileHandler(str(path), encoding="utf-8")
+    handler.setLevel(logging.NOTSET)
+    handler.setFormatter(formatter)
+    return handler
+
+
 def setup_logger(
     name=__name__,
     logfile=None,
     level: Union[int, str] = logging.DEBUG,
     buffer_size: int = 1000,
+    max_bytes: int = 10 * 1024 * 1024,
+    backup_count: int = 5,
 ):
     level_map = {
         "DEBUG": logging.DEBUG,
@@ -141,11 +170,13 @@ def setup_logger(
     if buffer_handler not in logger.handlers:
         logger.addHandler(buffer_handler)
 
+    filehandler = None
     if logfile:
-        filehandler = logging.FileHandler(logfile)
-        filehandler.setLevel(logging.NOTSET)
-        filehandler.setFormatter(formatter)
+        filehandler = create_file_handler(
+            logfile, max_bytes=max_bytes, backup_count=backup_count, formatter=formatter
+        )
         logger.addHandler(filehandler)
+
     if level == logging.DEBUG:
         for log in (
             "aiohttp.access",
@@ -159,6 +190,8 @@ def setup_logger(
             logging.getLogger(log).addHandler(stream_handler)
             if buffer_handler not in logging.getLogger(log).handlers:
                 logging.getLogger(log).addHandler(buffer_handler)
+            if filehandler and filehandler not in logging.getLogger(log).handlers:
+                logging.getLogger(log).addHandler(filehandler)
 
     return logger
 

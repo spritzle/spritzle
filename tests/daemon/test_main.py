@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -37,6 +38,8 @@ def test_spritzled_version_and_help():
     res_help = runner.invoke(spritzled_cli, ["--help"])
     assert res_help.exit_code == 0
     assert "Manage API keys" in res_help.output
+    assert "--logfile" in res_help.output
+    assert "-L" in res_help.output
 
 
 def test_key_management_cli(tmp_path):
@@ -207,3 +210,27 @@ def test_daemon_identity_oserror(tmp_path):
     with patch.object(Path, "read_text", side_effect=OSError("permission denied")):
         identity = Identity(state_dir=st_dir)
         assert identity.daemon_id.startswith("spz_d_")
+
+
+def test_run_daemon_with_logfile(tmp_path):
+    cfg_dir = tmp_path / "cfg"
+    st_dir = tmp_path / "st"
+    cfg_dir.mkdir()
+    st_dir.mkdir()
+    log_file = tmp_path / "daemon_run.log"
+
+    with patch("aiohttp.web.run_app") as mock_run:
+        run_daemon(
+            config_dir=str(cfg_dir),
+            state_dir=str(st_dir),
+            logfile=str(log_file),
+        )
+        assert mock_run.called
+    assert log_file.exists()
+    assert "spritzled starting" in log_file.read_text()
+    # Clean up file handler
+    log_obj = logging.getLogger("spritzle")
+    for h in list(log_obj.handlers):
+        if isinstance(h, logging.FileHandler):
+            log_obj.removeHandler(h)
+            h.close()

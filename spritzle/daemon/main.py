@@ -228,17 +228,38 @@ def run_daemon(
     state_dir: Optional[str] = None,
     log_level: str = "INFO",
     listen_interfaces: Optional[str] = None,
+    logfile: Optional[str] = None,
 ):
     check_libtorrent()
-    log = setup_logger(name="spritzle", level=log_level)
+    config = Config(config_dir=config_dir)
+    raw_logfile = logfile or config.get("log_file") or config.get("logfile")
+    effective_logfile = (
+        str(raw_logfile).strip()
+        if isinstance(raw_logfile, (str, Path)) and str(raw_logfile).strip()
+        else None
+    )
+    try:
+        max_bytes = int(config.get("log_rotate_max_bytes", 10 * 1024 * 1024))
+    except (ValueError, TypeError):
+        max_bytes = 10 * 1024 * 1024
+    try:
+        backup_count = int(config.get("log_rotate_backup_count", 5))
+    except (ValueError, TypeError):
+        backup_count = 5
+
+    log = setup_logger(
+        name="spritzle",
+        level=log_level,
+        logfile=effective_logfile,
+        max_bytes=max_bytes,
+        backup_count=backup_count,
+    )
     log.info(
-        f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, state_dir={state_dir}, log_level={log_level}, debug={debug}, listen_interfaces={listen_interfaces}"
+        f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, state_dir={state_dir}, log_level={log_level}, logfile={effective_logfile}, debug={debug}, listen_interfaces={listen_interfaces}"
     )
 
     loop = get_or_create_event_loop()
     loop.set_debug(debug)
-
-    config = Config(config_dir=config_dir)
 
     # Prevent more than one process using the same config path from running.
     f = Path(config.path, "spritzled.lock").open(mode="w")
@@ -253,6 +274,7 @@ def run_daemon(
         config,
         state_dir=Path(state_dir) if state_dir else None,
         startup_listen_interfaces=listen_interfaces,
+        startup_logfile=logfile,
     )
     bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
     core.key_manager.ensure_local_client_remote(f"http://{bracketed_host}:{port}", core.identity.daemon_id)
@@ -311,8 +333,27 @@ def run_daemon(
     type=str,
     help="Network interfaces to bind (e.g. 'tun0:6881' or 'wg0:6881').",
 )
+@click.option(
+    "-L",
+    "--logfile",
+    "--log-file",
+    "logfile",
+    default=None,
+    type=click.Path(),
+    help="Path to log file.",
+)
 @click.pass_context
-def main(ctx, host, port, debug, config_dir, state_dir, log_level, listen_interfaces):
+def main(
+    ctx,
+    host,
+    port,
+    debug,
+    config_dir,
+    state_dir,
+    log_level,
+    listen_interfaces,
+    logfile,
+):
     """Spritzle daemon."""
     if ctx.invoked_subcommand is None:
         run_daemon(
@@ -323,6 +364,7 @@ def main(ctx, host, port, debug, config_dir, state_dir, log_level, listen_interf
             state_dir=state_dir,
             log_level=log_level,
             listen_interfaces=listen_interfaces,
+            logfile=logfile,
         )
 
 

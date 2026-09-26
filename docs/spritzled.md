@@ -15,6 +15,7 @@ spritzled [OPTIONS] [COMMAND] [ARGS]...
 * `-c, --config-dir, --config_dir PATH`: Path to the configuration directory (default: `~/.config/spritzle`, env: `SPRITZLE_CONFIG_DIR`).
 * `-s, --state-dir, --state_dir PATH`: Path to the state directory for persistent data (resume files, keys, identity; default: `~/.local/share/spritzle/state`, env: `SPRITZLE_STATE_DIR`).
 * `-l, --log-level [DEBUG|INFO|WARNING|ERROR]`: Daemon log verbosity (default: `INFO`, env: `SPRITZLE_LOG_LEVEL`).
+* `-L, --logfile, --log-file PATH`: Path to write daemon log output to a file (env: `SPRITZLE_LOGFILE`).
 * `-i, --listen-interfaces TEXT`: Network interface and port to bind for BitTorrent swarm traffic (default: libtorrent default, env: `SPRITZLE_LISTEN_INTERFACES`; e.g. `tun0:6881` or `wg0:6881`).
 * `--debug`: Enable asyncio event loop debug mode.
 * `--help`: Show the help message and exit.
@@ -78,6 +79,9 @@ Daemon-level configuration values can be inspected or modified at runtime via th
 | `listen_interfaces` | string | `""` | Network interfaces and ports to bind for BitTorrent swarm traffic (e.g. `tun0:6881`). When defined, overrides libtorrent defaults on startup and config reload. |
 | `log_level` | string | `"INFO"` | Logging verbosity level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Dynamically applied on config change or reload. |
 | `log_buffer_size` | int | `1000` | Maximum number of structured log records stored in the in-memory ring buffer served by `GET /log` and `spritzle logs`. |
+| `log_file` | string | `""` | Path to write daemon log output to a file. Supports dynamic addition, updating, or removal on config change or reload. (CLI `-L / --logfile` takes precedence if specified). |
+| `log_rotate_max_bytes` | int | `10485760` | Maximum size in bytes before the log file is rotated (default: 10MB). Set to `0` to disable rotation. |
+| `log_rotate_backup_count` | int | `5` | Number of rotated log backup files to retain. |
 | `state_dir` | string | `""` | Directory for persistent daemon state (resume data, keys, identity). When not specified, defaults to `$SPRITZLE_STATE_DIR` or `~/.local/share/spritzle/state`. |
 
 ### Configuration Reloading & Live Watching

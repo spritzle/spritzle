@@ -140,3 +140,88 @@ async def test_config_logging_dynamic_update(core):
 
     assert log_obj.level == logging.DEBUG
     assert handler.max_size == 250
+
+
+async def test_dynamic_log_file(core, tmp_path):
+    log_obj = logging.getLogger("spritzle")
+    log_file1 = tmp_path / "test1.log"
+    log_file2 = tmp_path / "sub" / "test2.log"
+
+    core.config["log_file"] = str(log_file1)
+    log_obj.info("First log entry to file 1")
+    for h in log_obj.handlers:
+        h.flush()
+    assert log_file1.exists()
+    assert "First log entry to file 1" in log_file1.read_text()
+
+    # Switch log file
+    core.config["log_file"] = str(log_file2)
+    log_obj.info("Second log entry to file 2")
+    for h in log_obj.handlers:
+        h.flush()
+    assert log_file2.exists()
+    assert "Second log entry to file 2" in log_file2.read_text()
+    assert "Second log entry to file 2" not in log_file1.read_text()
+
+    # Remove log file via empty string
+    core.config["log_file"] = ""
+    file_handlers = [h for h in log_obj.handlers if isinstance(h, logging.FileHandler)]
+    assert len(file_handlers) == 0
+
+    # Test re-adding and then deleting via del
+    core.config["log_file"] = str(log_file1)
+    file_handlers = [h for h in log_obj.handlers if isinstance(h, logging.FileHandler)]
+    assert len(file_handlers) == 1
+    del core.config["log_file"]
+    file_handlers = [h for h in log_obj.handlers if isinstance(h, logging.FileHandler)]
+    assert len(file_handlers) == 0
+
+
+async def test_startup_logfile_takes_precedence(tmp_path):
+    from spritzle.daemon.config import Config
+    from spritzle.daemon.core import Core
+
+    cfg_dir = tmp_path / "cfg"
+    st_dir = tmp_path / "st"
+    cfg_dir.mkdir()
+    st_dir.mkdir()
+
+    cfg = Config(config_dir=str(cfg_dir))
+    startup_log = tmp_path / "startup.log"
+    core = Core(cfg, state_dir=st_dir, startup_logfile=str(startup_log))
+
+    try:
+        log_obj = logging.getLogger("spritzle")
+        log_obj.info("startup message")
+        for h in log_obj.handlers:
+            h.flush()
+        assert startup_log.exists()
+        assert "startup message" in startup_log.read_text()
+
+        # Config change should not override startup_logfile
+        cfg_log = tmp_path / "config.log"
+        core.config["log_file"] = str(cfg_log)
+        log_obj.info("after config change")
+        for h in log_obj.handlers:
+            h.flush()
+
+        assert not cfg_log.exists()
+        assert "after config change" in startup_log.read_text()
+    finally:
+        await core.stop(save=False)
+        core.startup_logfile = None
+        core._update_file_handler(None)
+
+
+def test_create_file_handler(tmp_path):
+    from spritzle.daemon.logger import create_file_handler
+    from logging.handlers import RotatingFileHandler
+
+    rfh = create_file_handler(tmp_path / "sub1" / "rot.log", max_bytes=1024, backup_count=3)
+    assert isinstance(rfh, RotatingFileHandler)
+    rfh.close()
+
+    fh = create_file_handler(tmp_path / "sub2" / "plain.log", max_bytes=0)
+    assert isinstance(fh, logging.FileHandler)
+    assert not isinstance(fh, RotatingFileHandler)
+    fh.close()
