@@ -67,9 +67,8 @@ async def test_torrent_transfer(create_core, loop):
             data_file.write_bytes(data)
 
             # Create torrent
-            fs = lt.file_storage()
-            lt.add_files(fs, str(data_file))
-            t = lt.create_torrent(fs)
+            entry = lt.create_file_entry(data_file.name, len(data))
+            t = lt.create_torrent([entry])
             t.set_creator("libtorrent %s" % lt.__version__)
             t.set_comment("Test")
             lt.set_piece_hashes(t, str(tmp_path))
@@ -82,12 +81,13 @@ async def test_torrent_transfer(create_core, loop):
             ti = lt.torrent_info(str(torrent_file))
 
             # Add to seeder
-            params = {
-                "ti": ti,
-                "save_path": str(tmp_path),
-                "flags": lt.torrent_flags.seed_mode,
-            }
-            seeder_handle = seeder_core.session.add_torrent(params)
+            from tests.daemon.common import add_test_torrent
+            seeder_handle = add_test_torrent(
+                seeder_core.session,
+                ti,
+                save_path=str(tmp_path),
+                flags=lt.torrent_flags.seed_mode,
+            )
 
             # Wait for seeder to be checked/ready
             while not seeder_handle.status().is_seeding:
@@ -96,8 +96,10 @@ async def test_torrent_transfer(create_core, loop):
             # Add to leecher
             # Use a different download directory
             with tempfile.TemporaryDirectory() as dl_dir:
-                leecher_handle = leecher_core.session.add_torrent(
-                    {"ti": ti, "save_path": str(dl_dir)}
+                leecher_handle = add_test_torrent(
+                    leecher_core.session,
+                    ti,
+                    save_path=str(dl_dir),
                 )
 
                 # Connect peers
@@ -153,14 +155,14 @@ echo "Hook Triggered" > "{token_file}"
             # Create a real dummy torrent
             dummy = Path(tmpdir) / "dummy.txt"
             dummy.write_text("Hello World")
-            fs = lt.file_storage()
-            lt.add_files(fs, str(dummy))
-            t = lt.create_torrent(fs)
+            entry = lt.create_file_entry(dummy.name, dummy.stat().st_size)
+            t = lt.create_torrent([entry])
             lt.set_piece_hashes(t, str(tmpdir))
 
             ti = lt.torrent_info(t.generate())
 
-            handle = core.session.add_torrent({"ti": ti, "save_path": str(tmpdir)})
+            from tests.daemon.common import add_test_torrent
+            handle = add_test_torrent(core.session, ti, save_path=str(tmpdir))
 
             # Wait a bit
             await asyncio.sleep(0.5)

@@ -18,21 +18,15 @@ from spritzle.daemon.core import Core
 
 
 def create_dummy_torrent(path: Path, name: str, size: int = 1024 * 1024):
-    # Create a dummy file
     file_path = path / name
-    with open(file_path, "wb") as f:
-        f.write(os.urandom(size))
-    
-    fs = lt.file_storage()
-    fs.add_file(name, size)
-    t = lt.create_torrent(fs)
+    file_path.write_bytes(os.urandom(size))
+    entry = lt.create_file_entry(name, size)
+    t = lt.create_torrent([entry])
     t.set_creator("Spritzle Benchmark")
     lt.set_piece_hashes(t, str(path), lambda x: 0)
-    
+
     torrent_path = path.parent / f"{name}.torrent"
-    with open(torrent_path, "wb") as f:
-        f.write(lt.bencode(t.generate()))
-    
+    torrent_path.write_bytes(lt.bencode(t.generate()))
     return torrent_path
 
 async def test_performance_many_torrents(cli, core, tmp_path):
@@ -190,7 +184,7 @@ async def test_performance_many_torrents(cli, core, tmp_path):
         
         # Update app to use new core
         from spritzle.daemon.keys import APP_KEY_CORE
-        cli.app[APP_KEY_CORE] = new_core
+        cli.app._state[APP_KEY_CORE] = new_core
         
         # Measure Bulk Pause (Sequential HTTP)
         log.info("Pausing all torrents via HTTP...")

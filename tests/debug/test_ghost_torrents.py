@@ -9,16 +9,13 @@ from spritzle.daemon.core import Core
 # Reuse dummy torrent logic
 def create_dummy_torrent(path: Path, name: str, size: int = 1024 * 1024):
     file_path = path / name
-    with open(file_path, "wb") as f:
-        f.write(os.urandom(size))
-    fs = lt.file_storage()
-    fs.add_file(name, size)
-    t = lt.create_torrent(fs)
+    file_path.write_bytes(os.urandom(size))
+    entry = lt.create_file_entry(name, size)
+    t = lt.create_torrent([entry])
     t.set_creator("Spritzle Check")
     lt.set_piece_hashes(t, str(path), lambda x: 0)
     torrent_path = path.parent / f"{name}.torrent"
-    with open(torrent_path, "wb") as f:
-        f.write(lt.bencode(t.generate()))
+    torrent_path.write_bytes(lt.bencode(t.generate()))
     return torrent_path
 
 async def test_ghost_torrents(core, tmp_path):
@@ -36,7 +33,8 @@ async def test_ghost_torrents(core, tmp_path):
     name = "ghost_torrent"
     path = create_dummy_torrent(data_dir, name, size=1024)
     info = lt.torrent_info(str(path))
-    handle = core.session.add_torrent({"ti": info, "save_path":str(tmp_path)})
+    from tests.daemon.common import add_test_torrent
+    handle = add_test_torrent(core.session, info, save_path=str(tmp_path))
     
     # Populate torrent_data manually (simulate normal add)
     info_hash = str(handle.info_hash())

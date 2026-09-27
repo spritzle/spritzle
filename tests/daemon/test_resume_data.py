@@ -113,7 +113,7 @@ async def test_load_custom_metadata_types(cli, core):
     new_core = Core(config, state_dir)
     await new_core.start(settings)
     from spritzle.daemon.keys import APP_KEY_CORE
-    cli.app[APP_KEY_CORE] = new_core
+    cli.app._state[APP_KEY_CORE] = new_core
 
     try:
         # The metadata in torrent_data must contain python strings, not bytes
@@ -342,13 +342,17 @@ async def test_save_torrent_multi_waiter_cancellation_isolation(core):
 def test_decode_bencoded_value_and_atomic_write(tmp_path):
     from pathlib import Path
     from unittest.mock import patch
-    from spritzle.daemon.resume_data import decode_bencoded_value, _atomic_write_file
+    from spritzle.daemon.resume_data import decode_bencoded_value, encode_bencoded_value, _atomic_write_file
 
     # test latin-1 fallback
     assert decode_bencoded_value(b"\xff") == "\xff"
     # test list and dict recursion
     assert decode_bencoded_value([b"hello", {b"k": b"v"}]) == ["hello", {"k": "v"}]
     assert decode_bencoded_value(123) == 123
+    assert encode_bencoded_value(["hello", {"k": "v", "num": 123, "tup": ("a",)}]) == [
+        b"hello",
+        {b"k": b"v", b"num": 123, b"tup": (b"a",)},
+    ]
 
     # atomic write with deleted condition
     f = tmp_path / "test.txt"

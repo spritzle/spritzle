@@ -51,6 +51,22 @@ def decode_bencoded_value(val: Any) -> Any:
     return val
 
 
+def encode_bencoded_value(val: Any) -> Any:
+    """Recursively encode python strings into bencoded byte strings."""
+    if isinstance(val, str):
+        return val.encode("utf-8")
+    elif isinstance(val, list):
+        return [encode_bencoded_value(item) for item in val]
+    elif isinstance(val, tuple):
+        return tuple(encode_bencoded_value(item) for item in val)
+    elif isinstance(val, dict):
+        return {
+            (k.encode("utf-8") if isinstance(k, str) else k): encode_bencoded_value(v)
+            for k, v in val.items()
+        }
+    return val
+
+
 def _atomic_write_file(path: Path, data: bytes, is_deleted: Callable[[], bool]) -> None:
     """Atomically write data to path, checking if the file was marked deleted."""
     tmp_path = path.with_name(f".{path.name}.{os.getpid()}_{time.monotonic_ns()}.tmp")
@@ -173,7 +189,7 @@ class ResumeData(object):
         if info_hash in self.core.torrent_data:
             r.update(self.core.torrent_data[info_hash])
 
-        data = lt.bencode(r)
+        data = lt.bencode(encode_bencoded_value(r))
 
         waiters = self._pop_waiters(info_hash)
         # Fire-and-forget write task to avoid blocking the alert loop

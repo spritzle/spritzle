@@ -12,8 +12,60 @@ from spritzle.daemon.core import Core
 from spritzle.daemon.config import Config
 from spritzle.daemon.main import setup_app
 from daemon.common import torrent_dir
+import inspect
+from aiohttp.test_utils import TestClient, TestServer, setup_test_loop, teardown_test_loop
 
-pytest_plugins = "aiohttp.pytest_plugin"
+
+@pytest.fixture
+def loop():
+    loop = setup_test_loop()
+    yield loop
+    teardown_test_loop(loop, fast=True)
+
+
+
+@pytest.fixture
+def aiohttp_client(loop):
+    clients = []
+
+    async def go(app_or_server, *, server_kwargs=None, **kwargs):
+        if not isinstance(app_or_server, TestServer):
+            skw = dict(server_kwargs) if server_kwargs else {}
+            server = TestServer(app_or_server, **skw)
+        else:
+            server = app_or_server
+        client = TestClient(server, **kwargs)
+        await client.start_server()
+        clients.append(client)
+        return client
+
+    yield go
+
+    async def finalize():
+        while clients:
+            await clients.pop().close()
+
+    loop.run_until_complete(finalize())
+
+
+def pytest_pyfunc_call(pyfuncitem):
+    if inspect.iscoroutinefunction(pyfuncitem.function):
+        loop = pyfuncitem.funcargs.get("loop")
+        needs_teardown = False
+        if loop is None:
+            loop = setup_test_loop()
+            needs_teardown = True
+        try:
+            testargs = {
+                arg: pyfuncitem.funcargs[arg]
+                for arg in pyfuncitem._fixtureinfo.argnames
+            }
+            loop.run_until_complete(pyfuncitem.obj(**testargs))
+        finally:
+            if needs_teardown:
+                teardown_test_loop(loop, fast=True)
+        return True
+
 
 
 @pytest.fixture(scope="function")

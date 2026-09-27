@@ -66,7 +66,7 @@ async def f(client, all_stats: bool = False, raw: bool = False, json_output: boo
 
         table = []
         for k, v in sorted(status.items()):
-            table.append([k, v])
+            table.append((k, v))
 
         if should_use_color(color_opt) and not plain:
             console = get_console(color_opt)

@@ -21,6 +21,7 @@
 #
 
 import asyncio
+import inspect
 import logging
 import socket
 from typing import Optional
@@ -74,6 +75,23 @@ class Alert(object):
         self.alert_types = build_alert_types()
         self._notify_r: Optional[socket.socket] = None
         self._notify_w: Optional[socket.socket] = None
+
+    def __del__(self):
+        r = getattr(self, "_notify_r", None)
+        if r is not None:
+            try:
+                r.close()
+            except Exception:
+                pass
+            self._notify_r = None
+        w = getattr(self, "_notify_w", None)
+        if w is not None:
+            try:
+                w.close()
+            except Exception:
+                pass
+            self._notify_w = None
+
 
     async def start(self, session):
         self.loop = asyncio.get_running_loop()
@@ -162,7 +180,7 @@ class Alert(object):
     def register_handler(self, alert_type, handler):
         if alert_type not in self.alert_types and alert_type not in self.categories:
             raise ValueError("Not a valid alert type or category.")
-        if not asyncio.iscoroutinefunction(handler):
+        if not inspect.iscoroutinefunction(handler):
             raise ValueError("Alert handlers must be coroutine functions.")
         self.handlers.setdefault(alert_type, []).append(handler)
 

@@ -45,7 +45,7 @@ def test_parse_add_torrent_flags_unit():
 
 async def test_post_torrent_with_flag_list(cli):
     filepath = Path(torrent_dir, "random_one_file.torrent")
-    file_b64 = b64encode(filepath.open(mode="rb").read()).decode("ascii")
+    file_b64 = b64encode(filepath.read_bytes()).decode("ascii")
 
     # Add paused via flag list
     post_data = {
@@ -66,7 +66,7 @@ async def test_post_torrent_with_flag_list(cli):
 
 async def test_post_torrent_with_invalid_flags(cli):
     filepath = Path(torrent_dir, "random_one_file.torrent")
-    file_b64 = b64encode(filepath.open(mode="rb").read()).decode("ascii")
+    file_b64 = b64encode(filepath.read_bytes()).decode("ascii")
 
     post_data = {
         "file": file_b64,

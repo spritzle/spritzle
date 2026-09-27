@@ -34,6 +34,7 @@ import re
 import socket
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
+import warnings
 
 
 import aiohttp
@@ -347,7 +348,7 @@ def get_torrent_files(handle: Any) -> List[Dict[str, Any]]:
     ti = handle.torrent_file() if handle.is_valid() else None
     if not ti:
         return []
-    fs = ti.files()
+    fs = ti.layout() if hasattr(ti, "layout") else ti.files()
     num = ti.num_files()
     try:
         progresses = handle.file_progress()
@@ -396,7 +397,9 @@ def get_torrent_peers(handle: Any) -> List[Dict[str, Any]]:
             try:
                 identify_fn = getattr(lt, "identify_client", None)
                 if identify_fn:
-                    identified = identify_fn(p.pid).strip()
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", DeprecationWarning)
+                        identified = identify_fn(p.pid).strip()
                     if identified and identified != "Unknown" and not identified.startswith("Unknown [00000000"):
                         client = identified
             except Exception:
@@ -949,7 +952,10 @@ async def post_torrent(request):
                 raise web.HTTPBadRequest(
                     reason=f"Invalid info-hash length: {raw_info_hash}"
                 )
-            atp_dict["info_hashes"] = info_hash_bytes
+            if len(info_hash_bytes) == 20:
+                atp_dict["info_hashes"] = lt.info_hash_t(lt.sha1_hash(info_hash_bytes))
+            else:
+                atp_dict["info_hashes"] = lt.info_hash_t(lt.sha256_hash(info_hash_bytes))
         except (binascii.Error, ValueError) as ex:
             raise web.HTTPBadRequest(reason=f"Invalid hex info-hash: {ex}")
 
@@ -1002,17 +1008,42 @@ async def post_torrent(request):
             atp_dict["flags"] = parsed_flags
 
     # We have already popped all spritzle specific options from post, merge it in
-    atp: Union[Dict[str, Any], lt.add_torrent_params]
+    atp: lt.add_torrent_params
     if magnet_params is not None:
         atp = magnet_params
-        for k, v in post.items():
+    else:
+        atp = lt.add_torrent_params()
+        for k, v in atp_dict.items():
             try:
                 setattr(atp, k, v)
             except Exception:
                 pass
-    else:
-        atp = atp_dict
-        atp.update(post)
+
+    valid_fields = {x for x in dir(lt.add_torrent_params) if not x.startswith("_")}
+    valid_flags = set(get_lt_torrent_flags())
+    for k, v in post.items():
+        if k in valid_flags:
+            fval = int(getattr(lt.torrent_flags, k))
+            val_bool = bool(v)
+            if isinstance(v, str):
+                val_bool = v.strip().lower() in ("true", "1", "yes", "on")
+            if val_bool:
+                atp.flags |= fval
+            else:
+                atp.flags &= ~fval
+        elif k in valid_fields:
+            try:
+                setattr(atp, k, v)
+            except (TypeError, ValueError, AttributeError, Exception) as ex:
+                if isinstance(v, str) and v.isdigit():
+                    try:
+                        setattr(atp, k, int(v))
+                        continue
+                    except Exception:
+                        pass
+                raise web.HTTPBadRequest(reason=f"Invalid value for '{k}': {ex}")
+        else:
+            raise web.HTTPBadRequest(reason=f"Invalid parameter '{k}' for add_torrent")
 
     try:
         torrent_handle = await asyncio.get_running_loop().run_in_executor(

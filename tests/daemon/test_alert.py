@@ -173,7 +173,8 @@ async def test_alert_no_deadlock_on_sync_handle_calls(tmp_path):
     try:
         t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
         ti = lt.torrent_info(lt.bdecode(t1))
-        h: Any = cast(Any, ses.add_torrent({"ti": ti, "save_path": str(tmp_path)}))
+        from tests.daemon.common import add_test_torrent
+        h: Any = add_test_torrent(ses, ti, save_path=str(tmp_path))
 
         for _ in range(200):
             ses.post_session_stats()

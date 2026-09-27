@@ -196,16 +196,25 @@ class Core(object):
                 t.cancel()
             await asyncio.gather(*self._tasks, return_exceptions=True)
             self._tasks.clear()
-        await self.hooks.stop()
-        await self.resume_data.stop(save=save)
-        if self.session is not None:
-            if save:
-                await self.save_session_state()
-            self.session.pause()
-        await self.alert.stop()
-        if self.session is not None:
-            del self.session
-            self.session = None
+        try:
+            await self.hooks.stop()
+            await self.resume_data.stop(save=save)
+        finally:
+            try:
+                if self.session is not None:
+                    if save:
+                        try:
+                            await self.save_session_state()
+                        except Exception:
+                            pass
+                    self.session.pause()
+            finally:
+                try:
+                    await self.alert.stop()
+                finally:
+                    if self.session is not None:
+                        del self.session
+                        self.session = None
         log.debug("Core stopped..")
 
     def _on_config_changed(self, cfg: Config) -> None:

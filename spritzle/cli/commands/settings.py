@@ -234,7 +234,7 @@ async def show(client, modified=False, defaults=False, json_output=False, plain=
 
     table = []
     for k, v in sorted(display_data.items()):
-        table.append([k, v])
+        table.append((k, v))
 
     if should_use_color(getattr(client, "color", None)) and not plain:
         console = get_console(getattr(client, "color", None))

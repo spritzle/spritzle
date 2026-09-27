@@ -1,6 +1,15 @@
 import json
+from typing import Any
 from click.testing import CliRunner
 from spritzle.cli.main import cli as spritzle_cli
+
+
+def _add_test_torrent(session, ti, save_path="/tmp"):
+    import libtorrent as lt
+    atp = lt.add_torrent_params()
+    atp.ti = ti
+    atp.save_path = save_path
+    return session.add_torrent(atp)
 
 
 def test_list_commands(cli):
@@ -105,7 +114,7 @@ def test_remove_delete_files_command(cli, loop):
     # Add a torrent first
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
 
@@ -161,7 +170,7 @@ def test_list_command_non_string_list_field(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     # Add non-string list field to torrent_data
@@ -250,7 +259,7 @@ def test_flags_command(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -396,7 +405,7 @@ def test_cli_daemon_config_and_flags_send_json_content_type(cli):
 
         t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
         ti = lt.torrent_info(lt.bdecode(t_file))
-        handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+        handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
         valid_hash = str(handle.info_hash())
 
         res2 = runner.invoke(
@@ -548,7 +557,7 @@ def test_pause_command(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -567,7 +576,7 @@ def test_resume_command(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -586,7 +595,7 @@ def test_move_storage_command(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -625,7 +634,7 @@ def test_pause_by_name(cli):
 
     t_file = (torrent_dir / "testtorrent1.torrent").read_bytes()
     ti = lt.torrent_info(lt.bdecode(t_file))
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, ti)
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -645,8 +654,8 @@ def test_pause_ambiguous_name(cli):
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
     t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t2)))
 
     runner = CliRunner()
     result = runner.invoke(
@@ -674,8 +683,8 @@ def test_pause_query_and_all(cli):
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
     t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t2)))
 
     runner = CliRunner()
     # Pause by query
@@ -702,8 +711,8 @@ def test_resume_by_name_and_query(cli):
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
     t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t2)))
 
     runner = CliRunner()
     # Resume single by name
@@ -738,8 +747,8 @@ def test_remove_by_name_and_query(cli):
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
     t2 = (torrent_dir / "testtorrent2.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t2)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t2)))
 
     runner = CliRunner()
     # Remove single by name
@@ -769,7 +778,7 @@ def test_flags_by_name_and_query(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
 
     runner = CliRunner()
     # Show flags by name
@@ -801,7 +810,7 @@ def test_move_storage_by_name(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -1011,7 +1020,7 @@ def test_list_json_output(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
 
     runner = CliRunner()
     res = runner.invoke(
@@ -1033,7 +1042,7 @@ def test_list_plain_and_color_flags(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
 
     runner = CliRunner()
     # Plain mode
@@ -1060,7 +1069,7 @@ def test_paused_torrent_display(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
     ih = str(handle.info_hash())
 
     runner = CliRunner()
@@ -1111,7 +1120,7 @@ def test_flags_json_and_plain(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
 
     runner = CliRunner()
     # JSON mode
@@ -1281,7 +1290,7 @@ def test_quiet_action_commands(cli):
     from tests.daemon.common import torrent_dir
 
     t1 = (torrent_dir / "testtorrent1.torrent").read_bytes()
-    handle = cli.app[APP_KEY_CORE].session.add_torrent({"ti": lt.torrent_info(lt.bdecode(t1)), "save_path": "/tmp"})
+    handle = _add_test_torrent(cli.app[APP_KEY_CORE].session, lt.torrent_info(lt.bdecode(t1)))
     info_hash = str(handle.info_hash())
 
     runner = CliRunner()
@@ -1511,7 +1520,7 @@ def test_info_command(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     # Add a tracker to the handle
@@ -1610,7 +1619,7 @@ def test_info_formatting_and_subresource_fallbacks(capsys):
 
     class MockClient:
         def __init__(self, full_data):
-            self.session = MockSession(full_data)
+            self.session: Any = MockSession(full_data)
             self.color = "never"
             self.plain = True
 
@@ -2426,7 +2435,7 @@ def test_files_command(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     # 1. Plain listing
@@ -2469,7 +2478,7 @@ def test_trackers_command(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     # 1. Add tracker
@@ -2511,7 +2520,7 @@ def test_reannounce_command(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     res = runner.invoke(spritzle_cli, ["reannounce", ih])
@@ -2577,7 +2586,7 @@ def test_trackers_command_edge_cases(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     # Missing torrent argument
@@ -2665,7 +2674,7 @@ def test_files_command_edge_cases(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     # Color output
@@ -2775,7 +2784,7 @@ def test_batch_commands_not_found_and_quiet(cli):
         t_data = f.read()
     ti = lt.torrent_info(lt.bdecode(t_data))
     core = cli.app[APP_KEY_CORE]
-    handle = core.session.add_torrent({"ti": ti, "save_path": "/tmp"})
+    handle = _add_test_torrent(core.session, ti)
     ih = str(handle.info_hash())
 
     res_pause = runner.invoke(spritzle_cli, ["pause", "--quiet", ih])

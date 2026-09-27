@@ -102,6 +102,8 @@ async def error_middleware(request, handler):
             text="An internal error occurred in Spritzle.",
         )
     if response.status < 400:
+        if isinstance(response, aiohttp.web.HTTPException):
+            raise response
         return response
     headers = {
         k: v
@@ -195,25 +197,37 @@ def check_libtorrent() -> None:
         sys.exit(1)
 
 
-def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
-    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+def get_existing_event_loop() -> Optional[asyncio.AbstractEventLoop]:
+    """Get the current event loop if one is already set and not closed, otherwise None."""
     try:
         return asyncio.get_running_loop()
     except RuntimeError:
         pass
 
     try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=DeprecationWarning,
-                message=".*There is no current event loop.*",
-            )
-            loop = asyncio.get_event_loop()
+        import asyncio.events as _events
+
+        if getattr(_events, "_event_loop_policy", None) is None:
+            init_fn = getattr(_events, "_init_event_loop_policy", None)
+            if callable(init_fn):
+                init_fn()
+        policy = getattr(_events, "_event_loop_policy", None)
+        if policy is not None:
+            loop = getattr(getattr(policy, "_local", None), "_loop", None)
             if loop is not None and not loop.is_closed():
                 return loop
-    except RuntimeError:
+            return None
+    except Exception:
         pass
+
+    return None
+
+
+def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
+    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+    existing = get_existing_event_loop()
+    if existing is not None:
+        return existing
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -258,36 +272,54 @@ def run_daemon(
         f"spritzled starting.. host={host}, port={port}, config_dir={config_dir}, state_dir={state_dir}, log_level={log_level}, logfile={effective_logfile}, debug={debug}, listen_interfaces={listen_interfaces}"
     )
 
-    loop = get_or_create_event_loop()
+    existing_loop = get_existing_event_loop()
+    created_loop = existing_loop is None
+    loop = existing_loop if existing_loop is not None else get_or_create_event_loop()
     loop.set_debug(debug)
 
     # Prevent more than one process using the same config path from running.
     f = Path(config.path, "spritzled.lock").open(mode="w")
     try:
-        fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError as e:
-        log.error(f"Another instance of Spritzle is running: {e}")
-        log.error("Exiting..")
-        sys.exit(1)
+        try:
+            fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError as e:
+            log.error(f"Another instance of Spritzle is running: {e}")
+            log.error("Exiting..")
+            sys.exit(1)
 
-    core = Core(
-        config,
-        state_dir=Path(state_dir) if state_dir else None,
-        startup_listen_interfaces=listen_interfaces,
-        startup_logfile=logfile,
-    )
-    bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
-    core.key_manager.ensure_local_client_remote(f"http://{bracketed_host}:{port}", core.identity.daemon_id)
-    daemon_app = create_app(core, log)
-    # Auth middleware is outside setup_app because we don't want it for unit tests
-    daemon_app.middlewares.append(auth_middleware)
-    try:
-        aiohttp.web.run_app(daemon_app, host=host, port=port, loop=loop)
-    except OSError as e:
-        log.error(f"Failed to bind to {host}:{port}: {e}")
-        log.error(f"Check for conflicting services with: ss -tulpn | grep ':{port}'")
-        log.error(f"Specify another port with -p / --port (e.g. spritzled -p {port + 1}) or set SPRITZLE_PORT.")
-        sys.exit(1)
+        core = Core(
+            config,
+            state_dir=Path(state_dir) if state_dir else None,
+            startup_listen_interfaces=listen_interfaces,
+            startup_logfile=logfile,
+        )
+        bracketed_host = f"[{host}]" if ":" in host and not (host.startswith("[") and host.endswith("]")) else host
+        core.key_manager.ensure_local_client_remote(f"http://{bracketed_host}:{port}", core.identity.daemon_id)
+        daemon_app = create_app(core, log)
+        # Auth middleware is outside setup_app because we don't want it for unit tests
+        daemon_app.middlewares.append(auth_middleware)
+        try:
+            aiohttp.web.run_app(daemon_app, host=host, port=port, loop=loop)
+        except OSError as e:
+            log.error(f"Failed to bind to {host}:{port}: {e}")
+            log.error(f"Check for conflicting services with: ss -tulpn | grep ':{port}'")
+            log.error(f"Specify another port with -p / --port (e.g. spritzled -p {port + 1}) or set SPRITZLE_PORT.")
+            sys.exit(1)
+    finally:
+        f.close()
+        if created_loop:
+            try:
+                pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                for t in pending:
+                    t.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+
 
 
 @click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)

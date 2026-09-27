@@ -33,11 +33,12 @@ class MockAlert(Alert):
 
 
 @pytest.fixture
-async def mock_alert():
+def mock_alert(loop):
     mock_alert = MockAlert()
-    await mock_alert.start(None)
+    loop.run_until_complete(mock_alert.start(None))
     yield mock_alert
-    await mock_alert.stop()
+    loop.run_until_complete(mock_alert.stop())
+
 
 
 async def test_torrent_remove(loop, mock_alert):

@@ -49,10 +49,27 @@ from spritzle.cli.display import (
 
 def run_coroutine(coro: Any) -> Any:
     """Run an async coroutine using the existing event loop."""
-    from spritzle.cli.main import get_or_create_event_loop
+    from spritzle.cli.main import get_existing_event_loop, get_or_create_event_loop
 
-    loop = get_or_create_event_loop()
-    return loop.run_until_complete(coro)
+    existing_loop = get_existing_event_loop()
+    created_loop = existing_loop is None
+    loop = existing_loop if existing_loop is not None else get_or_create_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        if created_loop:
+            try:
+                pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                for t in pending:
+                    t.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+
 
 
 def format_uptime(seconds: Union[int, float]) -> str:

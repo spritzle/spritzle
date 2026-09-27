@@ -21,6 +21,17 @@
 #
 
 from pathlib import Path
+from typing import Any
+import libtorrent as lt
 
 resume_data_dir = Path(__file__).resolve().parent / "resume_data"
 torrent_dir = Path(__file__).resolve().parent / "torrents"
+
+
+def add_test_torrent(session: Any, ti: Any, save_path: str = "/tmp", **kwargs: Any) -> Any:
+    atp = lt.add_torrent_params()
+    atp.ti = ti
+    atp.save_path = save_path
+    for k, v in kwargs.items():
+        setattr(atp, k, v)
+    return session.add_torrent(atp)

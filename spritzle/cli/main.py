@@ -18,29 +18,43 @@ from spritzle.cli.config import CLIConfig, RemotesConfig
 CONTEXT_SETTINGS = dict(auto_envvar_prefix="SPRITZLE")
 
 
-def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
-    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+def get_existing_event_loop() -> Optional[asyncio.AbstractEventLoop]:
+    """Get the current event loop if one is already set and not closed, otherwise None."""
     try:
         return asyncio.get_running_loop()
     except RuntimeError:
         pass
 
     try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=DeprecationWarning,
-                message=".*There is no current event loop.*",
-            )
-            loop = asyncio.get_event_loop()
+        import asyncio.events as _events
+
+        if getattr(_events, "_event_loop_policy", None) is None:
+            init_fn = getattr(_events, "_init_event_loop_policy", None)
+            if callable(init_fn):
+                init_fn()
+        policy = getattr(_events, "_event_loop_policy", None)
+        if policy is not None:
+            loop = getattr(getattr(policy, "_local", None), "_loop", None)
             if loop is not None and not loop.is_closed():
                 return loop
-    except RuntimeError:
+            return None
+    except Exception:
         pass
+
+    return None
+
+
+
+def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
+    """Get the current event loop if set, or create and set a new one without DeprecationWarning."""
+    existing = get_existing_event_loop()
+    if existing is not None:
+        return existing
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     return loop
+
 
 
 class Client(object):
@@ -159,7 +173,9 @@ class Client(object):
                 self.session = session
                 await cmd(self, *args, **kwargs)
 
-        loop = get_or_create_event_loop()
+        existing_loop = get_existing_event_loop()
+        created_loop = existing_loop is None
+        loop = existing_loop if existing_loop is not None else get_or_create_event_loop()
         try:
             loop.run_until_complete(_do_command(cmd, *args, **kwargs))
         except (KeyboardInterrupt, asyncio.CancelledError):
@@ -189,6 +205,19 @@ class Client(object):
             )
             sys.exit(1)
         finally:
+            if created_loop:
+                try:
+                    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                    for t in pending:
+                        t.cancel()
+                    if pending:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
+                finally:
+                    loop.close()
+                    asyncio.set_event_loop(None)
+
             from spritzle.cli.dashboard import _restore_all_terminals
 
             _restore_all_terminals()

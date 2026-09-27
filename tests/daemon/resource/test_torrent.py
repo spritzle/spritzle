@@ -38,7 +38,7 @@ def create_torrent_post_data(filename=None, tags=None, **kwargs):
 
     if filename:
         filepath = Path(torrent_dir, filename)
-        post["file"] = b64encode(filepath.open(mode="rb").read()).decode("ascii")
+        post["file"] = b64encode(filepath.read_bytes()).decode("ascii")
 
     if tags:
         post["spritzle.tags"] = tags
@@ -1321,6 +1321,8 @@ async def test_delete_tracker_via_json_body_and_file_helper_exceptions(cli):
     mock_h.is_valid.return_value = True
     mock_h.torrent_file.return_value = mock_ti
     mock_ti.num_files.return_value = 1
+    mock_ti.layout().file_size.return_value = 100
+    mock_ti.layout().file_path.return_value = "file.iso"
     mock_ti.files().file_size.return_value = 100
     mock_ti.files().file_path.return_value = "file.iso"
     mock_h.file_progress.side_effect = Exception("progress failed")

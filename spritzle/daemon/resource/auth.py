@@ -27,7 +27,12 @@ from typing import Any
 
 from aiohttp import web
 
-from spritzle.daemon.keys import APP_KEY_CORE, APP_KEY_IDENTITY, APP_KEY_KEY_MANAGER
+from spritzle.daemon.keys import (
+    APP_KEY_CORE,
+    APP_KEY_IDENTITY,
+    APP_KEY_KEY_MANAGER,
+    REQ_KEY_AUTH_IDENTITY,
+)
 
 routes = web.RouteTableDef()
 
@@ -125,7 +130,7 @@ async def auth_middleware(request: web.Request, handler: Any) -> web.Response:
     if key_info is None:
         raise web.HTTPUnauthorized(reason="API key is invalid or revoked")
 
-    request["auth_identity"] = key_info
+    request[REQ_KEY_AUTH_IDENTITY] = key_info
     response = await handler(request)
     if daemon_id:
         response.headers["X-Spritzle-Daemon-Id"] = daemon_id

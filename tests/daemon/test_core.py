@@ -117,7 +117,8 @@ async def test_state_changed_alert_registered(core):
 async def test_on_status_notification_alert_removed_torrent(core, monkeypatch):
     await core.start()
     ti = lt.torrent_info("tests/daemon/resource/torrents/_test.torrent")
-    handle = core.session.add_torrent({"ti": ti, "save_path": "."})
+    from tests.daemon.common import add_test_torrent
+    handle = add_test_torrent(core.session, ti, save_path=".")
     info_hash = str(handle.info_hash())
 
     captured_hooks = []
