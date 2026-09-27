@@ -5,7 +5,6 @@ from pathlib import Path
 import pkgutil
 import sys
 from typing import Optional, Union
-import warnings
 
 from urllib.parse import urlparse
 

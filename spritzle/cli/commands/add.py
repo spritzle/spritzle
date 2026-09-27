@@ -58,6 +58,32 @@ from spritzle.cli.display import (
 @click.option("--plain", is_flag=True, default=False, help="Force plain unstyled output.")
 @click.pass_obj
 def command(client, path, option, flag, tag, quiet, watch, json_output, plain):
+    color_opt = getattr(client, "color", None)
+    if path.startswith("magnet:"):
+        parsed = urlparse(path)
+        qs = parse_qs(parsed.query)
+        if "xt" not in qs:
+            print_error(
+                "Malformed magnet URI (missing 'xt' parameter).\n"
+                "If your magnet link contained '&', it was likely split by your shell.\n"
+                "Enclose the URL in single quotes: spritzle add 'magnet:?...'",
+                color_opt=color_opt,
+            )
+            sys.exit(1)
+        if path.endswith(("&", "=", "?")):
+            print_warning(
+                "The magnet URL ends with a trailing symbol ('&', '=', '?') which suggests it was truncated by the shell.",
+                color_opt=color_opt,
+            )
+        if hasattr(os, "getpgrp") and hasattr(os, "tcgetpgrp"):
+            try:
+                if sys.stdin.isatty() and os.getpgrp() != os.tcgetpgrp(sys.stdin.fileno()):
+                    print_warning(
+                        "Command is running in the background. If you passed an unquoted magnet link with '&', the URL was likely split.",
+                        color_opt=color_opt,
+                    )
+            except Exception:
+                pass
     client.do_command(f, path, option, flag, tag, quiet, watch, json_output, plain)
 
 
@@ -96,30 +122,6 @@ async def f(
 
     # Magnet URI checks
     elif path.startswith("magnet:"):
-        parsed = urlparse(path)
-        qs = parse_qs(parsed.query)
-        if "xt" not in qs:
-            print_error(
-                "Malformed magnet URI (missing 'xt' parameter).\n"
-                "If your magnet link contained '&', it was likely split by your shell.\n"
-                "Enclose the URL in single quotes: spritzle add 'magnet:?...'",
-                color_opt=color_opt,
-            )
-            sys.exit(1)
-        if path.endswith(("&", "=", "?")):
-            print_warning(
-                "The magnet URL ends with a trailing symbol ('&', '=', '?') which suggests it was truncated by the shell.",
-                color_opt=color_opt,
-            )
-        if hasattr(os, "getpgrp") and hasattr(os, "tcgetpgrp"):
-            try:
-                if sys.stdin.isatty() and os.getpgrp() != os.tcgetpgrp(sys.stdin.fileno()):
-                    print_warning(
-                        "Command is running in the background. If you passed an unquoted magnet link with '&', the URL was likely split.",
-                        color_opt=color_opt,
-                    )
-            except Exception:
-                pass
         data["url"] = path
 
     elif urlparse(path).scheme:

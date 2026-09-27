@@ -21,7 +21,7 @@
 #
 
 import asyncio
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock, AsyncMock
 
 import pytest

@@ -32,7 +32,7 @@ import os
 from pathlib import Path
 import re
 import socket
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 import warnings
 

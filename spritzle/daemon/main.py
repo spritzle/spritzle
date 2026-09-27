@@ -27,7 +27,6 @@ import sys
 
 import traceback
 from typing import Optional
-import warnings
 
 import aiohttp.web
 import click
