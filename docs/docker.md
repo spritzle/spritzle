@@ -3,7 +3,7 @@
 Spritzle provides an official lightweight container image for `spritzled`, tailored for homelab, NAS, and seedbox environments.
 
 ## Features
-- **Arch Linux Native**: Multi-stage build based on `archlinux:base` using official `libtorrent-rasterbar` packages.
+- **Minimal Footprint**: Multi-stage build based on `alpine:latest` (~95MB uncompressed).
 - **Rootless Operation**: Drops privileges to `spritzle` user (UID/GID configurable via `PUID`/`PGID`).
 - **Healthcheck Enabled**: Integrates automatic container health monitoring on `/status`.
 - **VPN Leak Prevention**: Native interface binding (`listen_interfaces`) to bind strictly to VPN interfaces (`tun0`, `wg0`).
